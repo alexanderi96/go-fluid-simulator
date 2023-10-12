@@ -26,21 +26,21 @@ type Coordinates struct {
 }
 
 type Ball struct {
-	pos           Coordinates
-	prevPos       Coordinates
-	radius        *float32
-	restitution   *float32
-	density       *float32
-	cohesionForce *float32
-	adhesionForce *float32
-	isFreeFall    bool
-	actionRadius  *float32
+	pos            Coordinates
+	prevPos        Coordinates
+	radius         *float32
+	restitution    *float32
+	density        *float32
+	cohesionForce  *float32
+	adhesionForce  *float32
+	reactToGravity bool
+	actionRadius   *float32
 
 	color color.RGBA
 }
 
 var (
-	sidebarWidth int = 200 // larghezza della barra laterale
+	sidebarWidth int = 200 // larghezza della barra lateralecheck
 	winWidth     int = 1920
 	winHeight    int = 1080
 	//gameWidth    int = winWidth - sidebarWidth
@@ -52,14 +52,13 @@ var (
 	lastTime                = time.Now()
 	accumulatedTime float64 = 0.0
 
-	showSidebar               = true
-	numBalls          int32   = 3000 // Nota che è int32
+	numBalls          int32   = 250 // Nota che è int32
 	ballRadius        float32 = 5
 	ballRestitution   float32 = 0.9
-	ballDensity       float32 = 15
+	ballDensity       float32 = 10
 	ballCohesionForce float32 = 200
 	ballAdhesionForce float32 = 200
-	ballActionRadius  float32 = 10
+	ballActionRadius  float32 = 15
 	wallRestitution   float32 = 0.8
 	gravity           float32 = 9.81 // Assegnato a una variabile invece di essere una costante
 	mouseForce        float32 = 50
@@ -68,14 +67,13 @@ var (
 	collisionSound  beep.StreamSeekCloser
 	collisionBuffer *beep.Buffer
 
+	realDeltaTime float64
 	lastFrameTime time.Time
 	fps           float64
 
 	mousePos     Coordinates
 	isAttracting bool
 	isRepulsing  bool
-
-	k = 0.5 // costante elastica, regola questo valore
 )
 
 func (b *Ball) Mass() float32 {
@@ -83,11 +81,11 @@ func (b *Ball) Mass() float32 {
 	return *b.density * float32(volume)
 }
 
-func (b *Ball) Speed() float64 {
+func (b *Ball) Velocity() Coordinates {
 	// Calcola la velocità come differenza tra posizione attuale e precedente
-	dx := b.pos.X - b.prevPos.X
-	dy := b.pos.Y - b.prevPos.Y
-	return math.Sqrt(dx*dx + dy*dy)
+	dx := (b.pos.X - b.prevPos.X) / realDeltaTime
+	dy := (b.pos.Y - b.prevPos.Y) / realDeltaTime
+	return Coordinates{X: dx, Y: dy}
 }
 
 func loadSound() {
@@ -116,63 +114,79 @@ func playCollisionSound() {
 	}()
 }
 
-func resolveCollision(a, b *Ball) {
-	dx := b.pos.X - a.pos.X
-	dy := b.pos.Y - a.pos.Y
-
-	distance := math.Sqrt(dx*dx + dy*dy)
-	if distance > float64(*a.radius+*b.radius) {
-		return
-	}
-
-	overlap := 0.5 * (float64(*a.radius+*b.radius) - distance)
-
-	// Calcolo del vettore normale
-	nx := dx / distance
-	ny := dy / distance
-
-	// Correzione della posizione
-	a.pos.X -= overlap * nx
-	a.pos.Y -= overlap * ny
-	b.pos.X += overlap * nx
-	b.pos.Y += overlap * ny
-}
-
 func resetBalls() {
-
 	isUnstable = false
 	balls = make([]Ball, numBalls)
 	ballsPerRow := int(math.Sqrt(float64(numBalls)))
 	ballsPerCol := (int(numBalls)-1)/ballsPerRow + 1
-	spacing := int(ballRadius*2 + 10) // 10 è lo spaziamento
+	spacing := int(ballRadius*2) + 20 // Nessun spazio extra, solo il doppio del raggio
+
+	// Calcola le dimensioni totali della griglia
+	totalGridWidth := ballsPerRow * spacing
+	totalGridHeight := ballsPerCol * spacing
+
+	// Verifica se la griglia si adatta nella finestra
+	if totalGridWidth > winWidth || totalGridHeight > winHeight {
+		// Qui puoi decidere come gestire questo caso: ridimensionare le palle, ridurre il loro numero, ecc.
+		fmt.Println("Griglia troppo grande per la finestra!")
+		return
+	}
 
 	for i := 0; i < int(numBalls); i++ {
 		x := (i%ballsPerRow - ballsPerRow/2 + 1) * spacing
 		y := (i/ballsPerRow - ballsPerCol/2 + 1) * spacing
 		balls[i] = Ball{
-			pos:     Coordinates{X: float64(winWidth+x) / 2, Y: float64(winHeight+y) / 2},
-			prevPos: Coordinates{X: float64(winWidth+x) / 2, Y: float64(winHeight+y) / 2}, // Imposta prevPos uguale a pos
-			// velocity:      Coordinates{X: 0, Y: 0},
-			radius:        &ballRadius,
-			restitution:   &ballRestitution,
-			density:       &ballDensity,
-			isFreeFall:    true,
-			cohesionForce: &ballCohesionForce,
-			adhesionForce: &ballAdhesionForce,
-			actionRadius:  &ballActionRadius,
+			pos:            Coordinates{X: float64(winWidth+x) / 2, Y: float64(winHeight+y) / 2},
+			prevPos:        Coordinates{X: float64(winWidth+x) / 2, Y: float64(winHeight+y) / 2},
+			radius:         &ballRadius,
+			restitution:    &ballRestitution,
+			density:        &ballDensity,
+			reactToGravity: true,
+			cohesionForce:  &ballCohesionForce,
+			adhesionForce:  &ballAdhesionForce,
+			actionRadius:   &ballActionRadius,
+		}
+	}
+
+	// Dopo aver inizializzato le palle in resetBalls(), aggiungi questo ciclo per controllare le sovrapposizioni
+	for i, ball1 := range balls {
+		for j, ball2 := range balls {
+			if i >= j {
+				continue // Salta il confronto della palla con se stessa o con palle già controllate
+			}
+			dx := ball2.pos.X - ball1.pos.X
+			dy := ball2.pos.Y - ball1.pos.Y
+			distance := math.Sqrt(dx*dx + dy*dy)
+
+			// Calcola la velocità delle palline
+			velocity1 := ball1.Velocity()
+			velocity2 := ball2.Velocity()
+
+			speed1 := math.Sqrt(velocity1.X*velocity1.X + velocity1.Y*velocity1.Y)
+			speed2 := math.Sqrt(velocity2.X*velocity2.X + velocity2.Y*velocity2.Y)
+
+			// Controlla la collisione e la velocità
+			if distance < float64(*ball1.radius+*ball2.radius) {
+				fmt.Println("Collisione rilevata tra palla", i, "e palla", j, "in posizione", ball1.pos, "e", ball2.pos)
+				isUnstable = true
+			}
+
+			// Soglia di velocità elevata (ad esempio 100.0, modifica secondo necessità)
+			highSpeedThreshold := 100.0
+			if speed1 > highSpeedThreshold || speed2 > highSpeedThreshold {
+				fmt.Println("Errore: Velocità elevata rilevata per palla", i, "o palla", j)
+			}
 		}
 	}
 }
 
 // Aggiorna questa funzione per utilizzare l'integrazione di Verlet
-func updateBallPositionAndCorrectOverlap(b *Ball, dt float64) {
+func updateBallPositionAndCorrectOverlap(b *Ball) {
 	// Calcolo delle accelerazioni (puoi cambiarle in base alle tue necessità)
-	accelerationX := 0.0
-	accelerationY := float64(gravity) // Ad esempio, potrebbe essere la gravità
 
 	// Applica l'integrazione di Verlet per calcolare la nuova posizione
-	newX := 2*b.pos.X - b.prevPos.X + accelerationX*dt*dt
-	newY := 2*b.pos.Y - b.prevPos.Y + accelerationY*dt*dt
+	newX := 2*b.pos.X - b.prevPos.X + realDeltaTime*realDeltaTime
+	newY := 2*b.pos.Y - b.prevPos.Y + realDeltaTime*realDeltaTime
 
 	// Aggiorna la posizione precedente e la posizione corrente
 	b.prevPos.X = b.pos.X
@@ -206,45 +220,27 @@ func updateBallPositionAndCorrectOverlap(b *Ball, dt float64) {
 	}
 }
 
-func (b *Ball) ApplyAdditionalForces(dt float64) {
-	if b.isFreeFall {
-		b.pos.Y += 0.5 * float64(gravity) * math.Pow(dt, 2)
+func (b *Ball) ApplyAdditionalForces() {
+	if b.reactToGravity {
+		b.pos.Y += 0.5 * float64(gravity) * math.Pow(realDeltaTime, 2)
 	}
-}
-
-func resolveCollisions() {
-	var wg sync.WaitGroup
-	n := len(balls)
-	numGoroutines := runtime.NumCPU()
-	chunkSize := n / numGoroutines
-
-	for i := 0; i < numGoroutines; i++ {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
-			start := i * chunkSize
-			end := start + chunkSize
-			for j := start; j < end; j++ {
-				for k := j + 1; k < n; k++ {
-					resolveCollision(&balls[j], &balls[k])
-				}
-			}
-		}(i)
-	}
-	wg.Wait()
 }
 
 func checkWallCollisions(b *Ball, winWidth, winHeight int) {
-	if int(b.pos.X-float64(*b.radius)) <= sidebarWidth {
+	if int(b.pos.X-float64(*b.radius)) < sidebarWidth {
 		b.pos.X = float64(sidebarWidth) + float64(*b.radius)
-	} else if int(b.pos.X+float64(*b.radius)) >= winWidth {
+		b.prevPos.X = b.pos.X + (b.pos.X-b.prevPos.X)*float64(*b.restitution)
+	} else if int(b.pos.X+float64(*b.radius)) > winWidth {
 		b.pos.X = float64(winWidth) - float64(*b.radius)
+		b.prevPos.X = b.pos.X + (b.pos.X-b.prevPos.X)*float64(*b.restitution)
 	}
 
-	if int(b.pos.Y-float64(*b.radius)) <= 0 {
+	if int(b.pos.Y-float64(*b.radius)) < 0 {
 		b.pos.Y = float64(*b.radius)
-	} else if int(b.pos.Y+float64(*b.radius)) >= winHeight {
+		b.prevPos.Y = b.pos.Y + (b.pos.Y-b.prevPos.Y)*float64(*b.restitution)
+	} else if int(b.pos.Y+float64(*b.radius)) > winHeight {
 		b.pos.Y = float64(winHeight) - float64(*b.radius)
+		b.prevPos.Y = b.pos.Y + (b.pos.Y-b.prevPos.Y)*float64(*b.restitution)
 	}
 }
 
@@ -277,8 +273,9 @@ func updateColors() {
 	for i := range balls {
 		ball := &balls[i]
 
-		// Utilizza una funzione esponenziale per un cambio di colore più graduale
-		colorFactor := math.Min(1, math.Pow(ball.Speed()/100, 0.3))
+		velocity := ball.Velocity()                                           // Ottieni le componenti della velocità
+		speed := math.Sqrt(math.Pow(velocity.X, 2) + math.Pow(velocity.Y, 2)) // Calcola la magnitudine della velocità
+		colorFactor := math.Min(1, math.Pow(speed/200, 0.3))                  // Calcola il colorFactor come prima
 
 		// // Calcola il colore RGB
 		// R := uint8(0 + colorFactor*255)         // Da 0 (blu mare) a 255 (bianco)
@@ -300,18 +297,7 @@ func updateColors() {
 	}
 }
 
-// func Update(dt float64, winWidth, winHeight int) {
-// 	updateColors()
-// 	applyFluidForces()
-// 	for i := range balls {
-// 		balls[i].ApplyAdditionalForces(dt)                  // Aggiorna la velocità in base a forze esterne (es. gravità)
-// 		checkWallCollisions(&balls[i], winWidth, winHeight) // Controlla le collisioni con i muri
-// 		updateBallPositionAndCorrectOverlap(&balls[i], dt)  // Aggiorna la posizione delle palline
-// 	}
-// 	resolveCollisions() // Risolvi le collisioni tra palline
-// }
-
-func Update(dt float64, winWidth, winHeight int) {
+func Update(winWidth, winHeight int) {
 	updateColors()
 	var wg sync.WaitGroup
 	n := len(balls)
@@ -326,11 +312,11 @@ func Update(dt float64, winWidth, winHeight int) {
 			end := start + chunkSize
 			for j := start; j < end; j++ {
 				ball := &balls[j]
-				ball.ApplyAdditionalForces(dt)
+				ball.ApplyAdditionalForces()
 				checkWallCollisions(ball, winWidth, winHeight)
-				updateBallPositionAndCorrectOverlap(ball, dt)
+				updateBallPositionAndCorrectOverlap(ball)
 				for k := j + 1; k < n; k++ {
-					resolveCollision(ball, &balls[k])
+					//resolveCollision(ball, &balls[k])
 					applyFluidForcesForPair(ball, &balls[k])
 				}
 			}
@@ -352,16 +338,15 @@ func addRandomBall() {
 	randY := rand.Intn(winHeight) // Genera una coordinata Y casuale
 
 	newBall := Ball{
-		pos:     Coordinates{X: float64(randX), Y: float64(randY)},
-		prevPos: Coordinates{X: float64(randX), Y: float64(randY)},
-		//velocity:      Coordinates{X: 0, Y: 0},
-		radius:        &ballRadius,
-		restitution:   &ballRestitution,
-		density:       &ballDensity,
-		isFreeFall:    true,
-		cohesionForce: &ballCohesionForce,
-		adhesionForce: &ballAdhesionForce,
-		actionRadius:  &ballActionRadius,
+		pos:            Coordinates{X: float64(randX), Y: float64(randY)},
+		prevPos:        Coordinates{X: float64(randX), Y: float64(randY)},
+		radius:         &ballRadius,
+		restitution:    &ballRestitution,
+		density:        &ballDensity,
+		reactToGravity: true,
+		cohesionForce:  &ballCohesionForce,
+		adhesionForce:  &ballAdhesionForce,
+		actionRadius:   &ballActionRadius,
 	}
 
 	balls = append(balls, newBall) // Aggiunge la nuova pallina all'array
@@ -392,7 +377,7 @@ func applyMouseForce(b *Ball) {
 
 	force := mouseForce / float32(math.Pow(distance, 2))
 
-	// Calcola il termine di accelerazione per il dt corrente
+	// Calcola il termine di accelerazione per il realDeltaTime corrente
 	ax := float64(force) * normalizedX / float64(b.Mass())
 	ay := float64(force) * normalizedY / float64(b.Mass())
 
@@ -407,6 +392,8 @@ func applyMouseForce(b *Ball) {
 }
 
 func loop() {
+	giu.Update()
+
 	giu.SingleWindow().Layout(
 		giu.Custom(func() {
 
@@ -458,10 +445,10 @@ func loop() {
 
 			if !isPaused && !isUnstable {
 				now := time.Now()
-				realDeltaTime := now.Sub(lastTime).Seconds()
+				realDeltaTime = now.Sub(lastTime).Seconds()
 				lastTime = now
 
-				Update(realDeltaTime, winWidth, winHeight)
+				Update(winWidth, winHeight)
 			}
 
 			canvas := giu.GetCanvas()
@@ -516,7 +503,6 @@ func loop() {
 		),
 	)
 
-	giu.Update()
 }
 
 func main() {
