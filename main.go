@@ -2,524 +2,246 @@ package main
 
 import (
 	"fmt"
-	"image"
 	"image/color"
-	"log"
 	"math"
-	"math/rand"
-	"os"
-	"runtime"
-	"runtime/pprof"
-	"sync"
-	"time"
 
-	"github.com/AllenDang/giu"
-
-	"github.com/faiface/beep"
-	"github.com/faiface/beep/speaker"
-	"github.com/faiface/beep/wav"
+	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
-type Coordinates struct {
-	X float64
-	Y float64
+type Fluid struct {
+	viscosity      float32
+	surfaceTension float32
+	pressure       float32
+	temperature    float32
+	units          []Unit
 }
 
-type Ball struct {
-	pos            Coordinates
-	prevPos        Coordinates
-	radius         *float32
-	restitution    *float32
-	density        *float32
-	cohesionForce  *float32
-	adhesionForce  *float32
-	reactToGravity bool
-	actionRadius   *float32
-
-	color color.RGBA
+type Unit struct {
+	pos     Vector2D
+	prevPos Vector2D
+	//velocity Vector2D
+	mass   float32
+	radius float32
+	color  color.RGBA
 }
+
+type Vector2D struct {
+	x float32
+	y float32
+}
+
+const ( // 16ms per frame, corrispondente a 60 FPS
+	pixelToMeter float32 = 0.01                // 1 pixel è uguale a 0.01 metri
+	gravity      float32 = 9.81 * pixelToMeter //* frameTime * frameTime // 9.81 m/s^2 convertito in unità di pixel/frame^2
+)
 
 var (
-	sidebarWidth int = 200 // larghezza della barra lateralecheck
-	winWidth     int = 1920
-	winHeight    int = 1080
-	//gameWidth    int = winWidth - sidebarWidth
+	screenWidth  int32 = 1280
+	screenHeight int32 = 720
+	sidebarWidth int32 = 200
+	gameWidth    int32 = screenWidth - sidebarWidth
 
-	isPaused        = false
-	isUnstable      = false
-	enableSound     = false
-	balls           []Ball
-	lastTime                = time.Now()
-	accumulatedTime float64 = 0.0
+	desiredFPS int32 = 999 // Imposta gli FPS desiderati qui
+	frameTime        = 1.0 / float32(desiredFPS)
 
-	numBalls          int32   = 250 // Nota che è int32
-	ballRadius        float32 = 5
-	ballRestitution   float32 = 0.9
-	ballDensity       float32 = 10
-	ballCohesionForce float32 = 200
-	ballAdhesionForce float32 = 200
-	ballActionRadius  float32 = 15
-	wallRestitution   float32 = 0.8
-	gravity           float32 = 9.81 // Assegnato a una variabile invece di essere una costante
-	mouseForce        float32 = 50
-	mouseForceRadius  float32 = 50
-
-	collisionSound  beep.StreamSeekCloser
-	collisionBuffer *beep.Buffer
-
-	realDeltaTime float64
-	lastFrameTime time.Time
-	fps           float64
-
-	mousePos     Coordinates
-	isAttracting bool
-	isRepulsing  bool
+	unitNumber int     = 500
+	unitRadius float32 = 6
+	unitMass   float32 = 1
 )
 
-func (b *Ball) Mass() float32 {
-	volume := (4.0 / 3.0) * math.Pi * math.Pow(float64(*b.radius), 3)
-	return *b.density * float32(volume)
+func (u *Unit) SetColorFromVelocity() {
+	velocity := u.pos.Sub(u.prevPos)
+	magnitude := math.Sqrt(float64(velocity.x*velocity.x + velocity.y*velocity.y))
+
+	// Utilizza il quadrato della magnitudine per un cambiamento più lento
+	normalizedMagnitude := magnitude * magnitude * 1 // Rivedi il fattore di normalizzazione
+
+	// Applica un fattore di smorzamento
+	smoothingFactor := 0.9
+	normalizedMagnitude = smoothingFactor*normalizedMagnitude + (1-smoothingFactor)*normalizedMagnitude
+
+	red := uint8(math.Min(255, 255*normalizedMagnitude))
+	blue := uint8(math.Min(255, 255*(1-normalizedMagnitude)))
+
+	u.color = color.RGBA{R: red, G: 0, B: blue, A: 255}
 }
 
-func (b *Ball) Velocity() Coordinates {
-	// Calcola la velocità come differenza tra posizione attuale e precedente
-	dx := (b.pos.X - b.prevPos.X) / realDeltaTime
-	dy := (b.pos.Y - b.prevPos.Y) / realDeltaTime
-	return Coordinates{X: dx, Y: dy}
+// Calcola il volume di una singola unità
+func (u *Unit) Volume() float32 {
+	return math.Pi * u.radius * u.radius
 }
 
-func loadSound() {
-	f, err := os.Open("collision.wav") // Sostituisci con il percorso al tuo file audio
-	if err != nil {
-		panic(err)
+// Calcola la densità del fluido
+func (f *Fluid) Density() float32 {
+	var totalMass, totalVolume float32
+	for _, unit := range f.units {
+		totalMass += unit.mass
+		totalVolume += unit.Volume()
 	}
-	streamer, format, err := wav.Decode(f)
-	if err != nil {
-		panic(err)
-	}
-	speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10))
-	collisionBuffer = beep.NewBuffer(format)
-	collisionBuffer.Append(streamer)
-	streamer.Close()
+	return totalMass / totalVolume
 }
 
-func playCollisionSound() {
-	if !enableSound {
-		return
-	}
-	go func() {
-		speaker.Play(beep.Seq(collisionBuffer.Streamer(0, collisionBuffer.Len()), beep.Callback(func() {
-			log.Println("Collision!")
-		})))
-	}()
+// Aggiunge una unità al fluido
+func (f *Fluid) AddUnit(unit Unit) {
+	f.units = append(f.units, unit)
 }
 
-func resetBalls() {
-	isUnstable = false
-	balls = make([]Ball, numBalls)
-	ballsPerRow := int(math.Sqrt(float64(numBalls)))
-	ballsPerCol := (int(numBalls)-1)/ballsPerRow + 1
-	spacing := int(ballRadius*2) + 20 // Nessun spazio extra, solo il doppio del raggio
+// Rimuove una unità dal fluido dato un indice
+func (f *Fluid) RemoveUnit(index int) {
+	f.units = append(f.units[:index], f.units[index+1:]...)
+}
 
-	// Calcola le dimensioni totali della griglia
-	totalGridWidth := ballsPerRow * spacing
-	totalGridHeight := ballsPerCol * spacing
+func (v Vector2D) Add(other Vector2D) Vector2D {
+	return Vector2D{v.x + other.x, v.y + other.y}
+}
 
-	// Verifica se la griglia si adatta nella finestra
-	if totalGridWidth > winWidth || totalGridHeight > winHeight {
-		// Qui puoi decidere come gestire questo caso: ridimensionare le palle, ridurre il loro numero, ecc.
-		fmt.Println("Griglia troppo grande per la finestra!")
-		return
-	}
+func (v Vector2D) Sub(other Vector2D) Vector2D {
+	return Vector2D{v.x - other.x, v.y - other.y}
+}
 
-	for i := 0; i < int(numBalls); i++ {
-		x := (i%ballsPerRow - ballsPerRow/2 + 1) * spacing
-		y := (i/ballsPerRow - ballsPerCol/2 + 1) * spacing
-		balls[i] = Ball{
-			pos:            Coordinates{X: float64(winWidth+x) / 2, Y: float64(winHeight+y) / 2},
-			prevPos:        Coordinates{X: float64(winWidth+x) / 2, Y: float64(winHeight+y) / 2},
-			radius:         &ballRadius,
-			restitution:    &ballRestitution,
-			density:        &ballDensity,
-			reactToGravity: true,
-			cohesionForce:  &ballCohesionForce,
-			adhesionForce:  &ballAdhesionForce,
-			actionRadius:   &ballActionRadius,
+func (v Vector2D) Mul(scalar float32) Vector2D {
+	return Vector2D{v.x * scalar, v.y * scalar}
+}
+
+func acceleration(unit Unit, otherUnits []Unit) Vector2D {
+	accel := Vector2D{0, gravity} // Starting with gravity
+	// Add other forces here
+	return accel
+}
+
+func resetField(screenWidth, screenHeight, totalUnits int) Fluid {
+	var units []Unit
+	centerX := float32(screenWidth) / 2
+	centerY := float32(screenHeight) / 2
+
+	gap := float32(1) // Spazio tra unità
+
+	// Calcolo del raggio totale in base al numero totale di unità
+	maxRadius := math.Sqrt(float64(totalUnits)/math.Pi) * float64(unitRadius*2+gap)
+
+	for r := float64(unitRadius + gap); r < maxRadius; r += float64(unitRadius*2 + gap) {
+		// Calcolare il numero di unità che possono stare in un cerchio di raggio r
+		circumference := 2 * math.Pi * r
+		numUnits := int(circumference) / int(unitRadius*2+gap)
+
+		for i := 0; i < numUnits; i++ {
+			angle := float32(i) * (math.Pi * 2 / float32(numUnits))
+
+			x := centerX + float32(r*math.Cos(float64(angle)))
+			y := centerY + float32(r*math.Sin(float64(angle)))
+			unit := Unit{
+				pos:     Vector2D{x, y},
+				prevPos: Vector2D{x, y},
+				mass:    unitMass,
+				radius:  unitRadius,
+			}
+			units = append(units, unit)
 		}
 	}
 
-	// Dopo aver inizializzato le palle in resetBalls(), aggiungi questo ciclo per controllare le sovrapposizioni
-	for i, ball1 := range balls {
-		for j, ball2 := range balls {
-			if i >= j {
-				continue // Salta il confronto della palla con se stessa o con palle già controllate
-			}
-			dx := ball2.pos.X - ball1.pos.X
-			dy := ball2.pos.Y - ball1.pos.Y
-			distance := math.Sqrt(dx*dx + dy*dy)
+	return Fluid{units: units}
+}
 
-			// Calcola la velocità delle palline
-			velocity1 := ball1.Velocity()
-			velocity2 := ball2.Velocity()
+// Function to handle collisions between two units
+func handleCollision(unit1 *Unit, unit2 *Unit) {
+	dx := unit1.pos.x - unit2.pos.x
+	dy := unit1.pos.y - unit2.pos.y
+	distance := math.Sqrt(float64(dx*dx + dy*dy))
+	minDistance := unit1.radius + unit2.radius
 
-			speed1 := math.Sqrt(velocity1.X*velocity1.X + velocity1.Y*velocity1.Y)
-			speed2 := math.Sqrt(velocity2.X*velocity2.X + velocity2.Y*velocity2.Y)
+	if distance < float64(minDistance) {
+		overlap := float64(minDistance) - distance
 
-			// Controlla la collisione e la velocità
-			if distance < float64(*ball1.radius+*ball2.radius) {
-				fmt.Println("Collisione rilevata tra palla", i, "e palla", j, "in posizione", ball1.pos, "e", ball2.pos)
-				isUnstable = true
-			}
+		// Compute normal vectors
+		nx := dx / float32(distance)
+		ny := dy / float32(distance)
 
-			// Soglia di velocità elevata (ad esempio 100.0, modifica secondo necessità)
-			highSpeedThreshold := 100.0
-			if speed1 > highSpeedThreshold || speed2 > highSpeedThreshold {
-				fmt.Println("Errore: Velocità elevata rilevata per palla", i, "o palla", j)
-			}
-		}
+		// Move unit1 and unit2 so that they no longer overlap
+		unit1.pos.x += float32(overlap) / 2 * nx
+		unit1.pos.y += float32(overlap) / 2 * ny
+		unit2.pos.x -= float32(overlap) / 2 * nx
+		unit2.pos.y -= float32(overlap) / 2 * ny
 	}
 }
 
-// Aggiorna questa funzione per utilizzare l'integrazione di Verlet
-func updateBallPositionAndCorrectOverlap(b *Ball) {
-	// Calcolo delle accelerazioni (puoi cambiarle in base alle tue necessità)
-
-	// Applica l'integrazione di Verlet per calcolare la nuova posizione
-	newX := 2*b.pos.X - b.prevPos.X + realDeltaTime*realDeltaTime
-	newY := 2*b.pos.Y - b.prevPos.Y + realDeltaTime*realDeltaTime
-
-	// Aggiorna la posizione precedente e la posizione corrente
-	b.prevPos.X = b.pos.X
-	b.prevPos.Y = b.pos.Y
-	b.pos.X = newX
-	b.pos.Y = newY
-
-	// Correzione della sovrapposizione
-	for i := range balls {
-		if b == &balls[i] {
-			continue
-		}
-
-		other := &balls[i]
-		dx := other.pos.X - b.pos.X
-		dy := other.pos.Y - b.pos.Y
-		distance := math.Sqrt(dx*dx + dy*dy)
-		overlap := float64(*b.radius+*other.radius) - distance
-
-		if overlap > 0 {
-			nx := dx / distance
-			ny := dy / distance
-			correctionX := nx * overlap / 2
-			correctionY := ny * overlap / 2
-
-			b.pos.X -= correctionX
-			b.pos.Y -= correctionY
-			other.pos.X += correctionX
-			other.pos.Y += correctionY
+// Funzione per gestire tutte le collisioni
+func handleAllCollisions(fluid *Fluid) {
+	for i := 0; i < len(fluid.units); i++ {
+		for j := i + 1; j < len(fluid.units); j++ {
+			handleCollision(&fluid.units[i], &fluid.units[j])
 		}
 	}
 }
 
-func (b *Ball) ApplyAdditionalForces() {
-	if b.reactToGravity {
-		b.pos.Y += 0.5 * float64(gravity) * math.Pow(realDeltaTime, 2)
-	}
+// Funzione per applicare l'integrazione di Verlet
+func VerletIntegration(unit *Unit) {
+	//currentPos := unit.pos
+	accel := acceleration(*unit, nil) // Passiamo nil perché non stiamo considerando altre forze
+
+	// Verlet integration
+	tempPos := unit.pos
+	unit.pos = unit.pos.Add(unit.pos.Sub(unit.prevPos)).Add(accel.Mul(10 * frameTime))
+	unit.prevPos = tempPos
 }
 
-func checkWallCollisions(b *Ball, winWidth, winHeight int) {
-	if int(b.pos.X-float64(*b.radius)) < sidebarWidth {
-		b.pos.X = float64(sidebarWidth) + float64(*b.radius)
-		b.prevPos.X = b.pos.X + (b.pos.X-b.prevPos.X)*float64(*b.restitution)
-	} else if int(b.pos.X+float64(*b.radius)) > winWidth {
-		b.pos.X = float64(winWidth) - float64(*b.radius)
-		b.prevPos.X = b.pos.X + (b.pos.X-b.prevPos.X)*float64(*b.restitution)
-	}
+// Funzione per gestire la fisica e il movimento delle unità
+// Funzione per gestire la fisica e il movimento delle unità
+func updateUnits(fluid *Fluid) {
+	for i, unit := range fluid.units {
+		// Applica l'integrazione di Verlet
+		VerletIntegration(&unit)
 
-	if int(b.pos.Y-float64(*b.radius)) < 0 {
-		b.pos.Y = float64(*b.radius)
-		b.prevPos.Y = b.pos.Y + (b.pos.Y-b.prevPos.Y)*float64(*b.restitution)
-	} else if int(b.pos.Y+float64(*b.radius)) > winHeight {
-		b.pos.Y = float64(winHeight) - float64(*b.radius)
-		b.prevPos.Y = b.pos.Y + (b.pos.Y-b.prevPos.Y)*float64(*b.restitution)
-	}
-}
-
-func applyFluidForcesForPair(a, b *Ball) {
-	dx := b.pos.X - a.pos.X
-	dy := b.pos.Y - a.pos.Y
-
-	distance := math.Sqrt(dx*dx + dy*dy)
-
-	if distance < float64(*a.actionRadius) {
-		// Calcola una forza attrattiva che aumenta con la distanza
-		cohesion := -*a.cohesionForce * (float32(distance) / *a.actionRadius)
-
-		// Calcola una forza repulsiva che aumenta quando le sfere si avvicinano troppo
-		adhesion := *b.adhesionForce * (1 - float32(distance) / *a.actionRadius)
-
-		// Calcola le componenti delle forze
-		forceX := float32((dx / distance)) * (cohesion + adhesion)
-		forceY := float32((dy / distance)) * (cohesion + adhesion)
-
-		// Applica direttamente alla posizione
-		a.pos.X += float64(forceX / a.Mass())
-		a.pos.Y += float64(forceY / a.Mass())
-		b.pos.X -= float64(forceX / b.Mass())
-		b.pos.Y -= float64(forceY / b.Mass())
-	}
-}
-
-func updateColors() {
-	for i := range balls {
-		ball := &balls[i]
-
-		velocity := ball.Velocity()                                           // Ottieni le componenti della velocità
-		speed := math.Sqrt(math.Pow(velocity.X, 2) + math.Pow(velocity.Y, 2)) // Calcola la magnitudine della velocità
-		colorFactor := math.Min(1, math.Pow(speed/200, 0.3))                  // Calcola il colorFactor come prima
-
-		// // Calcola il colore RGB
-		// R := uint8(0 + colorFactor*255)         // Da 0 (blu mare) a 255 (bianco)
-		// G := uint8(128 + colorFactor*(255-128)) // Da 128 (blu mare) a 255 (bianco)
-		// B := uint8(255 + colorFactor*(255-255)) // Da 255 (blu mare) a 255 (bianco)
-
-		// Calcola una scala di colori da blu (freddo, lento) a rosso (caldo, veloce)
-		R := uint8(255 * colorFactor)
-		G := uint8(0)
-		B := uint8(255 * (1 - colorFactor))
-
-		ball.color = color.RGBA{
-			R: R,
-			G: G,
-			B: B,
-			A: 255,
+		// Gestire la collisione con i bordi
+		if unit.pos.x <= 0 || unit.pos.x >= float32(gameWidth) {
+			unit.prevPos.x = unit.pos.x // Aggiorna la posizione precedente
+			unit.pos.x = float32(math.Max(0, math.Min(float64(unit.pos.x), float64(gameWidth))))
+		}
+		if unit.pos.y <= 0 || unit.pos.y >= float32(screenHeight) {
+			unit.prevPos.y = unit.pos.y // Aggiorna la posizione precedente
+			unit.pos.y = float32(math.Max(0, math.Min(float64(unit.pos.y), float64(screenHeight))))
 		}
 
+		unit.SetColorFromVelocity() // Imposta il colore in base alla velocità
+
+		rl.DrawCircleV(rl.NewVector2(unit.pos.x, unit.pos.y), unit.radius, unit.color)
+
+		fluid.units[i] = unit // Aggiorna l'unità nel fluido
+
 	}
 }
 
-func Update(winWidth, winHeight int) {
-	updateColors()
-	var wg sync.WaitGroup
-	n := len(balls)
-	numGoroutines := runtime.NumCPU()
-	chunkSize := n / numGoroutines
+func drawSidebar() {
+	// Disegna il rettangolo della barra laterale
+	rl.DrawRectangle(gameWidth, 0, sidebarWidth, screenHeight, rl.Gray)
 
-	for i := 0; i < numGoroutines; i++ {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
-			start := i * chunkSize
-			end := start + chunkSize
-			for j := start; j < end; j++ {
-				ball := &balls[j]
-				ball.ApplyAdditionalForces()
-				checkWallCollisions(ball, winWidth, winHeight)
-				updateBallPositionAndCorrectOverlap(ball)
-				for k := j + 1; k < n; k++ {
-					//resolveCollision(ball, &balls[k])
-					applyFluidForcesForPair(ball, &balls[k])
-				}
-			}
-		}(i)
-	}
-	wg.Wait()
+	// Disegna il testo per gli FPS
+	fpsText := fmt.Sprintf("FPS: %d", rl.GetFPS())
+	rl.DrawText(fpsText, screenWidth-190, 10, 20, rl.Black)
 
-	// Applica la forza del mouse a tutte le palline
-	if isAttracting || isRepulsing {
-		for i := 0; i < n; i++ {
-			applyMouseForce(&balls[i])
-		}
-	}
-}
-
-// Funzione per generare una nuova pallina in una posizione casuale
-func addRandomBall() {
-	randX := rand.Intn(winWidth)  // Genera una coordinata X casuale
-	randY := rand.Intn(winHeight) // Genera una coordinata Y casuale
-
-	newBall := Ball{
-		pos:            Coordinates{X: float64(randX), Y: float64(randY)},
-		prevPos:        Coordinates{X: float64(randX), Y: float64(randY)},
-		radius:         &ballRadius,
-		restitution:    &ballRestitution,
-		density:        &ballDensity,
-		reactToGravity: true,
-		cohesionForce:  &ballCohesionForce,
-		adhesionForce:  &ballAdhesionForce,
-		actionRadius:   &ballActionRadius,
-	}
-
-	balls = append(balls, newBall) // Aggiunge la nuova pallina all'array
-
-}
-
-func removeRandomBall() {
-
-	if len(balls) == 0 {
-		return
-	}
-
-	randIndex := rand.Intn(len(balls))
-	balls = append(balls[:randIndex], balls[randIndex+1:]...)
-
-}
-
-func applyMouseForce(b *Ball) {
-	dx := b.pos.X - mousePos.X
-	dy := b.pos.Y - mousePos.Y
-	distance := math.Sqrt(dx*dx + dy*dy)
-	if distance == 0 || float32(distance) > mouseForceRadius**b.radius {
-		return
-	}
-
-	normalizedX := dx / distance
-	normalizedY := dy / distance
-
-	force := mouseForce / float32(math.Pow(distance, 2))
-
-	// Calcola il termine di accelerazione per il realDeltaTime corrente
-	ax := float64(force) * normalizedX / float64(b.Mass())
-	ay := float64(force) * normalizedY / float64(b.Mass())
-
-	// Aggiorna la posizione della palla in base alla forza del mouse
-	if isAttracting {
-		b.pos.X -= ax
-		b.pos.Y -= ay
-	} else if isRepulsing {
-		b.pos.X += ax
-		b.pos.Y += ay
-	}
-}
-
-func loop() {
-	giu.Update()
-
-	giu.SingleWindow().Layout(
-		giu.Custom(func() {
-
-			if int(numBalls) > len(balls) {
-				addRandomBall()
-
-			} else if int(numBalls) < len(balls) {
-				removeRandomBall()
-			}
-
-			if giu.IsMouseDown(giu.MouseButtonLeft) {
-				isAttracting = true
-				isRepulsing = false
-				mousePosition := giu.GetMousePos()
-				mousePos = Coordinates{X: float64(mousePosition.X), Y: float64(mousePosition.Y)}
-			} else if giu.IsMouseDown(giu.MouseButtonRight) {
-				isAttracting = false
-				isRepulsing = true
-				mousePosition := giu.GetMousePos()
-				mousePos = Coordinates{X: float64(mousePosition.X), Y: float64(mousePosition.Y)}
-			} else {
-				isAttracting = false
-				isRepulsing = false
-			}
-
-			if giu.IsKeyPressed(giu.KeySpace) {
-				isPaused = !isPaused
-				if !isPaused {
-					lastTime = time.Now() // Reset lastTime when resuming
-					accumulatedTime = 0.0 // Reset accumulated time
-				} else if isUnstable {
-					resetBalls()
-				}
-			}
-			if giu.IsKeyPressed(giu.KeyR) {
-				resetBalls()
-			}
-			if giu.IsKeyPressed(giu.KeyUp) {
-				numBalls++
-			}
-			if giu.IsKeyPressed(giu.KeyDown) && numBalls > 0 {
-				numBalls--
-			}
-
-			w, h := giu.GetAvailableRegion()
-			winWidth = int(w) // sottrai la larghezza della barra laterale
-			winHeight = int(h)
-			// gameWidth = winWidth - sidebarWidth
-
-			if !isPaused && !isUnstable {
-				now := time.Now()
-				realDeltaTime = now.Sub(lastTime).Seconds()
-				lastTime = now
-
-				Update(winWidth, winHeight)
-			}
-
-			canvas := giu.GetCanvas()
-			for _, ball := range balls {
-				canvas.AddCircleFilled(image.Pt(int(ball.pos.X), int(ball.pos.Y)), float32(*ball.radius), ball.color)
-			}
-
-			// Calcola gli FPS
-			currentTime := time.Now()
-			deltaTime := currentTime.Sub(lastFrameTime).Seconds()
-			fps = 1.0 / deltaTime
-
-			// Aggiorna lastFrameTime
-			lastFrameTime = currentTime
-		}),
-		giu.Child().Size(float32(sidebarWidth), float32(winHeight)).Layout(
-			// giu.MenuBar().Layout(
-			// // giu.Menu("Options").Layout(
-			// // 	giu.MenuItem("Show Sidebar").Selected(showSidebar),
-			// // ),
-			// ),
-			giu.Label("Press 'Space' to pause,\n'R' to reset,\n'Up' to add ball,\n'Down' to remove ball"),
-			giu.Label(""),
-			giu.Label("Settings:"),
-			giu.Label("Gravity:"),
-			giu.SliderFloat(&gravity, 0, 20),
-			giu.Label("Number of balls:"),
-			giu.SliderInt(&numBalls, 1, 10000),
-			giu.Label("Ball Radius:"),
-			giu.SliderFloat(&ballRadius, 1, 50),
-			giu.Label(""),
-			giu.Label("Wall Restitution:"),
-			giu.SliderFloat(&wallRestitution, 0, 2),
-			giu.Label("Ball Restitution:"),
-			giu.SliderFloat(&ballRestitution, 0, 2),
-			giu.Label(""),
-			giu.Label("Ball Density:"),
-			giu.SliderFloat(&ballDensity, 1, 100),
-			giu.Label("Ball Cohesion Force:"),
-			giu.SliderFloat(&ballCohesionForce, 0, 1000),
-			giu.Label("Ball Adhesion Force:"),
-			giu.SliderFloat(&ballAdhesionForce, 0, 1000),
-			giu.Label("Ball Action Radius:"),
-			giu.SliderFloat(&ballActionRadius, 1, 100),
-			giu.Label(""),
-			giu.Label("Mouse Force:"),
-			giu.SliderFloat(&mouseForce, 1, 1000),
-			giu.Label("Mouse Force Radius:"),
-			giu.SliderFloat(&mouseForceRadius, 1, 1000),
-			giu.Checkbox("Enable Collision Sound:", &enableSound),
-			giu.Label(fmt.Sprintf("FPS: %.2f", fps)),
-		),
-	)
-
+	// Qui potresti aggiungere altri controlli o informazioni
 }
 
 func main() {
-	f, err := os.Create("mem.out")
-	if err != nil {
-		log.Fatal("could not create memory profile: ", err)
-	}
-	defer f.Close() // chiude il file alla fine della funzione main
+	rl.InitWindow(screenWidth, screenHeight, "Raylib Go Fluid Simulation")
+	rl.SetTargetFPS(desiredFPS)
 
-	runtime.GC() // esegue il garbage collector per ottenere statistiche più accurate
-	if err := pprof.WriteHeapProfile(f); err != nil {
-		log.Fatal("could not write memory profile: ", err)
-	}
-	lastFrameTime = time.Now()
+	fluid := resetField(int(gameWidth), int(screenHeight), unitNumber)
 
-	loadSound()
-	wnd := giu.NewMasterWindow("Bouncing Ball", int(winWidth), int(winHeight), 0)
-	resetBalls()
-	wnd.Run(loop)
+	for !rl.WindowShouldClose() {
+		rl.BeginDrawing()
+		rl.ClearBackground(rl.RayWhite)
+
+		if rl.IsKeyPressed(rl.KeyR) {
+			fluid = resetField(int(gameWidth), int(screenHeight), unitNumber) // Resetta il campo
+		}
+
+		updateUnits(&fluid)
+		handleAllCollisions(&fluid)
+
+		drawSidebar() // Disegna la barra laterale
+
+		rl.EndDrawing()
+	}
+
+	rl.CloseWindow()
 }
