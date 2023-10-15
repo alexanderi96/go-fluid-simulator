@@ -36,6 +36,7 @@ func init() {
 func main() {
 
 	for !rl.WindowShouldClose() {
+		simulation.Config.UpdateWindowSettings()
 
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.RayWhite)
@@ -47,7 +48,10 @@ func main() {
 		}
 
 		if !simulation.IsPause {
-			simulation.Update((rl.GetFrameTime()))
+			if err := simulation.Update((rl.GetFrameTime())); err != nil {
+				log.Fatal("Errore durante l'update della simulazione %w", err)
+			}
+
 		}
 
 		gui.Draw(simulation)

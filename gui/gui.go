@@ -16,6 +16,30 @@ func Draw(s *physics.Simulation) {
 	if s.Config.ShowVectors {
 		drawVectors(s.Fluid)
 	}
+	if s.Config.ShowQuadtree {
+		drawQuadtree(s.Quadtree)
+	}
+}
+
+func drawQuadtree(quadtree *physics.Quadtree) {
+	if quadtree == nil {
+		return // Ritorna se il quadtree è nil
+	}
+
+	// Converte i valori float32 del rettangolo in int32 per rl.DrawLine
+	x1, y1 := int32(quadtree.Bounds.X), int32(quadtree.Bounds.Y)
+	x2, y2 := int32(quadtree.Bounds.X+quadtree.Bounds.Width), int32(quadtree.Bounds.Y+quadtree.Bounds.Height)
+
+	// Disegna i bordi del quadtree corrente
+	rl.DrawLine(x1, y1, x2, y1, rl.Green) // Linea superiore
+	rl.DrawLine(x2, y1, x2, y2, rl.Green) // Linea destra
+	rl.DrawLine(x2, y2, x1, y2, rl.Green) // Linea inferiore
+	rl.DrawLine(x1, y2, x1, y1, rl.Green) // Linea sinistra
+
+	// Disegna ricorsivamente i bordi dei sotto-quadtrees
+	for _, child := range quadtree.Children {
+		drawQuadtree(child)
+	}
 }
 
 func drawSidebar(s *physics.Simulation) {

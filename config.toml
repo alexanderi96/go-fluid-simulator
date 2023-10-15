@@ -1,17 +1,18 @@
 
-
+  full_screen = false
   window_width = 1600
   window_height = 900
   target_fps = 999
   is_resizable = true
-  particle_number = 5000
-  particle_radius = 5
-  particle_mass = 0.1
+  particle_number = 1000
+  particle_radius = 6
+  particle_mass = 1
   particle_initial_spacing = 1
-  particle_elasticity = 0.8
-  wall_elasticity = 0.8
+  particle_elasticity = 1
+  wall_elasticity = 1
   show_vectors = false
   scale_factor = 1 # 1 pixel = 1 cm
   apply_gravity = true
   gravity = 981
+  show_quadtree = true
 
