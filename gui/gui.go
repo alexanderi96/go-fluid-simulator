@@ -13,6 +13,9 @@ import (
 func Draw(s *physics.Simulation) {
 	drawSidebar(s)
 	drawFluid(s.Fluid)
+	if s.Config.ShowVectors {
+		drawVectors(s.Fluid)
+	}
 }
 
 func drawSidebar(s *physics.Simulation) {
@@ -27,6 +30,10 @@ func drawSidebar(s *physics.Simulation) {
 	rl.DrawText(unitNumbers, xStart, yStartTop, 20, rl.Black)
 	yStartTop += 20 + 5
 
+	fps := fmt.Sprintf("FPS: %d", rl.GetFPS())
+	rl.DrawText(fps, xStart, yStartTop, 20, rl.Black)
+	yStartTop += 20 + 5
+
 }
 
 func drawFluid(f *physics.Fluid) {
@@ -36,29 +43,32 @@ func drawFluid(f *physics.Fluid) {
 	}
 }
 
+func drawVectors(f *physics.Fluid) {
+	for _, unit := range f.Units {
+		// Calcolo della posizione finale del vettore della velocità
+		endVelocity := rl.Vector2Add(unit.Position, rl.Vector2Scale(unit.Velocity, 0.1)) // La scala 1.0 ridimensiona la lunghezza del vettore
+		// Disegno del vettore della velocità
+		rl.DrawLineEx(unit.Position, endVelocity, 2, rl.Blue) // Il vettore della velocità è blu
+
+		// Calcolo della posizione finale del vettore dell'accelerazione
+		endAcceleration := rl.Vector2Add(unit.Position, rl.Vector2Scale(unit.Acceleration, 0.1)) // La scala 1.0 ridimensiona la lunghezza del vettore
+		// Disegno del vettore dell'accelerazione
+		rl.DrawLineEx(unit.Position, endAcceleration, 2, rl.Orange) // Il vettore dell'accelerazione è arancione
+	}
+}
 func getColorFromVelocity(v rl.Vector2) color.RGBA {
 	magnitude := math.Sqrt(float64(v.X*v.X + v.Y*v.Y))
+	colorFactor := math.Min(1, math.Pow(magnitude/1000, 0.5))
 
-	//normalizedMagnitude := magnitude // Usa la magnitudine direttamente per una transizione più rapida
-	normalizedMagnitude := math.Min(magnitude/100, 1.0)
-	var red, green, blue uint8
+	// Calcola una scala di colori da blu (freddo, lento) a rosso (caldo, veloce)
+	R := uint8(255 * colorFactor)
+	G := uint8(0)
+	B := uint8(255 * (1 - colorFactor))
 
-	if normalizedMagnitude < 0.5 {
-		// Bassa velocità: Blu
-		blue = 255
-		red = uint8(255 * normalizedMagnitude * 2)
-		green = 0
-	} else if normalizedMagnitude < 1 {
-		// Velocità media: Transizione verso il Rosso
-		blue = uint8(255 * (1 - normalizedMagnitude) * 2)
-		red = 255
-		green = 0
-	} else {
-		// Alta velocità: Transizione verso il Giallo
-		red = 255
-		green = uint8(255 * (normalizedMagnitude - 1))
-		blue = 0
+	return color.RGBA{
+		R: R,
+		G: G,
+		B: B,
+		A: 255,
 	}
-
-	return color.RGBA{R: red, G: green, B: blue, A: 255}
 }
