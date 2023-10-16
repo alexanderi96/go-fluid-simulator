@@ -2,12 +2,12 @@
   full_screen = false
   window_width = 1280
   window_height = 720
-  target_fps = 60
+  target_fps = 999
   is_resizable = true
-  particle_number = 100
-  particle_radius = 20
+  particle_number = 8
+  particle_radius = 15
   particle_mass = 1
-  particle_initial_spacing = 2
+  particle_initial_spacing = 3
   particle_elasticity = 0.9
   wall_elasticity = 0.9
   show_vectors = false

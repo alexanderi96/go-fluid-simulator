@@ -168,10 +168,3 @@ func calculateCollision(collisionTime float32, unitA, unitB *Unit) {
 		unitB.Velocity.Y -= impulse * unitA.Mass * float32(normalY) * coefficientOfRestitution
 	}
 }
-
-// Funzione helper per calcolare lo scostamento tra due posizioni
-func positionsDisplacement(pos1, pos2 rl.Vector2) float32 {
-	deltaX := pos1.X - pos2.X
-	deltaY := pos1.Y - pos2.Y
-	return float32(math.Sqrt(float64(deltaX*deltaX + deltaY*deltaY)))
-}

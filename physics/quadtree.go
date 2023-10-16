@@ -5,8 +5,8 @@ import (
 )
 
 const (
-	maxObjects = 10
-	maxLevels  = 4
+	maxObjects = 4
+	maxLevels  = 2
 )
 
 type Quadtree struct {
