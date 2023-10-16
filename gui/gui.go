@@ -19,11 +19,20 @@ func Draw(s *physics.Simulation) {
 	if s.Config.ShowQuadtree {
 		drawQuadtree(s.Quadtree)
 	}
+
+	if s.Config.ShowTrail {
+		for _, unit := range s.Fluid.Units {
+			drawTrail(&unit)
+		}
+	}
 }
 
 func drawQuadtree(quadtree *physics.Quadtree) {
 	if quadtree == nil {
+		// log.Println("quadtree is nil")
 		return // Ritorna se il quadtree è nil
+	} else {
+		// log.Println("quadtree is NOT nil")
 	}
 
 	// Converte i valori float32 del rettangolo in int32 per rl.DrawLine
@@ -31,10 +40,10 @@ func drawQuadtree(quadtree *physics.Quadtree) {
 	x2, y2 := int32(quadtree.Bounds.X+quadtree.Bounds.Width), int32(quadtree.Bounds.Y+quadtree.Bounds.Height)
 
 	// Disegna i bordi del quadtree corrente
-	rl.DrawLine(x1, y1, x2, y1, rl.Green) // Linea superiore
-	rl.DrawLine(x2, y1, x2, y2, rl.Green) // Linea destra
-	rl.DrawLine(x2, y2, x1, y2, rl.Green) // Linea inferiore
-	rl.DrawLine(x1, y2, x1, y1, rl.Green) // Linea sinistra
+	rl.DrawLine(x1, y1, x2, y1, rl.Red) // Linea superiore
+	rl.DrawLine(x2, y1, x2, y2, rl.Red) // Linea destra
+	rl.DrawLine(x2, y2, x1, y2, rl.Red) // Linea inferiore
+	rl.DrawLine(x1, y2, x1, y1, rl.Red) // Linea sinistra
 
 	// Disegna ricorsivamente i bordi dei sotto-quadtrees
 	for _, child := range quadtree.Children {
@@ -94,5 +103,16 @@ func getColorFromVelocity(v rl.Vector2) color.RGBA {
 		G: G,
 		B: B,
 		A: 255,
+	}
+}
+
+func drawTrail(unit *physics.Unit) {
+	for i := 0; i < len(unit.History)-1; i++ {
+		start := unit.History[i].Snapshot.Position
+		end := unit.History[i+1].Snapshot.Position
+		color := getColorFromVelocity(unit.History[i+1].Snapshot.Velocity)
+		// Usa le informazioni dello snapshot per modificare l'aspetto della traccia, se necessario
+		// ...
+		rl.DrawLineEx(start, end, 2, color)
 	}
 }

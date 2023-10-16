@@ -23,6 +23,12 @@ type Unit struct {
 	Mass         float32
 	Radius       float32
 	Color        color.RGBA
+	History      []UnitSnapshot // Coda di snapshot	Elasticity   float32
+}
+
+type UnitSnapshot struct {
+	Snapshot  Unit
+	Timestamp float32
 }
 
 func newFluid(simulationWidth, simulationHeight, unitNumber int32, unitRadius, unitMass, initialSpacing, scaleFactor, elasticity float32) *Fluid {
@@ -98,6 +104,20 @@ func (u *Unit) UpdateUnit(dt float32, externalForces rl.Vector2, cfg *config.Con
 		return fmt.Errorf("l'unità %v ha un raggio negativo: %v", u.Id, u.Radius)
 	}
 
+	// Crea un nuovo oggetto UnitSnapshot con le informazioni correnti
+	snapshotInfo := UnitSnapshot{
+		Snapshot:  *u, // Crea una copia dell'oggetto Unit corrente
+		Timestamp: dt, // Assumendo che dt restituisca il tempo corrente
+	}
+
+	// Aggiungi il nuovo oggetto UnitSnapshot alla coda
+	u.History = append(u.History, snapshotInfo)
+
+	maxHistoryLength := 10 // Sostituisci con il numero desiderato di snapshot da memorizzare
+	if len(u.History) > maxHistoryLength {
+		u.History = u.History[1:]
+	}
+
 	// Aggiorna la velocità dell'unità in base all'accelerazione e le forze esterne
 	u.Velocity.X += (u.Acceleration.X + externalForces.X) * dt
 	u.Velocity.Y += (u.Acceleration.Y + externalForces.Y) * dt
@@ -118,10 +138,10 @@ func (u *Unit) UpdateUnit(dt float32, externalForces rl.Vector2, cfg *config.Con
 	// Controlla e corregge la posizione Y
 	if u.Position.Y-u.Radius < 0 {
 		u.Position.Y = u.Radius
-		u.Velocity.Y = -u.Velocity.Y // Invertire la velocità Y
+		u.Velocity.Y = -u.Velocity.Y * cfg.WallElasticity // Invertire la velocità Y
 	} else if u.Position.Y+u.Radius > float32(cfg.WindowHeight) {
 		u.Position.Y = float32(cfg.WindowHeight) - u.Radius
-		u.Velocity.Y = -u.Velocity.Y // Invertire la velocità Y
+		u.Velocity.Y = -u.Velocity.Y * cfg.WallElasticity // Invertire la velocità Y
 	}
 
 	// Resetta l'accelerazione per il prossimo frame
