@@ -2,6 +2,8 @@ package main
 
 import (
 	"log"
+	"os"
+	"runtime/pprof"
 
 	"github.com/alexanderi96/go-fluid-simulator/config"
 	"github.com/alexanderi96/go-fluid-simulator/gui"
@@ -35,6 +37,15 @@ func init() {
 
 func main() {
 
+	if simulation.Config.ShouldBeProfiled {
+		f, err := os.Create("cpu.pprof")
+		if err != nil {
+			log.Fatal(err)
+		}
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
+	}
+
 	for !rl.WindowShouldClose() {
 		simulation.Config.UpdateWindowSettings()
 
@@ -45,10 +56,13 @@ func main() {
 			simulation.Reset() // Resetta il campo
 		} else if rl.IsKeyPressed(rl.KeySpace) {
 			simulation.IsPause = !simulation.IsPause
+		} else if rl.IsMouseButtonPressed(rl.MouseLeftButton) {
+			mousePosition := rl.GetMousePosition()
+			simulation.NewFluidAtPosition(mousePosition)
 		}
 
 		if !simulation.IsPause {
-			if err := simulation.Update((rl.GetFrameTime())); err != nil {
+			if err := simulation.Update(rl.GetFrameTime()); err != nil {
 				log.Fatal("Errore durante l'update della simulazione %w", err)
 			}
 

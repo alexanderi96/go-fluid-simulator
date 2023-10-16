@@ -6,7 +6,7 @@ import (
 
 const (
 	maxObjects = 10
-	maxLevels  = 5
+	maxLevels  = 4
 )
 
 type Quadtree struct {
@@ -26,7 +26,7 @@ func NewQuadtree(level int, bounds rl.Rectangle) *Quadtree {
 
 // Clear pulisce il quadtree.
 func (qt *Quadtree) Clear() {
-	qt.objects = []*Unit{}
+	qt.objects = qt.objects[:0]
 	for i := 0; i < 4; i++ {
 		if qt.Children[i] != nil {
 			qt.Children[i].Clear()

@@ -17,17 +17,23 @@ type Simulation struct {
 
 // La funzione che si occupa di creare una nuova simulazione
 func NewSimulation(config *config.Config) (*Simulation, error) {
+
+	config.UpdateWindowSettings()
 	// Ad esempio, se desideri passare alcuni valori di config a NewFluid:
 	fluid := newFluid(config.GameWidth, config.WindowHeight, config.ParticleNumber, config.ParticleRadius, config.ParticleMass, config.ParticleInitialSpacing, config.ScaleFactor, config.ParticleElasticity)
+
 	bounds := rl.NewRectangle(0, 0, float32(config.GameWidth), float32(config.WindowHeight))
 	quadtree := NewQuadtree(0, bounds)
-	return &Simulation{
+
+	sim := &Simulation{
 		Fluid:    fluid,
 		Quadtree: quadtree,
 		Metrics:  make(map[string]uint64),
 		Config:   config,
 		IsPause:  false,
-	}, nil
+	}
+
+	return sim, nil
 }
 
 // La funzione che si occupa di resettare il fluido
@@ -35,7 +41,12 @@ func (s *Simulation) Reset() {
 	s.Fluid = newFluid(s.Config.GameWidth, s.Config.WindowHeight, s.Config.ParticleNumber, s.Config.ParticleRadius, s.Config.ParticleMass, s.Config.ParticleInitialSpacing, s.Config.ScaleFactor, s.Config.ParticleElasticity)
 }
 
-func (s *Simulation) Update(frametime float32) error {
+func (s *Simulation) NewFluidAtPosition(position rl.Vector2) {
+	s.Fluid.Units = append(s.Fluid.Units, *newUnitsAtPosition(position, s.Config.GameWidth, s.Config.WindowHeight, s.Config.ParticleNumber, s.Config.ParticleRadius, s.Config.ParticleMass, s.Config.ParticleInitialSpacing, s.Config.ScaleFactor, s.Config.ParticleElasticity)...)
+}
+
+func (s *Simulation) Update(currentFrameTime float32) error {
+
 	s.Quadtree.Clear() // Pulisce il quadtree all'inizio di ogni frame
 
 	// Costruisci il quadtree
@@ -51,14 +62,13 @@ func (s *Simulation) Update(frametime float32) error {
 		for _, unitB := range nearUnits {
 			if unitA.Id != unitB.Id {
 
-				if collisionTime, collided := findCollisionTime(unitA, unitB, frametime); collided {
+				if collisionTime, collided := findCollisionTime(unitA, unitB, currentFrameTime); collided {
 					calculateCollision(
-						frametime,
+						collisionTime,
 						unitA,
 						unitB,
 					)
-					// Aggiorna il frametime rimanente
-					frametime -= collisionTime
+					currentFrameTime -= collisionTime
 				}
 			}
 		}
@@ -74,17 +84,15 @@ func (s *Simulation) Update(frametime float32) error {
 		}
 
 		unit := &s.Fluid.Units[i]
-		if err := unit.UpdateUnit(frametime, externalForces, s.Config); err != nil {
+		if err := unit.UpdateUnit(currentFrameTime, externalForces, s.Config); err != nil {
 			return err
 		}
 	}
-
 	return nil
 
 }
 
-func findCollisionTime(unitA, unitB *Unit, frametime float32) (float32, bool) {
-
+func findCollisionTime(unitA, unitB *Unit, frametime float32) (t float32, collided bool) {
 	// Controlla se le unità sono già sovrapposte
 	deltaX := unitB.Position.X - unitA.Position.X
 	deltaY := unitB.Position.Y - unitA.Position.Y
@@ -118,12 +126,14 @@ func findCollisionTime(unitA, unitB *Unit, frametime float32) (float32, bool) {
 
 	// Scegli il tempo di collisione più piccolo che sia all'interno dell'intervallo [0, 1]
 	if 0 <= t1 && t1 <= 1 {
-		return t1 * frametime, true
+		t, collided = t1*frametime, true
 	} else if 0 <= t2 && t2 <= 1 {
-		return t2 * frametime, true
+		t, collided = t2*frametime, true
 	} else {
-		return 0, false // Nessuna collisione in questo frame
+		t, collided = 0, false // Nessuna collisione in questo frame
 	}
+
+	return
 }
 
 func calculateCollision(collisionTime float32, unitA, unitB *Unit) {
@@ -157,4 +167,11 @@ func calculateCollision(collisionTime float32, unitA, unitB *Unit) {
 		unitB.Velocity.X -= impulse * unitA.Mass * float32(normalX) * coefficientOfRestitution
 		unitB.Velocity.Y -= impulse * unitA.Mass * float32(normalY) * coefficientOfRestitution
 	}
+}
+
+// Funzione helper per calcolare lo scostamento tra due posizioni
+func positionsDisplacement(pos1, pos2 rl.Vector2) float32 {
+	deltaX := pos1.X - pos2.X
+	deltaY := pos1.Y - pos2.Y
+	return float32(math.Sqrt(float64(deltaX*deltaX + deltaY*deltaY)))
 }

@@ -27,6 +27,7 @@ type Config struct {
 	Gravity                float32
 	ShowQuadtree           bool
 	ShowTrail              bool
+	ShouldBeProfiled       bool
 }
 
 // ReadConfig legge il file di configurazione e restituisce un'istanza di Config
@@ -56,6 +57,7 @@ func ReadConfig(filepath string) (*Config, error) {
 		Gravity:                float32(viper.GetFloat64("gravity")),
 		ShowQuadtree:           viper.GetBool("show_quadtree"),
 		ShowTrail:              viper.GetBool("show_trail"),
+		ShouldBeProfiled:       viper.GetBool("should_be_profiled"),
 	}
 
 	return config, nil
