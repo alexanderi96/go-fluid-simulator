@@ -155,12 +155,13 @@ func (f *Fluid) RemoveUnit(index int) {
 	f.Units = append(f.Units[:index], f.Units[index+1:]...)
 }
 
-func (u *Unit) UpdateUnit(dt float32, externalForces rl.Vector2, cfg *config.Config) error {
-	// Controlla se il raggio dell'unità è negativo
-	if u.Radius < 0 {
-		return fmt.Errorf("l'unità %v ha un raggio negativo: %v", u.Id, u.Radius)
-	}
+func (u *Unit) ApplyExternalForce(dt float32, externalForces rl.Vector2) {
+	// Aggiorna la velocità dell'unità in base all'accelerazione e le forze esterne
+	u.Velocity.X += (u.Acceleration.X + externalForces.X) * dt
+	u.Velocity.Y += (u.Acceleration.Y + externalForces.Y) * dt
+}
 
+func (u *Unit) TakeSnapshot(dt float32) {
 	// Crea un nuovo oggetto UnitSnapshot con le informazioni correnti
 	snapshotInfo := UnitSnapshot{
 		Snapshot:  *u, // Crea una copia dell'oggetto Unit corrente
@@ -174,35 +175,22 @@ func (u *Unit) UpdateUnit(dt float32, externalForces rl.Vector2, cfg *config.Con
 	if len(u.History) > maxHistoryLength {
 		u.History = u.History[1:]
 	}
+}
 
-	// Aggiorna la velocità dell'unità in base all'accelerazione e le forze esterne
-	u.Velocity.X += (u.Acceleration.X + externalForces.X) * dt
-	u.Velocity.Y += (u.Acceleration.Y + externalForces.Y) * dt
+func (u *Unit) Update(dt float32, cfg *config.Config) error {
+	// Controlla se il raggio dell'unità è negativo
+	if u.Radius < 0 {
+		return fmt.Errorf("l'unità %v ha un raggio negativo: %v", u.Id, u.Radius)
+	}
 
 	// Aggiorna la posizione dell'unità in base alla velocità
 	u.Position.X += u.Velocity.X * dt
 	u.Position.Y += u.Velocity.Y * dt
 
-	// Controlla e corregge la posizione X
-	if u.Position.X-u.Radius < 0 {
-		u.Position.X = u.Radius
-		u.Velocity.X = -u.Velocity.X // Invertire la velocità X
-	} else if u.Position.X+u.Radius > float32(cfg.GameWidth) {
-		u.Position.X = float32(cfg.GameWidth) - u.Radius
-		u.Velocity.X = -u.Velocity.X // Invertire la velocità X
-	}
-
-	// Controlla e corregge la posizione Y
-	if u.Position.Y-u.Radius < 0 {
-		u.Position.Y = u.Radius
-		u.Velocity.Y = -u.Velocity.Y * cfg.WallElasticity // Invertire la velocità Y
-	} else if u.Position.Y+u.Radius > float32(cfg.WindowHeight) {
-		u.Position.Y = float32(cfg.WindowHeight) - u.Radius
-		u.Velocity.Y = -u.Velocity.Y * cfg.WallElasticity // Invertire la velocità Y
-	}
-
 	// Resetta l'accelerazione per il prossimo frame
 	u.Acceleration = rl.Vector2{X: 0, Y: 0}
+
+	u.TakeSnapshot(dt)
 
 	return nil
 }

@@ -4,8 +4,8 @@
   window_height = 720
   target_fps = 999
   is_resizable = true
-  particle_number = 8
-  particle_radius = 15
+  particle_number = 100
+  particle_radius = 10
   particle_mass = 1
   particle_initial_spacing = 3
   particle_elasticity = 0.9

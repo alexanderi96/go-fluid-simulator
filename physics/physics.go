@@ -4,13 +4,14 @@ import (
 	"math"
 
 	"github.com/alexanderi96/go-fluid-simulator/config"
+	"github.com/alexanderi96/go-fluid-simulator/metrics"
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
 type Simulation struct {
 	Fluid    *Fluid
 	Quadtree *Quadtree
-	Metrics  map[string]uint64
+	Metrics  *metrics.Metrics
 	Config   *config.Config
 	IsPause  bool
 }
@@ -28,7 +29,7 @@ func NewSimulation(config *config.Config) (*Simulation, error) {
 	sim := &Simulation{
 		Fluid:    fluid,
 		Quadtree: quadtree,
-		Metrics:  make(map[string]uint64),
+		Metrics:  &metrics.Metrics{},
 		Config:   config,
 		IsPause:  false,
 	}
@@ -45,8 +46,9 @@ func (s *Simulation) NewFluidAtPosition(position rl.Vector2) {
 	s.Fluid.Units = append(s.Fluid.Units, *newUnitsAtPosition(position, s.Config.GameWidth, s.Config.WindowHeight, s.Config.ParticleNumber, s.Config.ParticleRadius, s.Config.ParticleMass, s.Config.ParticleInitialSpacing, s.Config.ScaleFactor, s.Config.ParticleElasticity)...)
 }
 
-func (s *Simulation) Update(currentFrameTime float32) error {
-
+func (s *Simulation) Update() error {
+	s.Metrics.Update()
+	currentFrameTime := s.Metrics.Frametime
 	s.Quadtree.Clear() // Pulisce il quadtree all'inizio di ogni frame
 
 	// Costruisci il quadtree
@@ -76,17 +78,15 @@ func (s *Simulation) Update(currentFrameTime float32) error {
 
 	// Aggiorna la posizione delle particelle in base alla loro velocità
 	for i := range s.Fluid.Units {
-		externalForces := rl.Vector2{}
-
-		// Applica la forza di gravità a tutte le particelle
-		if s.Config.ApplyGravity {
-			externalForces = rl.Vector2Add(externalForces, rl.Vector2{X: 0, Y: s.Config.Gravity})
-		}
-
 		unit := &s.Fluid.Units[i]
-		if err := unit.UpdateUnit(currentFrameTime, externalForces, s.Config); err != nil {
+
+		unit.ApplyExternalForce(currentFrameTime, rl.Vector2{X: 0, Y: s.Config.Gravity})
+
+		if err := unit.Update(currentFrameTime, s.Config); err != nil {
 			return err
 		}
+
+		checkWallCollision(unit, s.Config)
 	}
 	return nil
 
@@ -166,5 +166,25 @@ func calculateCollision(collisionTime float32, unitA, unitB *Unit) {
 		unitA.Velocity.Y += impulse * unitB.Mass * float32(normalY) * coefficientOfRestitution
 		unitB.Velocity.X -= impulse * unitA.Mass * float32(normalX) * coefficientOfRestitution
 		unitB.Velocity.Y -= impulse * unitA.Mass * float32(normalY) * coefficientOfRestitution
+	}
+}
+
+func checkWallCollision(u *Unit, cfg *config.Config) {
+	// Controlla e corregge la posizione X
+	if u.Position.X-u.Radius < 0 {
+		u.Position.X = u.Radius
+		u.Velocity.X = -u.Velocity.X // Invertire la velocità X
+	} else if u.Position.X+u.Radius > float32(cfg.GameWidth) {
+		u.Position.X = float32(cfg.GameWidth) - u.Radius
+		u.Velocity.X = -u.Velocity.X // Invertire la velocità X
+	}
+
+	// Controlla e corregge la posizione Y
+	if u.Position.Y-u.Radius < 0 {
+		u.Position.Y = u.Radius
+		u.Velocity.Y = -u.Velocity.Y * cfg.WallElasticity // Invertire la velocità Y
+	} else if u.Position.Y+u.Radius > float32(cfg.WindowHeight) {
+		u.Position.Y = float32(cfg.WindowHeight) - u.Radius
+		u.Velocity.Y = -u.Velocity.Y * cfg.WallElasticity // Invertire la velocità Y
 	}
 }

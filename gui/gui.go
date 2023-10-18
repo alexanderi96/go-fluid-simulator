@@ -63,12 +63,16 @@ func drawSidebar(s *physics.Simulation) {
 	rl.DrawText(unitNumbers, xStart, yStartTop, 20, rl.Black)
 	yStartTop += 20 + 5
 
-	frametime := fmt.Sprintf("Frametime: %f", rl.GetFrameTime())
+	frametime := fmt.Sprintf("Frametime: %f", s.Metrics.Frametime)
 	rl.DrawText(frametime, xStart, yStartTop, 20, rl.Black)
 	yStartTop += 20 + 5
 
-	fps := fmt.Sprintf("FPS: %d", rl.GetFPS())
+	fps := fmt.Sprintf("FPS: %d", s.Metrics.FPS)
 	rl.DrawText(fps, xStart, yStartTop, 20, rl.Black)
+	yStartTop += 20 + 5
+
+	heapSize := fmt.Sprintf("Heap Size: %d kb", s.Metrics.HeapSize)
+	rl.DrawText(heapSize, xStart, yStartTop, 20, rl.Black)
 	yStartTop += 20 + 5
 
 }

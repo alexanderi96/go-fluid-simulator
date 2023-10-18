@@ -62,7 +62,7 @@ func main() {
 		}
 
 		if !simulation.IsPause {
-			if err := simulation.Update(rl.GetFrameTime()); err != nil {
+			if err := simulation.Update(); err != nil {
 				log.Fatal("Errore durante l'update della simulazione %w", err)
 			}
 
