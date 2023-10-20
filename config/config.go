@@ -6,7 +6,6 @@ import (
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
-// Config rappresenta la configurazione dell'applicazione
 type Config struct {
 	FullScreen              bool
 	WindowWidth             int32
@@ -29,9 +28,20 @@ type Config struct {
 	ShowTrail               bool
 	ShouldBeProfiled        bool
 	UseExperimentalQuadtree bool
+	SetRandomRadius         bool
+	RadiusMin               float32
+	RadiusMax               float32
+	SetRandomMass           bool
+	MassMin                 float32
+	MassMax                 float32
+	SetRandomElasticity     bool
+	ElasticityMin           float32
+	ElasticityMax           float32
+	ShowOverlay             bool
+	SetRandomColor          bool
+	ShowSpeedColor          bool
 }
 
-// ReadConfig legge il file di configurazione e restituisce un'istanza di Config
 func ReadConfig(filepath string) (*Config, error) {
 	viper.SetConfigFile(filepath)
 	viper.SetConfigType("toml")
@@ -60,24 +70,34 @@ func ReadConfig(filepath string) (*Config, error) {
 		ShowTrail:               viper.GetBool("show_trail"),
 		ShouldBeProfiled:        viper.GetBool("should_be_profiled"),
 		UseExperimentalQuadtree: viper.GetBool("use_experimental_quadtree"),
+		SetRandomRadius:         viper.GetBool("set_random_radius"),
+		RadiusMin:               float32(viper.GetFloat64("radius_min")),
+		RadiusMax:               float32(viper.GetFloat64("radius_max")),
+		SetRandomMass:           viper.GetBool("set_random_mass"),
+		MassMin:                 float32(viper.GetFloat64("mass_min")),
+		MassMax:                 float32(viper.GetFloat64("mass_max")),
+		SetRandomElasticity:     viper.GetBool("set_random_elasticity"),
+		ElasticityMin:           float32(viper.GetFloat64("elasticity_min")),
+		ElasticityMax:           float32(viper.GetFloat64("elasticity_max")),
+		ShowOverlay:             viper.GetBool("show_overlay"),
+		SetRandomColor:          viper.GetBool("set_random_color"),
+		ShowSpeedColor:          viper.GetBool("show_speed_color"),
 	}
 
 	return config, nil
 }
 
 func (c *Config) UpdateWindowSettings() {
-	// Ottieni le dimensioni attuali della finestra usando raylib
+
 	currentWidth := int32(rl.GetScreenWidth())
 	currentHeight := int32(rl.GetScreenHeight())
 
-	// Aggiorna le dimensioni della finestra nella struttura Config
 	c.WindowWidth = currentWidth
 	c.WindowHeight = currentHeight
 	c.SidebarWidth = c.WindowWidth / 5
 	c.GameWidth = c.WindowWidth - c.SidebarWidth
 
-	// Gestione del passaggio a schermo intero
 	if c.FullScreen {
-		rl.ToggleFullscreen() // Se è necessario passare a schermo intero o uscire dallo schermo intero
+		rl.ToggleFullscreen()
 	}
 }

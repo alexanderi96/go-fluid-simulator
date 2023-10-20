@@ -49,19 +49,20 @@ func main() {
 	for !rl.WindowShouldClose() {
 		simulation.Config.UpdateWindowSettings()
 
-		rl.BeginDrawing()
-		rl.ClearBackground(rl.RayWhite)
-
 		if rl.IsKeyPressed(rl.KeyR) {
-			simulation.Reset() // Resetta il campo
+			simulation.Reset()
 		} else if rl.IsKeyPressed(rl.KeySpace) {
 			simulation.IsPause = !simulation.IsPause
 		} else if rl.IsMouseButtonPressed(rl.MouseLeftButton) {
 			mousePosition := rl.GetMousePosition()
-			simulation.NewFluidAtPosition(mousePosition)
+			if mousePosition.X > 0 && mousePosition.X < float32(simulation.Config.GameWidth) && mousePosition.Y > 0 && mousePosition.Y < float32(simulation.Config.WindowHeight) {
+				simulation.NewFluidAtPosition(mousePosition)
+			}
 		} else if rl.IsMouseButtonPressed(rl.MouseRightButton) {
 			mousePosition := rl.GetMousePosition()
-			simulation.NewFluidWithVelocity(mousePosition)
+			if mousePosition.X > 0 && mousePosition.X < float32(simulation.Config.GameWidth) && mousePosition.Y > 0 && mousePosition.Y < float32(simulation.Config.WindowHeight) {
+				simulation.NewFluidWithVelocity(mousePosition)
+			}
 		}
 
 		if !simulation.IsPause {
@@ -72,8 +73,6 @@ func main() {
 		}
 
 		gui.Draw(simulation)
-
-		rl.EndDrawing()
 	}
 
 	rl.CloseWindow()

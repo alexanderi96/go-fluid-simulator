@@ -60,6 +60,8 @@ github.com/frankban/quicktest v1.14.4 h1:g2rn0vABPOOXmZUj+vbmUp0lPoXEMuhTpIluN0X
 github.com/frankban/quicktest v1.14.4/go.mod h1:4ptaffx2x8+WTWXmUCuVU6aPUX1/Mz7zb5vbUoiM6w0=
 github.com/fsnotify/fsnotify v1.6.0 h1:n+5WquG0fcWoWp6xPWfHdbskMCQaFnG6PfBrh1Ky4HY=
 github.com/fsnotify/fsnotify v1.6.0/go.mod h1:sl3t1tCWJFWoRz9R8WJCbQihKKwmorjAbSClcnxKAGw=
+github.com/gen2brain/raylib-go/raygui v0.0.0-20231017191853-10c61020bc6c h1:bCzj6Ls1ekGL7FpJi88i/sIscD5e4GoXUqLApoUilKQ=
+github.com/gen2brain/raylib-go/raygui v0.0.0-20231017191853-10c61020bc6c/go.mod h1:uYchFLZ2wwfI+gRV8i0qHk6DKk5ZL/6VNrY/Nmzw5Ps=
 github.com/gen2brain/raylib-go/raylib v0.0.0-20231010155130-e9da61431c85 h1:I2/JInsnZucykXIhlpkCsJfXt3CjOk+NV4wwv2qBOvs=
 github.com/gen2brain/raylib-go/raylib v0.0.0-20231010155130-e9da61431c85/go.mod h1:AwtGA3aTtYdezNxEVbfchaLw/z+CuRDh2Mlxy0FbBro=
 github.com/go-gl/glfw v0.0.0-20190409004039-e6da0acd62b1/go.mod h1:vR7hzQXu2zJy9AVAgeJqvqgH9Q5CA+iKCZ2gyEVpxRU=

@@ -2,63 +2,41 @@ package gui
 
 import (
 	"fmt"
-	"image/color"
-	"math"
+	"strconv"
 
 	"github.com/alexanderi96/go-fluid-simulator/physics"
+	"github.com/alexanderi96/go-fluid-simulator/utils"
 
+	"github.com/gen2brain/raylib-go/raygui"
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
 func Draw(s *physics.Simulation) {
+	rl.BeginDrawing()
+	rl.ClearBackground(rl.LightGray)
 
 	drawSidebar(s)
 	drawFluid(s)
 
-	if s.Config.ShowQuadtree {
-		drawQuadtree(s.Quadtree)
+	if s.Config.ShowOverlay {
+		for _, unit := range s.Fluid {
+			drawOverlay(unit)
+		}
 	}
+	rl.EndDrawing()
+
 }
 
-func drawQuadtree(quadtree *physics.Quadtree) {
-	if quadtree == nil {
-		// log.Println("quadtree is nil")
-		return // Ritorna se il quadtree è nil
-	} else {
-		// log.Println("quadtree is NOT nil")
-	}
-
-	// Converte i valori float32 del rettangolo in int32 per rl.DrawLine
-	x1, y1 := int32(quadtree.Bounds.X), int32(quadtree.Bounds.Y)
-	x2, y2 := int32(quadtree.Bounds.X+quadtree.Bounds.Width), int32(quadtree.Bounds.Y+quadtree.Bounds.Height)
-
-	// Disegna i bordi del quadtree corrente
-	rl.DrawLine(x1, y1, x2, y1, rl.Red) // Linea superiore
-	rl.DrawLine(x2, y1, x2, y2, rl.Red) // Linea destra
-	rl.DrawLine(x2, y2, x1, y2, rl.Red) // Linea inferiore
-	rl.DrawLine(x1, y2, x1, y1, rl.Red) // Linea sinistra
-
-	// Disegna ricorsivamente i bordi dei sotto-quadtrees
-	for _, child := range quadtree.Children {
-		drawQuadtree(child)
-	}
-}
-
-func drawSidebar(s *physics.Simulation) {
-	rl.DrawRectangle(s.Config.GameWidth, 0, s.Config.WindowWidth, s.Config.WindowHeight, rl.Gray)
+func drawSidebar(s *physics.Simulation) error {
+	rl.DrawRectangle(s.Config.GameWidth, 0, s.Config.WindowWidth, s.Config.WindowHeight, rl.RayWhite)
 
 	border := int32(10)
 	xStart := s.Config.GameWidth + border
 	yStartTop := border
+
+	sliderLength := float32(s.Config.SidebarWidth - 2*border)
+	sliderThickness := float32(20)
 	//yStartBottom := s.Config.WindowHeight - border
-
-	unitNumbers := fmt.Sprintf("Actual Units: %d", len(s.Fluid))
-	rl.DrawText(unitNumbers, xStart, yStartTop, 20, rl.Black)
-	yStartTop += 20 + 5
-
-	quadtree := fmt.Sprintf("Using qTree: %t", s.Config.UseExperimentalQuadtree)
-	rl.DrawText(quadtree, xStart, yStartTop, 20, rl.Black)
-	yStartTop += 20 + 5
 
 	frametime := fmt.Sprintf("Frametime: %f", s.Metrics.Frametime)
 	rl.DrawText(frametime, xStart, yStartTop, 20, rl.Black)
@@ -72,53 +50,189 @@ func drawSidebar(s *physics.Simulation) {
 	rl.DrawText(heapSize, xStart, yStartTop, 20, rl.Black)
 	yStartTop += 20 + 5
 
+	quadtree := fmt.Sprintf("Using qTree: %t", s.Config.UseExperimentalQuadtree)
+	rl.DrawText(quadtree, xStart, yStartTop, 20, rl.Black)
+	yStartTop += 40 + 5
+
+	selectedUnitNumbers := fmt.Sprintf("Selected Units: %d", s.Config.ParticleNumber)
+	rl.DrawText(selectedUnitNumbers, xStart, yStartTop, 20, rl.Black)
+	yStartTop += 20 + 5
+
+	unitNumbers := fmt.Sprintf("Spawned Units: %d", len(s.Fluid))
+	rl.DrawText(unitNumbers, xStart, yStartTop, 20, rl.Black)
+	yStartTop += 20 + 5
+
+	s.Config.ParticleNumber = int32(raygui.Slider(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: sliderLength, Height: sliderThickness}, "", "", float32(s.Config.ParticleNumber), 1, 1000))
+	yStartTop += 20 + 5
+
+	s.Config.ApplyGravity = raygui.CheckBox(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 20, Height: 20}, "Apply Gravity", s.Config.ApplyGravity)
+	yStartTop += 20 + 5
+
+	s.Config.SetRandomColor = raygui.CheckBox(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 20, Height: 20}, "Set Random Color", s.Config.SetRandomColor)
+	yStartTop += 20 + 5
+
+	s.Config.ShowSpeedColor = raygui.CheckBox(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 20, Height: 20}, "Show Speed Color", s.Config.ShowSpeedColor)
+	yStartTop += 20 + 5
+
+	s.Config.ShowOverlay = raygui.CheckBox(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 20, Height: 20}, "Show Overlay", s.Config.ShowOverlay)
+	yStartTop += 20 + 5
+
+	s.Config.SetRandomRadius = raygui.CheckBox(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 20, Height: 20}, "Set Random Radius", s.Config.SetRandomRadius)
+	yStartTop += 20 + 5
+
+	if s.Config.SetRandomRadius {
+		radMinText := strconv.FormatFloat(float64(s.Config.RadiusMin), 'f', 2, 64)
+
+		radMinInput := rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 200, Height: 30}
+
+		radMinEdited := raygui.TextBox(radMinInput, &radMinText, 10, true)
+		yStartTop += 30 + 5
+
+		if radMinEdited {
+
+			if radMin, err := utils.CheckTextFloat32(radMinText); err == nil {
+				s.Config.RadiusMin = radMin
+			}
+		}
+
+		radMaxText := strconv.FormatFloat(float64(s.Config.RadiusMax), 'f', 2, 64)
+
+		radMaxInput := rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 200, Height: 30}
+
+		radMaxEdited := raygui.TextBox(radMaxInput, &radMaxText, 10, true)
+		yStartTop += 30 + 5
+
+		if radMaxEdited {
+
+			if radMax, err := utils.CheckTextFloat32(radMaxText); err == nil {
+				s.Config.RadiusMax = radMax
+			}
+		}
+
+	}
+
+	s.Config.SetRandomElasticity = raygui.CheckBox(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 20, Height: 20}, "Set Random Elasticity", s.Config.SetRandomElasticity)
+	yStartTop += 20 + 5
+
+	if s.Config.SetRandomElasticity {
+		elasticityMinText := strconv.FormatFloat(float64(s.Config.ElasticityMin), 'f', 2, 64)
+
+		elasticityMinInput := rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 200, Height: 30}
+
+		elasticityMinEdited := raygui.TextBox(elasticityMinInput, &elasticityMinText, 10, true)
+		yStartTop += 30 + 5
+
+		if elasticityMinEdited {
+
+			if elasticityMin, err := utils.CheckTextFloat32(elasticityMinText); err == nil {
+				s.Config.ElasticityMin = elasticityMin
+			}
+		}
+
+		elasticityMaxText := strconv.FormatFloat(float64(s.Config.ElasticityMax), 'f', 2, 64)
+
+		elasticityMaxInput := rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 200, Height: 30}
+
+		elasticityMaxEdited := raygui.TextBox(elasticityMaxInput, &elasticityMaxText, 10, true)
+		yStartTop += 30 + 5
+
+		if elasticityMaxEdited {
+
+			if elasticityMax, err := utils.CheckTextFloat32(elasticityMaxText); err == nil {
+				s.Config.ElasticityMax = elasticityMax
+			}
+		}
+
+	}
+
+	s.Config.SetRandomMass = raygui.CheckBox(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 20, Height: 20}, "Set Random Mass", s.Config.SetRandomMass)
+	yStartTop += 20 + 5
+
+	if s.Config.SetRandomMass {
+		massMinText := strconv.FormatFloat(float64(s.Config.MassMin), 'f', 2, 64)
+
+		MassMinInput := rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 200, Height: 30}
+
+		MassMinEdited := raygui.TextBox(MassMinInput, &massMinText, 10, true)
+		yStartTop += 30 + 5
+
+		if MassMinEdited {
+			if MassMin, err := utils.CheckTextFloat32(massMinText); err == nil {
+				s.Config.MassMin = MassMin
+			}
+		}
+
+		massMaxText := strconv.FormatFloat(float64(s.Config.MassMax), 'f', 2, 64)
+
+		MassMaxInput := rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 200, Height: 30}
+
+		MassMaxEdited := raygui.TextBox(MassMaxInput, &massMaxText, 10, true)
+		yStartTop += 30 + 5
+
+		if MassMaxEdited {
+			if MassMax, err := utils.CheckTextFloat32(massMaxText); err == nil {
+				s.Config.MassMax = MassMax
+			}
+		}
+
+	}
+
+	return nil
+
 }
 
 func drawFluid(s *physics.Simulation) {
 	for _, unit := range s.Fluid {
-		if s.Config.UseExperimentalQuadtree {
-			unit.Color = getColorFromVelocity(unit.Velocity)
-		} else {
-			unit.Color = getColorFromVelocity(unit.GetVelocityWithVerlet())
+
+		color := unit.Color
+		if s.Config.ShowSpeedColor {
+			if s.Config.UseExperimentalQuadtree {
+				color = utils.GetColorFromVelocity(unit.Velocity)
+			} else {
+				color = utils.GetColorFromVelocity(unit.GetVelocityWithVerlet())
+			}
 		}
 
 		if s.Config.ShowVectors {
 			drawVectors(unit)
 		}
 
-		if s.Config.ShowTrail {
-			// drawTrail(unit)
-		}
+		rl.DrawCircleV(unit.Position, unit.Radius, color)
+	}
+}
 
-		rl.DrawCircleV(unit.Position, unit.Radius, unit.Color)
+func drawOverlay(u *physics.Unit) {
+	mouseX := float32(rl.GetMouseX())
+	mouseY := float32(rl.GetMouseY())
+
+	if rl.CheckCollisionPointCircle(rl.NewVector2(mouseX, mouseY), u.Position, u.Radius) {
+
+		overlayText := fmt.Sprintf(
+			"ID: %s\nRadius: %.2f\nMass: %.2f\nElasticity: %.2f",
+			u.Id,
+			u.Radius,
+			u.Mass,
+			u.Elasticity,
+		)
+		x := int32(u.Position.X + u.Radius + 10)
+		y := int32(u.Position.Y - u.Radius - 10)
+
+		textWidth := rl.MeasureText(overlayText, 20)
+		textHeight := 35 * 3
+
+		rl.DrawRectangle(x-5, y-5, textWidth+10, int32(textHeight+10), rl.Color{255, 255, 255, 128})
+
+		rl.DrawText(overlayText, x, y, 20, rl.Black)
 	}
 }
 
 func drawVectors(u *physics.Unit) {
-	// Calcolo della posizione finale del vettore della velocità
-	endVelocity := rl.Vector2Add(u.Position, rl.Vector2Scale(u.Velocity, 0.1)) // La scala 1.0 ridimensiona la lunghezza del vettore
-	// Disegno del vettore della velocità
-	rl.DrawLineEx(u.Position, endVelocity, 2, rl.Blue) // Il vettore della velocità è blu
 
-	// Calcolo della posizione finale del vettore dell'accelerazione
-	endAcceleration := rl.Vector2Add(u.Position, rl.Vector2Scale(u.Acceleration, 0.1)) // La scala 1.0 ridimensiona la lunghezza del vettore
-	// Disegno del vettore dell'accelerazione
-	rl.DrawLineEx(u.Position, endAcceleration, 2, rl.Orange) // Il vettore dell'accelerazione è arancione
-}
+	endVelocity := rl.Vector2Add(u.Position, rl.Vector2Scale(u.Velocity, 0.1))
 
-func getColorFromVelocity(v rl.Vector2) color.RGBA {
-	magnitude := math.Sqrt(float64(v.X*v.X + v.Y*v.Y))
-	colorFactor := math.Min(1, math.Pow(magnitude/1000, 0.5))
+	rl.DrawLineEx(u.Position, endVelocity, 2, rl.Blue)
 
-	// Calcola una scala di colori da blu (freddo, lento) a rosso (caldo, veloce)
-	R := uint8(255 * colorFactor)
-	G := uint8(0)
-	B := uint8(255 * (1 - colorFactor))
+	endAcceleration := rl.Vector2Add(u.Position, rl.Vector2Scale(u.Acceleration, 0.1))
 
-	return color.RGBA{
-		R: R,
-		G: G,
-		B: B,
-		A: 255,
-	}
+	rl.DrawLineEx(u.Position, endAcceleration, 2, rl.Orange)
 }

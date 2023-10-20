@@ -18,4 +18,15 @@
   shot_trail = false
   should_be_profiled = true
   use_experimental_quadtree = false
-
+  set_random_radius = true
+  radius_min = 10
+  radius_max = 20
+  set_random_mass = true
+  mass_min = 1
+  mass_max = 100
+  set_random_elasticity = true
+  elasticity_min = 0.5
+  elasticity_max = 0.9
+  show_overlay = true
+  set_random_color = true
+  show_speed_color = true
