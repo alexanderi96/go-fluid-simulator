@@ -59,6 +59,9 @@ func main() {
 		} else if rl.IsMouseButtonPressed(rl.MouseLeftButton) {
 			mousePosition := rl.GetMousePosition()
 			simulation.NewFluidAtPosition(mousePosition)
+		} else if rl.IsMouseButtonPressed(rl.MouseRightButton) {
+			mousePosition := rl.GetMousePosition()
+			simulation.NewFluidWithVelocity(mousePosition)
 		}
 
 		if !simulation.IsPause {

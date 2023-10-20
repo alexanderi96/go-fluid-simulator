@@ -8,8 +8,8 @@
   particle_radius = 10
   particle_mass = 1
   particle_initial_spacing = 3
-  particle_elasticity = 0.9
-  wall_elasticity = 0.9
+  particle_elasticity = 1
+  wall_elasticity = 1
   show_vectors = false
   scale_factor = 1 # 1 pixel = 1 cm
   apply_gravity = true
@@ -17,4 +17,5 @@
   show_quadtree = true
   shot_trail = false
   should_be_profiled = true
+  use_experimental_quadtree = false
 

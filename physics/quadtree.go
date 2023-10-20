@@ -5,8 +5,8 @@ import (
 )
 
 const (
-	maxObjects = 4
-	maxLevels  = 2
+	maxObjects = 10
+	maxLevels  = 5
 )
 
 type Quadtree struct {
@@ -55,10 +55,12 @@ func (qt *Quadtree) Insert(obj *Unit) {
 		qt.Split()
 	}
 
-	index := qt.getIndex(*obj)
-	if index != -1 {
-		qt.Children[index].Insert(obj)
-		return
+	indices := qt.getIndexes(*obj)
+	for _, index := range indices {
+		if index != -1 {
+			qt.Children[index].Insert(obj)
+			return
+		}
 	}
 
 	if len(qt.objects) > maxObjects && qt.level < maxLevels {
@@ -68,9 +70,9 @@ func (qt *Quadtree) Insert(obj *Unit) {
 
 		i := 0
 		for i < len(qt.objects) {
-			index := qt.getIndex(*qt.objects[i])
-			if index != -1 {
-				qt.Children[index].Insert(qt.objects[i])
+			indexes := qt.getIndexes(*qt.objects[i])
+			if len(indexes) == 1 && indexes[0] != -1 {
+				qt.Children[indexes[0]].Insert(qt.objects[i])
 				qt.objects = append(qt.objects[:i], qt.objects[i+1:]...)
 			} else {
 				i++
@@ -81,42 +83,47 @@ func (qt *Quadtree) Insert(obj *Unit) {
 }
 
 // getIndex determina in quale sotto-quadtree un oggetto appartiene.
-func (qt *Quadtree) getIndex(obj Unit) int {
+func (qt *Quadtree) getIndexes(obj Unit) []int {
 	midHorizontal := qt.Bounds.X + qt.Bounds.Width/2
 	midVertical := qt.Bounds.Y + qt.Bounds.Height/2
 
-	topQuadrant := obj.Position.Y < midVertical && obj.Position.Y+obj.Radius*2 < midVertical
-	bottomQuadrant := obj.Position.Y > midVertical
+	topQuadrant := obj.Position.Y < midVertical && (obj.Position.Y+obj.Radius*2 < midVertical)
+	bottomQuadrant := (obj.Position.Y > midVertical) && (obj.Position.Y-obj.Radius*2 > midVertical)
 
-	if obj.Position.X < midHorizontal && obj.Position.X+obj.Radius*2 < midHorizontal {
+	indices := []int{}
+
+	// Aggiungiamo i controlli per la sovrapposizione usando il raggio
+	if (obj.Position.X < midHorizontal && obj.Position.X+obj.Radius*2 < midHorizontal) || (obj.Position.X-obj.Radius*2 < midHorizontal) {
 		if topQuadrant {
-			return 1
-		} else if bottomQuadrant {
-			return 2
+			indices = append(indices, 1)
 		}
-	} else if obj.Position.X > midHorizontal {
-		if topQuadrant {
-			return 0
-		} else if bottomQuadrant {
-			return 3
+		if bottomQuadrant {
+			indices = append(indices, 2)
 		}
 	}
 
-	return -1
+	if (obj.Position.X > midHorizontal) || (obj.Position.X+obj.Radius*2 > midHorizontal) {
+		if topQuadrant {
+			indices = append(indices, 0)
+		}
+		if bottomQuadrant {
+			indices = append(indices, 3)
+		}
+	}
+
+	if len(indices) == 0 {
+		indices = append(indices, -1)
+	}
+
+	return indices
 }
 
 // Retrieve restituisce tutti gli oggetti che potrebbero collidere con l'oggetto dato.
 func (qt *Quadtree) Retrieve(returnObjects *[]*Unit, obj *Unit) {
-	if qt.Children[0] != nil || qt.Children[1] != nil || qt.Children[2] != nil || qt.Children[3] != nil {
-		index := qt.getIndex(*obj)
-		if index != -1 && qt.Children[index] != nil { // Aggiunto controllo per nil
+	indices := qt.getIndexes(*obj)
+	for _, index := range indices {
+		if index != -1 && qt.Children[index] != nil {
 			qt.Children[index].Retrieve(returnObjects, obj)
-		} else {
-			for i := 0; i < 4; i++ {
-				if qt.Children[i] != nil { // Aggiunto controllo per nil
-					qt.Children[i].Retrieve(returnObjects, obj)
-				}
-			}
 		}
 	}
 

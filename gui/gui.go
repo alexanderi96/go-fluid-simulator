@@ -11,19 +11,12 @@ import (
 )
 
 func Draw(s *physics.Simulation) {
+
 	drawSidebar(s)
-	drawFluid(s.Fluid)
-	if s.Config.ShowVectors {
-		drawVectors(s.Fluid)
-	}
+	drawFluid(s)
+
 	if s.Config.ShowQuadtree {
 		drawQuadtree(s.Quadtree)
-	}
-
-	if s.Config.ShowTrail {
-		for _, unit := range s.Fluid.Units {
-			drawTrail(&unit)
-		}
 	}
 }
 
@@ -59,8 +52,12 @@ func drawSidebar(s *physics.Simulation) {
 	yStartTop := border
 	//yStartBottom := s.Config.WindowHeight - border
 
-	unitNumbers := fmt.Sprintf("Actual Units: %d", len(s.Fluid.Units))
+	unitNumbers := fmt.Sprintf("Actual Units: %d", len(s.Fluid))
 	rl.DrawText(unitNumbers, xStart, yStartTop, 20, rl.Black)
+	yStartTop += 20 + 5
+
+	quadtree := fmt.Sprintf("Using qTree: %t", s.Config.UseExperimentalQuadtree)
+	rl.DrawText(quadtree, xStart, yStartTop, 20, rl.Black)
 	yStartTop += 20 + 5
 
 	frametime := fmt.Sprintf("Frametime: %f", s.Metrics.Frametime)
@@ -77,26 +74,38 @@ func drawSidebar(s *physics.Simulation) {
 
 }
 
-func drawFluid(f *physics.Fluid) {
-	for _, unit := range f.Units {
-		unit.Color = getColorFromVelocity(unit.Velocity)
+func drawFluid(s *physics.Simulation) {
+	for _, unit := range s.Fluid {
+		if s.Config.UseExperimentalQuadtree {
+			unit.Color = getColorFromVelocity(unit.Velocity)
+		} else {
+			unit.Color = getColorFromVelocity(unit.GetVelocityWithVerlet())
+		}
+
+		if s.Config.ShowVectors {
+			drawVectors(unit)
+		}
+
+		if s.Config.ShowTrail {
+			// drawTrail(unit)
+		}
+
 		rl.DrawCircleV(unit.Position, unit.Radius, unit.Color)
 	}
 }
 
-func drawVectors(f *physics.Fluid) {
-	for _, unit := range f.Units {
-		// Calcolo della posizione finale del vettore della velocità
-		endVelocity := rl.Vector2Add(unit.Position, rl.Vector2Scale(unit.Velocity, 0.1)) // La scala 1.0 ridimensiona la lunghezza del vettore
-		// Disegno del vettore della velocità
-		rl.DrawLineEx(unit.Position, endVelocity, 2, rl.Blue) // Il vettore della velocità è blu
+func drawVectors(u *physics.Unit) {
+	// Calcolo della posizione finale del vettore della velocità
+	endVelocity := rl.Vector2Add(u.Position, rl.Vector2Scale(u.Velocity, 0.1)) // La scala 1.0 ridimensiona la lunghezza del vettore
+	// Disegno del vettore della velocità
+	rl.DrawLineEx(u.Position, endVelocity, 2, rl.Blue) // Il vettore della velocità è blu
 
-		// Calcolo della posizione finale del vettore dell'accelerazione
-		endAcceleration := rl.Vector2Add(unit.Position, rl.Vector2Scale(unit.Acceleration, 0.1)) // La scala 1.0 ridimensiona la lunghezza del vettore
-		// Disegno del vettore dell'accelerazione
-		rl.DrawLineEx(unit.Position, endAcceleration, 2, rl.Orange) // Il vettore dell'accelerazione è arancione
-	}
+	// Calcolo della posizione finale del vettore dell'accelerazione
+	endAcceleration := rl.Vector2Add(u.Position, rl.Vector2Scale(u.Acceleration, 0.1)) // La scala 1.0 ridimensiona la lunghezza del vettore
+	// Disegno del vettore dell'accelerazione
+	rl.DrawLineEx(u.Position, endAcceleration, 2, rl.Orange) // Il vettore dell'accelerazione è arancione
 }
+
 func getColorFromVelocity(v rl.Vector2) color.RGBA {
 	magnitude := math.Sqrt(float64(v.X*v.X + v.Y*v.Y))
 	colorFactor := math.Min(1, math.Pow(magnitude/1000, 0.5))
@@ -111,16 +120,5 @@ func getColorFromVelocity(v rl.Vector2) color.RGBA {
 		G: G,
 		B: B,
 		A: 255,
-	}
-}
-
-func drawTrail(unit *physics.Unit) {
-	for i := 0; i < len(unit.History)-1; i++ {
-		start := unit.History[i].Snapshot.Position
-		end := unit.History[i+1].Snapshot.Position
-		color := getColorFromVelocity(unit.History[i+1].Snapshot.Velocity)
-		// Usa le informazioni dello snapshot per modificare l'aspetto della traccia, se necessario
-		// ...
-		rl.DrawLineEx(start, end, 2, color)
 	}
 }

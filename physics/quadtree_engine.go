@@ -3,91 +3,52 @@ package physics
 import (
 	"math"
 
-	"github.com/alexanderi96/go-fluid-simulator/config"
-	"github.com/alexanderi96/go-fluid-simulator/metrics"
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
-type Simulation struct {
-	Fluid    *Fluid
-	Quadtree *Quadtree
-	Metrics  *metrics.Metrics
-	Config   *config.Config
-	IsPause  bool
-}
-
-// La funzione che si occupa di creare una nuova simulazione
-func NewSimulation(config *config.Config) (*Simulation, error) {
-
-	config.UpdateWindowSettings()
-	// Ad esempio, se desideri passare alcuni valori di config a NewFluid:
-	fluid := newFluid(config.GameWidth, config.WindowHeight, config.ParticleNumber, config.ParticleRadius, config.ParticleMass, config.ParticleInitialSpacing, config.ScaleFactor, config.ParticleElasticity)
-
-	bounds := rl.NewRectangle(0, 0, float32(config.GameWidth), float32(config.WindowHeight))
-	quadtree := NewQuadtree(0, bounds)
-
-	sim := &Simulation{
-		Fluid:    fluid,
-		Quadtree: quadtree,
-		Metrics:  &metrics.Metrics{},
-		Config:   config,
-		IsPause:  false,
-	}
-
-	return sim, nil
-}
-
-// La funzione che si occupa di resettare il fluido
-func (s *Simulation) Reset() {
-	s.Fluid = newFluid(s.Config.GameWidth, s.Config.WindowHeight, s.Config.ParticleNumber, s.Config.ParticleRadius, s.Config.ParticleMass, s.Config.ParticleInitialSpacing, s.Config.ScaleFactor, s.Config.ParticleElasticity)
-}
-
-func (s *Simulation) NewFluidAtPosition(position rl.Vector2) {
-	s.Fluid.Units = append(s.Fluid.Units, *newUnitsAtPosition(position, s.Config.GameWidth, s.Config.WindowHeight, s.Config.ParticleNumber, s.Config.ParticleRadius, s.Config.ParticleMass, s.Config.ParticleInitialSpacing, s.Config.ScaleFactor, s.Config.ParticleElasticity)...)
-}
-
-func (s *Simulation) Update() error {
-	s.Metrics.Update()
-	currentFrameTime := s.Metrics.Frametime
+func (s *Simulation) UpdateWithQuadtree() error {
 	s.Quadtree.Clear() // Pulisce il quadtree all'inizio di ogni frame
 
 	// Costruisci il quadtree
-	for i := range s.Fluid.Units {
-		s.Quadtree.Insert(&s.Fluid.Units[i])
+	for i := range s.Fluid {
+		s.Quadtree.Insert(s.Fluid[i])
 	}
 
 	// Controlla le collisioni tra particelle e aggiorna le velocità utilizzando il quadtree
-	for i := range s.Fluid.Units {
-		unitA := &s.Fluid.Units[i]
+	for i := range s.Fluid {
+		unitA := s.Fluid[i]
+		localFrametime := s.Metrics.Frametime
+
+		//log.Println(unitA.Velocity)
+
+		//log.Panic(unitA.Velocity)
 		nearUnits := []*Unit{}
 		s.Quadtree.Retrieve(&nearUnits, unitA)
 		for _, unitB := range nearUnits {
 			if unitA.Id != unitB.Id {
 
-				if collisionTime, collided := findCollisionTime(unitA, unitB, currentFrameTime); collided {
-					calculateCollision(
+				if collisionTime, collided := findCollisionTime(unitA, unitB, localFrametime); collided {
+					calculateCollisionWithQuadtree(
 						collisionTime,
 						unitA,
 						unitB,
 					)
-					currentFrameTime -= collisionTime
+					localFrametime -= collisionTime
 				}
 			}
 		}
 	}
 
-	// Aggiorna la posizione delle particelle in base alla loro velocità
-	for i := range s.Fluid.Units {
-		unit := &s.Fluid.Units[i]
-
-		unit.ApplyExternalForce(currentFrameTime, rl.Vector2{X: 0, Y: s.Config.Gravity})
-
-		if err := unit.Update(currentFrameTime, s.Config); err != nil {
-			return err
+	// Aggiorna le unità nell'ordine ottenuto
+	for _, unit := range s.Fluid {
+		if unit != nil {
+			unit.accelerate(rl.Vector2{X: 0, Y: s.Config.Gravity})
+			unit.checkWallCollision(s.Config)
+			unit.updateVelocity(s.Metrics.Frametime)
+			unit.updatePosition(s.Metrics.Frametime)
 		}
-
-		checkWallCollision(unit, s.Config)
 	}
+
 	return nil
 
 }
@@ -99,7 +60,12 @@ func findCollisionTime(unitA, unitB *Unit, frametime float32) (t float32, collid
 	distanceSquared := deltaX*deltaX + deltaY*deltaY
 	totalRadius := unitA.Radius + unitB.Radius
 	if distanceSquared < totalRadius*totalRadius {
-		return 0, true // Le unità sono già sovrapposte, restituisci un tempo di collisione di 0
+		separation := (unitA.Radius + unitB.Radius) - float32(math.Sqrt(float64(distanceSquared)))
+		unitA.Position.X -= separation / 2
+		unitA.Position.Y -= separation / 2
+		unitB.Position.X += separation / 2
+		unitB.Position.Y += separation / 2
+		return 0, true
 	}
 
 	// Scala le velocità delle particelle per il frametime
@@ -136,7 +102,7 @@ func findCollisionTime(unitA, unitB *Unit, frametime float32) (t float32, collid
 	return
 }
 
-func calculateCollision(collisionTime float32, unitA, unitB *Unit) {
+func calculateCollisionWithQuadtree(collisionTime float32, unitA, unitB *Unit) {
 	// Calcola la posizione delle particelle al momento della collisione
 	posXA := unitA.Position.X + unitA.Velocity.X*collisionTime
 	posYA := unitA.Position.Y + unitA.Velocity.Y*collisionTime
@@ -167,24 +133,19 @@ func calculateCollision(collisionTime float32, unitA, unitB *Unit) {
 		unitB.Velocity.X -= impulse * unitA.Mass * float32(normalX) * coefficientOfRestitution
 		unitB.Velocity.Y -= impulse * unitA.Mass * float32(normalY) * coefficientOfRestitution
 	}
-}
 
-func checkWallCollision(u *Unit, cfg *config.Config) {
-	// Controlla e corregge la posizione X
-	if u.Position.X-u.Radius < 0 {
-		u.Position.X = u.Radius
-		u.Velocity.X = -u.Velocity.X // Invertire la velocità X
-	} else if u.Position.X+u.Radius > float32(cfg.GameWidth) {
-		u.Position.X = float32(cfg.GameWidth) - u.Radius
-		u.Velocity.X = -u.Velocity.X // Invertire la velocità X
-	}
+	// Calcola la distanza di sovrapposizione
+	overlap := (unitA.Radius + unitB.Radius) - float32(math.Sqrt(float64(deltaX*deltaX+deltaY*deltaY)))
 
-	// Controlla e corregge la posizione Y
-	if u.Position.Y-u.Radius < 0 {
-		u.Position.Y = u.Radius
-		u.Velocity.Y = -u.Velocity.Y * cfg.WallElasticity // Invertire la velocità Y
-	} else if u.Position.Y+u.Radius > float32(cfg.WindowHeight) {
-		u.Position.Y = float32(cfg.WindowHeight) - u.Radius
-		u.Velocity.Y = -u.Velocity.Y * cfg.WallElasticity // Invertire la velocità Y
+	if overlap > 0 {
+		// Calcola la direzione di spostamento per separare le particelle
+		moveX := float32(normalX) * overlap / 2
+		moveY := float32(normalY) * overlap / 2
+
+		// Sposta le particelle fuori dalla sovrapposizione
+		unitA.Position.X -= moveX
+		unitA.Position.Y -= moveY
+		unitB.Position.X += moveX
+		unitB.Position.Y += moveY
 	}
 }
