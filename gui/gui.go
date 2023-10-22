@@ -7,7 +7,7 @@ import (
 	"github.com/alexanderi96/go-fluid-simulator/physics"
 	"github.com/alexanderi96/go-fluid-simulator/utils"
 
-	"github.com/gen2brain/raylib-go/raygui"
+	gui "github.com/gen2brain/raylib-go/raygui"
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
@@ -28,10 +28,10 @@ func Draw(s *physics.Simulation) {
 }
 
 func drawSidebar(s *physics.Simulation) error {
-	rl.DrawRectangle(s.Config.GameWidth, 0, s.Config.WindowWidth, s.Config.WindowHeight, rl.RayWhite)
+	rl.DrawRectangle(s.Config.ViewportX, 0, s.Config.WindowWidth, s.Config.WindowHeight, rl.RayWhite)
 
 	border := int32(10)
-	xStart := s.Config.GameWidth + border
+	xStart := s.Config.ViewportX + border
 	yStartTop := border
 
 	sliderLength := float32(s.Config.SidebarWidth - 2*border)
@@ -62,22 +62,22 @@ func drawSidebar(s *physics.Simulation) error {
 	rl.DrawText(unitNumbers, xStart, yStartTop, 20, rl.Black)
 	yStartTop += 20 + 5
 
-	s.Config.ParticleNumber = int32(raygui.Slider(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: sliderLength, Height: sliderThickness}, "", "", float32(s.Config.ParticleNumber), 1, 1000))
+	s.Config.ParticleNumber = int32(gui.Slider(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: sliderLength, Height: sliderThickness}, "", "", float32(s.Config.ParticleNumber), 1, 1000))
 	yStartTop += 20 + 5
 
-	s.Config.ApplyGravity = raygui.CheckBox(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 20, Height: 20}, "Apply Gravity", s.Config.ApplyGravity)
+	s.Config.ApplyGravity = gui.CheckBox(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 20, Height: 20}, "Apply Gravity", s.Config.ApplyGravity)
 	yStartTop += 20 + 5
 
-	s.Config.SetRandomColor = raygui.CheckBox(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 20, Height: 20}, "Set Random Color", s.Config.SetRandomColor)
+	s.Config.SetRandomColor = gui.CheckBox(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 20, Height: 20}, "Set Random Color", s.Config.SetRandomColor)
 	yStartTop += 20 + 5
 
-	s.Config.ShowSpeedColor = raygui.CheckBox(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 20, Height: 20}, "Show Speed Color", s.Config.ShowSpeedColor)
+	s.Config.ShowSpeedColor = gui.CheckBox(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 20, Height: 20}, "Show Speed Color", s.Config.ShowSpeedColor)
 	yStartTop += 20 + 5
 
-	s.Config.ShowOverlay = raygui.CheckBox(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 20, Height: 20}, "Show Overlay", s.Config.ShowOverlay)
+	s.Config.ShowOverlay = gui.CheckBox(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 20, Height: 20}, "Show Overlay", s.Config.ShowOverlay)
 	yStartTop += 20 + 5
 
-	s.Config.SetRandomRadius = raygui.CheckBox(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 20, Height: 20}, "Set Random Radius", s.Config.SetRandomRadius)
+	s.Config.SetRandomRadius = gui.CheckBox(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 20, Height: 20}, "Set Random Radius", s.Config.SetRandomRadius)
 	yStartTop += 20 + 5
 
 	if s.Config.SetRandomRadius {
@@ -85,7 +85,7 @@ func drawSidebar(s *physics.Simulation) error {
 
 		radMinInput := rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 200, Height: 30}
 
-		radMinEdited := raygui.TextBox(radMinInput, &radMinText, 10, true)
+		radMinEdited := gui.TextBox(radMinInput, &radMinText, 10, true)
 		yStartTop += 30 + 5
 
 		if radMinEdited {
@@ -99,7 +99,7 @@ func drawSidebar(s *physics.Simulation) error {
 
 		radMaxInput := rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 200, Height: 30}
 
-		radMaxEdited := raygui.TextBox(radMaxInput, &radMaxText, 10, true)
+		radMaxEdited := gui.TextBox(radMaxInput, &radMaxText, 10, true)
 		yStartTop += 30 + 5
 
 		if radMaxEdited {
@@ -111,7 +111,7 @@ func drawSidebar(s *physics.Simulation) error {
 
 	}
 
-	s.Config.SetRandomElasticity = raygui.CheckBox(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 20, Height: 20}, "Set Random Elasticity", s.Config.SetRandomElasticity)
+	s.Config.SetRandomElasticity = gui.CheckBox(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 20, Height: 20}, "Set Random Elasticity", s.Config.SetRandomElasticity)
 	yStartTop += 20 + 5
 
 	if s.Config.SetRandomElasticity {
@@ -119,7 +119,7 @@ func drawSidebar(s *physics.Simulation) error {
 
 		elasticityMinInput := rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 200, Height: 30}
 
-		elasticityMinEdited := raygui.TextBox(elasticityMinInput, &elasticityMinText, 10, true)
+		elasticityMinEdited := gui.TextBox(elasticityMinInput, &elasticityMinText, 10, true)
 		yStartTop += 30 + 5
 
 		if elasticityMinEdited {
@@ -133,7 +133,7 @@ func drawSidebar(s *physics.Simulation) error {
 
 		elasticityMaxInput := rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 200, Height: 30}
 
-		elasticityMaxEdited := raygui.TextBox(elasticityMaxInput, &elasticityMaxText, 10, true)
+		elasticityMaxEdited := gui.TextBox(elasticityMaxInput, &elasticityMaxText, 10, true)
 		yStartTop += 30 + 5
 
 		if elasticityMaxEdited {
@@ -145,7 +145,7 @@ func drawSidebar(s *physics.Simulation) error {
 
 	}
 
-	s.Config.SetRandomMass = raygui.CheckBox(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 20, Height: 20}, "Set Random Mass", s.Config.SetRandomMass)
+	s.Config.SetRandomMass = gui.CheckBox(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 20, Height: 20}, "Set Random Mass", s.Config.SetRandomMass)
 	yStartTop += 20 + 5
 
 	if s.Config.SetRandomMass {
@@ -153,7 +153,7 @@ func drawSidebar(s *physics.Simulation) error {
 
 		MassMinInput := rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 200, Height: 30}
 
-		MassMinEdited := raygui.TextBox(MassMinInput, &massMinText, 10, true)
+		MassMinEdited := gui.TextBox(MassMinInput, &massMinText, 10, true)
 		yStartTop += 30 + 5
 
 		if MassMinEdited {
@@ -166,7 +166,7 @@ func drawSidebar(s *physics.Simulation) error {
 
 		MassMaxInput := rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 200, Height: 30}
 
-		MassMaxEdited := raygui.TextBox(MassMaxInput, &massMaxText, 10, true)
+		MassMaxEdited := gui.TextBox(MassMaxInput, &massMaxText, 10, true)
 		yStartTop += 30 + 5
 
 		if MassMaxEdited {

@@ -55,12 +55,12 @@ func main() {
 			simulation.IsPause = !simulation.IsPause
 		} else if rl.IsMouseButtonPressed(rl.MouseLeftButton) {
 			mousePosition := rl.GetMousePosition()
-			if mousePosition.X > 0 && mousePosition.X < float32(simulation.Config.GameWidth) && mousePosition.Y > 0 && mousePosition.Y < float32(simulation.Config.WindowHeight) {
+			if mousePosition.X > 0 && mousePosition.X < float32(simulation.Config.WindowWidth-simulation.Config.SidebarWidth) && mousePosition.Y > 0 && mousePosition.Y < float32(simulation.Config.WindowHeight) {
 				simulation.NewFluidAtPosition(mousePosition)
 			}
 		} else if rl.IsMouseButtonPressed(rl.MouseRightButton) {
 			mousePosition := rl.GetMousePosition()
-			if mousePosition.X > 0 && mousePosition.X < float32(simulation.Config.GameWidth) && mousePosition.Y > 0 && mousePosition.Y < float32(simulation.Config.WindowHeight) {
+			if mousePosition.X > 0 && mousePosition.X < float32(simulation.Config.WindowWidth-simulation.Config.SidebarWidth) && mousePosition.Y > 0 && mousePosition.Y < float32(simulation.Config.WindowHeight) {
 				simulation.NewFluidWithVelocity(mousePosition)
 			}
 		}

@@ -11,7 +11,11 @@ type Config struct {
 	WindowWidth             int32
 	WindowHeight            int32
 	SidebarWidth            int32
-	GameWidth               int32
+	ViewportX               int32
+	ViewportY               int32
+	GameX                   int32
+	GameY                   int32
+	GameZ                   int32
 	TargetFPS               int32
 	IsResizable             bool
 	ParticleNumber          int32
@@ -54,6 +58,9 @@ func ReadConfig(filepath string) (*Config, error) {
 		FullScreen:              viper.GetBool("full_screen"),
 		WindowWidth:             viper.GetInt32("window_width"),
 		WindowHeight:            viper.GetInt32("window_height"),
+		GameX:                   viper.GetInt32("game_x"),
+		GameY:                   viper.GetInt32("game_y"),
+		GameZ:                   viper.GetInt32("game_z"),
 		TargetFPS:               viper.GetInt32("target_fps"),
 		IsResizable:             viper.GetBool("is_resizable"),
 		ParticleNumber:          viper.GetInt32("particle_number"),
@@ -95,7 +102,12 @@ func (c *Config) UpdateWindowSettings() {
 	c.WindowWidth = currentWidth
 	c.WindowHeight = currentHeight
 	c.SidebarWidth = c.WindowWidth / 5
-	c.GameWidth = c.WindowWidth - c.SidebarWidth
+
+	c.ViewportX = currentWidth - c.SidebarWidth
+	c.ViewportY = currentHeight
+
+	c.GameX = c.ViewportX
+	c.GameY = c.ViewportY
 
 	if c.FullScreen {
 		rl.ToggleFullscreen()

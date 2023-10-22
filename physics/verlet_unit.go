@@ -137,7 +137,7 @@ func spawnUnitsWithVelocity(units *[]*Unit, spawnPosition rl.Vector2, cfg *confi
 			time.Sleep(100 * time.Millisecond)
 		}
 
-		velocity := calculateInitialVelocity(spawnPosition, cfg.GameWidth, cfg.WindowHeight)
+		velocity := calculateInitialVelocity(spawnPosition, cfg.GameX, cfg.GameY)
 
 		previousPosition := rl.Vector2{
 			X: spawnPosition.X - velocity.X/float32(rl.GetFPS()),
@@ -226,30 +226,26 @@ func (u *Unit) updatePositionWithVerlet(dt float32) {
 
 func (u *Unit) checkWallCollisionVerlet(cfg *config.Config, deltaTime float32) {
 
-	oldPosition := u.Position
-
-	u.Position.X = 2*u.Position.X - oldPosition.X + u.Acceleration.X*deltaTime*deltaTime
-	u.Position.Y = 2*u.Position.Y - oldPosition.Y + u.Acceleration.Y*deltaTime*deltaTime
+	position := u.Position
 
 	if u.Position.X-u.Radius < 0 {
 		u.Position.X = u.Radius
 
-		oldPosition.X = u.Position.X + (u.Position.X-oldPosition.X)*cfg.WallElasticity
-	} else if u.Position.X+u.Radius > float32(cfg.GameWidth) {
-		u.Position.X = float32(cfg.GameWidth) - u.Radius
+		u.PreviousPosition.X = u.Position.X + (u.Position.X-position.X)*-cfg.WallElasticity
+	} else if u.Position.X+u.Radius > float32(cfg.GameX) {
+		u.Position.X = float32(cfg.GameX) - u.Radius
 
-		oldPosition.X = u.Position.X + (u.Position.X-oldPosition.X)*cfg.WallElasticity
+		u.PreviousPosition.X = u.Position.X + (u.Position.X-position.X)*-cfg.WallElasticity
 	}
 
 	if u.Position.Y-u.Radius < 0 {
 		u.Position.Y = u.Radius
 
-		oldPosition.Y = u.Position.Y + (u.Position.Y-oldPosition.Y)*cfg.WallElasticity
-	} else if u.Position.Y+u.Radius > float32(cfg.WindowHeight) {
-		u.Position.Y = float32(cfg.WindowHeight) - u.Radius
+		u.PreviousPosition.Y = u.Position.Y + (u.Position.Y-position.Y)*-cfg.WallElasticity
+	} else if u.Position.Y+u.Radius > float32(cfg.GameY) {
+		u.Position.Y = float32(cfg.GameY) - u.Radius
 
-		oldPosition.Y = u.Position.Y + (u.Position.Y-oldPosition.Y)*cfg.WallElasticity
+		u.PreviousPosition.Y = u.Position.Y + (u.Position.Y-position.Y)*-cfg.WallElasticity
 	}
 
-	//u.PreviousPosition = oldPosition
 }
