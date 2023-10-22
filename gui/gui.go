@@ -187,7 +187,7 @@ func drawFluid(s *physics.Simulation) {
 		color := unit.Color
 		if s.Config.ShowSpeedColor {
 			if s.Config.UseExperimentalQuadtree {
-				color = utils.GetColorFromVelocity(unit.Velocity)
+				//color = utils.GetColorFromVelocity(unit.Velocity)
 			} else {
 				color = utils.GetColorFromVelocity(unit.GetVelocityWithVerlet())
 			}
@@ -228,7 +228,7 @@ func drawOverlay(u *physics.Unit) {
 
 func drawVectors(u *physics.Unit) {
 
-	endVelocity := rl.Vector2Add(u.Position, rl.Vector2Scale(u.Velocity, 0.1))
+	endVelocity := rl.Vector2Add(u.Position, rl.Vector2Scale(u.GetVelocityWithVerlet(), 0.1))
 
 	rl.DrawLineEx(u.Position, endVelocity, 2, rl.Blue)
 

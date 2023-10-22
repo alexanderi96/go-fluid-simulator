@@ -16,7 +16,6 @@ type Unit struct {
 	Id               uuid.UUID
 	Position         rl.Vector2
 	PreviousPosition rl.Vector2
-	Velocity         rl.Vector2
 	Acceleration     rl.Vector2
 	Elasticity       float32
 	Radius           float32
@@ -98,12 +97,10 @@ func newUnitsAtPosition(spawnPosition rl.Vector2, cfg *config.Config) *[]*Unit {
 		if len(units) == 0 {
 			newUnit.Position = rl.Vector2{X: centerX, Y: centerY}
 			newUnit.PreviousPosition = newUnit.Position
-			newUnit.Velocity = rl.Vector2{X: 200, Y: 0}
 		} else {
 			newPosition := findClosestAvailablePosition(&newUnit, units, newUnit.Radius*2)
 			newUnit.Position = newPosition
 			newUnit.PreviousPosition = newPosition
-			newUnit.Velocity = rl.Vector2{X: 200, Y: 0}
 		}
 
 		units = append(units, &newUnit)
@@ -146,7 +143,6 @@ func spawnUnitsWithVelocity(units *[]*Unit, spawnPosition rl.Vector2, cfg *confi
 
 		unit.Position = spawnPosition
 		unit.PreviousPosition = previousPosition
-		unit.Velocity = velocity
 
 		*units = append(*units, &unit)
 		lastSpawned = &unit
@@ -201,17 +197,6 @@ func calculateCollisionWithVerlet(unitA, unitB *Unit) {
 	unitB.Position.X += correctionX
 	unitB.Position.Y += correctionY
 
-	relativeVelocityX := unitB.Velocity.X - unitA.Velocity.X
-	relativeVelocityY := unitB.Velocity.Y - unitA.Velocity.Y
-	impulse := -(1.0 + (unitA.Elasticity+unitB.Elasticity)/2) * (relativeVelocityX*normalX + relativeVelocityY*normalY) / (1/unitA.Mass + 1/unitB.Mass)
-
-	impulseX := impulse * normalX
-	impulseY := impulse * normalY
-
-	unitA.Velocity.X -= impulseX / unitA.Mass
-	unitA.Velocity.Y -= impulseY / unitA.Mass
-	unitB.Velocity.X += impulseX / unitB.Mass
-	unitB.Velocity.Y += impulseY / unitB.Mass
 }
 
 func (u *Unit) updatePositionWithVerlet(dt float32) {
