@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	simulation *physics.Simulation
+	s *physics.Simulation
 )
 
 func init() {
@@ -29,7 +29,7 @@ func init() {
 	rl.InitWindow(config.WindowWidth, config.WindowHeight, "Go Fluid Simulator")
 	rl.SetTargetFPS(config.TargetFPS)
 
-	simulation, err = physics.NewSimulation(config)
+	s, err = physics.NewSimulation(config)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -37,7 +37,7 @@ func init() {
 
 func main() {
 
-	if simulation.Config.ShouldBeProfiled {
+	if s.Config.ShouldBeProfiled {
 		f, err := os.Create("cpu.pprof")
 		if err != nil {
 			log.Fatal(err)
@@ -47,32 +47,20 @@ func main() {
 	}
 
 	for !rl.WindowShouldClose() {
-		simulation.Config.UpdateWindowSettings()
+		s.Config.UpdateWindowSettings()
 
-		if rl.IsKeyPressed(rl.KeyR) {
-			simulation.Reset()
-		} else if rl.IsKeyPressed(rl.KeySpace) {
-			simulation.IsPause = !simulation.IsPause
-		} else if rl.IsMouseButtonPressed(rl.MouseLeftButton) {
-			mousePosition := rl.GetMousePosition()
-			if mousePosition.X > 0 && mousePosition.X < float32(simulation.Config.WindowWidth-simulation.Config.SidebarWidth) && mousePosition.Y > 0 && mousePosition.Y < float32(simulation.Config.WindowHeight) {
-				simulation.NewFluidAtPosition(mousePosition)
-			}
-		} else if rl.IsMouseButtonPressed(rl.MouseRightButton) {
-			mousePosition := rl.GetMousePosition()
-			if mousePosition.X > 0 && mousePosition.X < float32(simulation.Config.WindowWidth-simulation.Config.SidebarWidth) && mousePosition.Y > 0 && mousePosition.Y < float32(simulation.Config.WindowHeight) {
-				simulation.NewFluidWithVelocity(mousePosition)
-			}
+		if !s.IsInputBeingHandled {
+			go s.HandleInput()
 		}
 
-		if !simulation.IsPause {
-			if err := simulation.Update(); err != nil {
+		if !s.IsPause {
+			if err := s.Update(); err != nil {
 				log.Fatal("Errore durante l'update della simulazione %w", err)
 			}
 
 		}
 
-		gui.Draw(simulation)
+		gui.Draw(s)
 	}
 
 	rl.CloseWindow()

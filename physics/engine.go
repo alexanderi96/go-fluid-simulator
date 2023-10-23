@@ -2,6 +2,7 @@ package physics
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/alexanderi96/go-fluid-simulator/config"
 	"github.com/alexanderi96/go-fluid-simulator/metrics"
@@ -9,35 +10,27 @@ import (
 )
 
 type Simulation struct {
-	Fluid   []*Unit
-	Metrics *metrics.Metrics
-	Config  *config.Config
-	IsPause bool
+	Fluid                []*Unit
+	Metrics              *metrics.Metrics
+	Config               *config.Config
+	IsPause              bool
+	InitialMousePosition rl.Vector2
+	CurrentMousePosition rl.Vector2
+	MouseButtonPressed   bool
+	IsInputBeingHandled  bool
 }
 
 func NewSimulation(config *config.Config) (*Simulation, error) {
 	config.UpdateWindowSettings()
 
 	sim := &Simulation{
-		Fluid:   make([]*Unit, 0, config.ParticleNumber),
+		Fluid:   make([]*Unit, 0, config.UnitNumber),
 		Metrics: &metrics.Metrics{},
 		Config:  config,
 		IsPause: false,
 	}
 
 	return sim, nil
-}
-
-func (s *Simulation) Reset() {
-	s.Fluid = []*Unit{}
-}
-
-func (s *Simulation) NewFluidAtPosition(position rl.Vector2) {
-	s.Fluid = append(s.Fluid, *newUnitsAtPosition(position, s.Config)...)
-}
-
-func (s *Simulation) NewFluidWithVelocity(position rl.Vector2) {
-	go spawnUnitsWithVelocity(&s.Fluid, position, s.Config)
 }
 
 func (s *Simulation) Update() error {
@@ -49,4 +42,47 @@ func (s *Simulation) Update() error {
 		return s.UpdateWithVerletIntegration()
 	}
 
+}
+
+func (s *Simulation) HandleInput() {
+	s.IsInputBeingHandled = true
+	if rl.IsKeyPressed(rl.KeyR) {
+		s.Fluid = []*Unit{}
+	} else if rl.IsKeyPressed(rl.KeySpace) {
+		s.IsPause = !s.IsPause
+	} else if rl.IsMouseButtonPressed(rl.MouseLeftButton) {
+		s.MouseButtonPressed = true
+		s.InitialMousePosition = rl.GetMousePosition()
+
+		for rl.IsMouseButtonDown(rl.MouseLeftButton) && s.InitialMousePosition.X > 0 && s.InitialMousePosition.X < float32(s.Config.WindowWidth-s.Config.SidebarWidth) &&
+			s.InitialMousePosition.Y > 0 && s.InitialMousePosition.Y < float32(s.Config.WindowHeight) {
+			s.CurrentMousePosition = rl.GetMousePosition()
+		}
+	} else if s.MouseButtonPressed && rl.IsMouseButtonReleased(rl.MouseLeftButton) {
+		s.MouseButtonPressed = false
+
+		if s.InitialMousePosition.X > 0 && s.InitialMousePosition.X < float32(s.Config.WindowWidth-s.Config.SidebarWidth) &&
+			s.InitialMousePosition.Y > 0 && s.InitialMousePosition.Y < float32(s.Config.WindowHeight) {
+
+			// Calcola la differenza tra la posizione finale del mouse e la posizione iniziale
+			delta := rl.Vector2Subtract(s.CurrentMousePosition, s.InitialMousePosition)
+			acceleration := rl.Vector2{}
+			// Calcola la normale del delta per ottenere la direzione
+			deltaLength := float32(math.Sqrt(float64(delta.X*delta.X + delta.Y*delta.Y)))
+			if deltaLength != 0 {
+				acceleration = rl.Vector2{
+					X: delta.X * deltaLength,
+					Y: delta.Y * deltaLength,
+				}
+
+				// Ora puoi chiamare newUnitsWithAcceleration o NewFluidAtPosition passando l'accelerazione come argomento
+			}
+			s.Fluid = append(s.Fluid, *newUnitsWithAcceleration(s.InitialMousePosition, s.Config, acceleration)...)
+		}
+	} else if rl.IsMouseButtonPressed(rl.MouseRightButton) {
+		if s.CurrentMousePosition.X > 0 && s.CurrentMousePosition.X < float32(s.Config.WindowWidth-s.Config.SidebarWidth) && s.CurrentMousePosition.Y > 0 && s.CurrentMousePosition.Y < float32(s.Config.WindowHeight) {
+			go spawnUnitsWithVelocity(&s.Fluid, s.CurrentMousePosition, s.Config)
+		}
+	}
+	s.IsInputBeingHandled = false
 }

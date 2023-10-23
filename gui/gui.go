@@ -13,7 +13,7 @@ import (
 
 func Draw(s *physics.Simulation) {
 	rl.BeginDrawing()
-	rl.ClearBackground(rl.LightGray)
+	rl.ClearBackground(rl.Green)
 
 	drawSidebar(s)
 	drawFluid(s)
@@ -22,6 +22,10 @@ func Draw(s *physics.Simulation) {
 		for _, unit := range s.Fluid {
 			drawOverlay(unit)
 		}
+	}
+
+	if s.MouseButtonPressed && s.InitialMousePosition.X > 0 && s.InitialMousePosition.X < float32(s.Config.WindowWidth-s.Config.SidebarWidth) {
+		rl.DrawLineEx(s.InitialMousePosition, s.CurrentMousePosition, 5, rl.Black)
 	}
 	rl.EndDrawing()
 
@@ -54,7 +58,7 @@ func drawSidebar(s *physics.Simulation) error {
 	rl.DrawText(quadtree, xStart, yStartTop, 20, rl.Black)
 	yStartTop += 40 + 5
 
-	selectedUnitNumbers := fmt.Sprintf("Selected Units: %d", s.Config.ParticleNumber)
+	selectedUnitNumbers := fmt.Sprintf("Selected Units: %d", s.Config.UnitNumber)
 	rl.DrawText(selectedUnitNumbers, xStart, yStartTop, 20, rl.Black)
 	yStartTop += 20 + 5
 
@@ -62,7 +66,7 @@ func drawSidebar(s *physics.Simulation) error {
 	rl.DrawText(unitNumbers, xStart, yStartTop, 20, rl.Black)
 	yStartTop += 20 + 5
 
-	s.Config.ParticleNumber = int32(gui.Slider(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: sliderLength, Height: sliderThickness}, "", "", float32(s.Config.ParticleNumber), 1, 1000))
+	s.Config.UnitNumber = int32(gui.Slider(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: sliderLength, Height: sliderThickness}, "", "", float32(s.Config.UnitNumber), 1, 1000))
 	yStartTop += 20 + 5
 
 	s.Config.ApplyGravity = gui.CheckBox(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 20, Height: 20}, "Apply Gravity", s.Config.ApplyGravity)
@@ -75,6 +79,12 @@ func drawSidebar(s *physics.Simulation) error {
 	yStartTop += 20 + 5
 
 	s.Config.ShowOverlay = gui.CheckBox(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 20, Height: 20}, "Show Overlay", s.Config.ShowOverlay)
+	yStartTop += 20 + 5
+
+	s.Config.ShowVectors = gui.CheckBox(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 20, Height: 20}, "Show Vectors", s.Config.ShowVectors)
+	yStartTop += 20 + 5
+
+	s.Config.UnitsEmitGravity = gui.CheckBox(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 20, Height: 20}, "Unit Emit Gravity", s.Config.UnitsEmitGravity)
 	yStartTop += 20 + 5
 
 	s.Config.SetRandomRadius = gui.CheckBox(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 20, Height: 20}, "Set Random Radius", s.Config.SetRandomRadius)
@@ -145,33 +155,33 @@ func drawSidebar(s *physics.Simulation) error {
 
 	}
 
-	s.Config.SetRandomMass = gui.CheckBox(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 20, Height: 20}, "Set Random Mass", s.Config.SetRandomMass)
+	s.Config.SetRandomMassMultiplier = gui.CheckBox(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 20, Height: 20}, "Set Random MassMultiplier", s.Config.SetRandomMassMultiplier)
 	yStartTop += 20 + 5
 
-	if s.Config.SetRandomMass {
-		massMinText := strconv.FormatFloat(float64(s.Config.MassMin), 'f', 2, 64)
+	if s.Config.SetRandomMassMultiplier {
+		massMinText := strconv.FormatFloat(float64(s.Config.MassMultiplierMin), 'f', 2, 64)
 
-		MassMinInput := rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 200, Height: 30}
+		MassMultiplierMinInput := rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 200, Height: 30}
 
-		MassMinEdited := gui.TextBox(MassMinInput, &massMinText, 10, true)
+		MassMultiplierMinEdited := gui.TextBox(MassMultiplierMinInput, &massMinText, 10, true)
 		yStartTop += 30 + 5
 
-		if MassMinEdited {
-			if MassMin, err := utils.CheckTextFloat32(massMinText); err == nil {
-				s.Config.MassMin = MassMin
+		if MassMultiplierMinEdited {
+			if MassMultiplierMin, err := utils.CheckTextFloat32(massMinText); err == nil {
+				s.Config.MassMultiplierMin = MassMultiplierMin
 			}
 		}
 
-		massMaxText := strconv.FormatFloat(float64(s.Config.MassMax), 'f', 2, 64)
+		massMaxText := strconv.FormatFloat(float64(s.Config.MassMultiplierMax), 'f', 2, 64)
 
-		MassMaxInput := rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 200, Height: 30}
+		MassMultiplierMaxInput := rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 200, Height: 30}
 
-		MassMaxEdited := gui.TextBox(MassMaxInput, &massMaxText, 10, true)
+		MassMultiplierMaxEdited := gui.TextBox(MassMultiplierMaxInput, &massMaxText, 10, true)
 		yStartTop += 30 + 5
 
-		if MassMaxEdited {
-			if MassMax, err := utils.CheckTextFloat32(massMaxText); err == nil {
-				s.Config.MassMax = MassMax
+		if MassMultiplierMaxEdited {
+			if MassMultiplierMax, err := utils.CheckTextFloat32(massMaxText); err == nil {
+				s.Config.MassMultiplierMax = MassMultiplierMax
 			}
 		}
 
@@ -189,12 +199,12 @@ func drawFluid(s *physics.Simulation) {
 			if s.Config.UseExperimentalQuadtree {
 				//color = utils.GetColorFromVelocity(unit.Velocity)
 			} else {
-				color = utils.GetColorFromVelocity(unit.GetVelocityWithVerlet())
+				color = utils.GetColorFromVelocity(unit.Velocity(s.Metrics.Frametime))
 			}
 		}
 
 		if s.Config.ShowVectors {
-			drawVectors(unit)
+			drawVectors(unit, s.Metrics.Frametime)
 		}
 
 		rl.DrawCircleV(unit.Position, unit.Radius, color)
@@ -208,10 +218,10 @@ func drawOverlay(u *physics.Unit) {
 	if rl.CheckCollisionPointCircle(rl.NewVector2(mouseX, mouseY), u.Position, u.Radius) {
 
 		overlayText := fmt.Sprintf(
-			"ID: %s\nRadius: %.2f\nMass: %.2f\nElasticity: %.2f",
+			"ID: %s\nRadius: %.2f\nMassMultiplier: %.2f\nElasticity: %.2f",
 			u.Id,
 			u.Radius,
-			u.Mass,
+			u.MassMultiplier,
 			u.Elasticity,
 		)
 		x := int32(u.Position.X + u.Radius + 10)
@@ -226,13 +236,13 @@ func drawOverlay(u *physics.Unit) {
 	}
 }
 
-func drawVectors(u *physics.Unit) {
+func drawVectors(u *physics.Unit, dt float32) {
 
-	endVelocity := rl.Vector2Add(u.Position, rl.Vector2Scale(u.GetVelocityWithVerlet(), 0.1))
+	endVelocity := rl.Vector2Add(u.Position, rl.Vector2Scale(u.Velocity(dt), 0.1))
 
-	rl.DrawLineEx(u.Position, endVelocity, 2, rl.Blue)
+	rl.DrawLineEx(u.Position, endVelocity, 5, rl.Blue)
 
 	endAcceleration := rl.Vector2Add(u.Position, rl.Vector2Scale(u.Acceleration, 0.1))
 
-	rl.DrawLineEx(u.Position, endAcceleration, 2, rl.Orange)
+	rl.DrawLineEx(u.Position, endAcceleration, 5, rl.Orange)
 }
