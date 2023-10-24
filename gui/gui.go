@@ -13,7 +13,7 @@ import (
 
 func Draw(s *physics.Simulation) {
 	rl.BeginDrawing()
-	rl.ClearBackground(rl.Green)
+	rl.ClearBackground(rl.White)
 
 	drawSidebar(s)
 	drawFluid(s)
@@ -27,6 +27,7 @@ func Draw(s *physics.Simulation) {
 	if s.MouseButtonPressed && s.InitialMousePosition.X > 0 && s.InitialMousePosition.X < float32(s.Config.WindowWidth-s.Config.SidebarWidth) {
 		rl.DrawLineEx(s.InitialMousePosition, s.CurrentMousePosition, 5, rl.Black)
 	}
+
 	rl.EndDrawing()
 
 }
@@ -58,8 +59,8 @@ func drawSidebar(s *physics.Simulation) error {
 	rl.DrawText(quadtree, xStart, yStartTop, 20, rl.Black)
 	yStartTop += 40 + 5
 
-	selectedUnitNumbers := fmt.Sprintf("Selected Units: %d", s.Config.UnitNumber)
-	rl.DrawText(selectedUnitNumbers, xStart, yStartTop, 20, rl.Black)
+	unitsToBeSpawned := fmt.Sprintf("Units  To Be Spawned: %d", s.Config.UnitNumber)
+	rl.DrawText(unitsToBeSpawned, xStart, yStartTop, 20, rl.Black)
 	yStartTop += 20 + 5
 
 	unitNumbers := fmt.Sprintf("Spawned Units: %d", len(s.Fluid))

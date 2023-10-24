@@ -58,16 +58,15 @@ func (s *Simulation) HandleInput() {
 			s.InitialMousePosition.Y > 0 && s.InitialMousePosition.Y < float32(s.Config.WindowHeight) {
 			s.CurrentMousePosition = rl.GetMousePosition()
 		}
+
 	} else if s.MouseButtonPressed && rl.IsMouseButtonReleased(rl.MouseLeftButton) {
 		s.MouseButtonPressed = false
 
 		if s.InitialMousePosition.X > 0 && s.InitialMousePosition.X < float32(s.Config.WindowWidth-s.Config.SidebarWidth) &&
 			s.InitialMousePosition.Y > 0 && s.InitialMousePosition.Y < float32(s.Config.WindowHeight) {
 
-			// Calcola la differenza tra la posizione finale del mouse e la posizione iniziale
 			delta := rl.Vector2Subtract(s.CurrentMousePosition, s.InitialMousePosition)
 			acceleration := rl.Vector2{}
-			// Calcola la normale del delta per ottenere la direzione
 			deltaLength := float32(math.Sqrt(float64(delta.X*delta.X + delta.Y*delta.Y)))
 			if deltaLength != 0 {
 				acceleration = rl.Vector2{
@@ -75,9 +74,9 @@ func (s *Simulation) HandleInput() {
 					Y: delta.Y * deltaLength,
 				}
 
-				// Ora puoi chiamare newUnitsWithAcceleration o NewFluidAtPosition passando l'accelerazione come argomento
 			}
 			s.Fluid = append(s.Fluid, *newUnitsWithAcceleration(s.InitialMousePosition, s.Config, acceleration)...)
+
 		}
 	} else if rl.IsMouseButtonPressed(rl.MouseRightButton) {
 		if s.CurrentMousePosition.X > 0 && s.CurrentMousePosition.X < float32(s.Config.WindowWidth-s.Config.SidebarWidth) && s.CurrentMousePosition.Y > 0 && s.CurrentMousePosition.Y < float32(s.Config.WindowHeight) {
