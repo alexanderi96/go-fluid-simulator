@@ -2,12 +2,10 @@ package gui
 
 import (
 	"fmt"
-	"strconv"
 
 	"github.com/alexanderi96/go-fluid-simulator/physics"
 	"github.com/alexanderi96/go-fluid-simulator/utils"
 
-	gui "github.com/gen2brain/raylib-go/raygui"
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
@@ -29,166 +27,6 @@ func Draw(s *physics.Simulation) {
 	}
 
 	rl.EndDrawing()
-
-}
-
-func drawSidebar(s *physics.Simulation) error {
-	rl.DrawRectangle(s.Config.ViewportX, 0, s.Config.WindowWidth, s.Config.WindowHeight, rl.RayWhite)
-
-	border := int32(10)
-	xStart := s.Config.ViewportX + border
-	yStartTop := border
-
-	sliderLength := float32(s.Config.SidebarWidth - 2*border)
-	sliderThickness := float32(20)
-	//yStartBottom := s.Config.WindowHeight - border
-
-	frametime := fmt.Sprintf("Frametime: %f", s.Metrics.Frametime)
-	rl.DrawText(frametime, xStart, yStartTop, 20, rl.Black)
-	yStartTop += 20 + 5
-
-	fps := fmt.Sprintf("FPS: %d", s.Metrics.FPS)
-	rl.DrawText(fps, xStart, yStartTop, 20, rl.Black)
-	yStartTop += 20 + 5
-
-	heapSize := fmt.Sprintf("Heap Size: %d kb", s.Metrics.HeapSize)
-	rl.DrawText(heapSize, xStart, yStartTop, 20, rl.Black)
-	yStartTop += 20 + 5
-
-	quadtree := fmt.Sprintf("Using qTree: %t", s.Config.UseExperimentalQuadtree)
-	rl.DrawText(quadtree, xStart, yStartTop, 20, rl.Black)
-	yStartTop += 40 + 5
-
-	unitsToBeSpawned := fmt.Sprintf("Units  To Be Spawned: %d", s.Config.UnitNumber)
-	rl.DrawText(unitsToBeSpawned, xStart, yStartTop, 20, rl.Black)
-	yStartTop += 20 + 5
-
-	unitNumbers := fmt.Sprintf("Spawned Units: %d", len(s.Fluid))
-	rl.DrawText(unitNumbers, xStart, yStartTop, 20, rl.Black)
-	yStartTop += 20 + 5
-
-	s.Config.UnitNumber = int32(gui.Slider(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: sliderLength, Height: sliderThickness}, "", "", float32(s.Config.UnitNumber), 1, 1000))
-	yStartTop += 20 + 5
-
-	s.Config.ApplyGravity = gui.CheckBox(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 20, Height: 20}, "Apply Gravity", s.Config.ApplyGravity)
-	yStartTop += 20 + 5
-
-	s.Config.SetRandomColor = gui.CheckBox(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 20, Height: 20}, "Set Random Color", s.Config.SetRandomColor)
-	yStartTop += 20 + 5
-
-	s.Config.ShowSpeedColor = gui.CheckBox(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 20, Height: 20}, "Show Speed Color", s.Config.ShowSpeedColor)
-	yStartTop += 20 + 5
-
-	s.Config.ShowOverlay = gui.CheckBox(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 20, Height: 20}, "Show Overlay", s.Config.ShowOverlay)
-	yStartTop += 20 + 5
-
-	s.Config.ShowVectors = gui.CheckBox(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 20, Height: 20}, "Show Vectors", s.Config.ShowVectors)
-	yStartTop += 20 + 5
-
-	s.Config.UnitsEmitGravity = gui.CheckBox(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 20, Height: 20}, "Unit Emit Gravity", s.Config.UnitsEmitGravity)
-	yStartTop += 20 + 5
-
-	s.Config.SetRandomRadius = gui.CheckBox(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 20, Height: 20}, "Set Random Radius", s.Config.SetRandomRadius)
-	yStartTop += 20 + 5
-
-	if s.Config.SetRandomRadius {
-		radMinText := strconv.FormatFloat(float64(s.Config.RadiusMin), 'f', 2, 64)
-
-		radMinInput := rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 200, Height: 30}
-
-		radMinEdited := gui.TextBox(radMinInput, &radMinText, 10, true)
-		yStartTop += 30 + 5
-
-		if radMinEdited {
-
-			if radMin, err := utils.CheckTextFloat32(radMinText); err == nil {
-				s.Config.RadiusMin = radMin
-			}
-		}
-
-		radMaxText := strconv.FormatFloat(float64(s.Config.RadiusMax), 'f', 2, 64)
-
-		radMaxInput := rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 200, Height: 30}
-
-		radMaxEdited := gui.TextBox(radMaxInput, &radMaxText, 10, true)
-		yStartTop += 30 + 5
-
-		if radMaxEdited {
-
-			if radMax, err := utils.CheckTextFloat32(radMaxText); err == nil {
-				s.Config.RadiusMax = radMax
-			}
-		}
-
-	}
-
-	s.Config.SetRandomElasticity = gui.CheckBox(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 20, Height: 20}, "Set Random Elasticity", s.Config.SetRandomElasticity)
-	yStartTop += 20 + 5
-
-	if s.Config.SetRandomElasticity {
-		elasticityMinText := strconv.FormatFloat(float64(s.Config.ElasticityMin), 'f', 2, 64)
-
-		elasticityMinInput := rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 200, Height: 30}
-
-		elasticityMinEdited := gui.TextBox(elasticityMinInput, &elasticityMinText, 10, true)
-		yStartTop += 30 + 5
-
-		if elasticityMinEdited {
-
-			if elasticityMin, err := utils.CheckTextFloat32(elasticityMinText); err == nil {
-				s.Config.ElasticityMin = elasticityMin
-			}
-		}
-
-		elasticityMaxText := strconv.FormatFloat(float64(s.Config.ElasticityMax), 'f', 2, 64)
-
-		elasticityMaxInput := rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 200, Height: 30}
-
-		elasticityMaxEdited := gui.TextBox(elasticityMaxInput, &elasticityMaxText, 10, true)
-		yStartTop += 30 + 5
-
-		if elasticityMaxEdited {
-
-			if elasticityMax, err := utils.CheckTextFloat32(elasticityMaxText); err == nil {
-				s.Config.ElasticityMax = elasticityMax
-			}
-		}
-
-	}
-
-	s.Config.SetRandomMassMultiplier = gui.CheckBox(rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 20, Height: 20}, "Set Random MassMultiplier", s.Config.SetRandomMassMultiplier)
-	yStartTop += 20 + 5
-
-	if s.Config.SetRandomMassMultiplier {
-		massMinText := strconv.FormatFloat(float64(s.Config.MassMultiplierMin), 'f', 2, 64)
-
-		MassMultiplierMinInput := rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 200, Height: 30}
-
-		MassMultiplierMinEdited := gui.TextBox(MassMultiplierMinInput, &massMinText, 10, true)
-		yStartTop += 30 + 5
-
-		if MassMultiplierMinEdited {
-			if MassMultiplierMin, err := utils.CheckTextFloat32(massMinText); err == nil {
-				s.Config.MassMultiplierMin = MassMultiplierMin
-			}
-		}
-
-		massMaxText := strconv.FormatFloat(float64(s.Config.MassMultiplierMax), 'f', 2, 64)
-
-		MassMultiplierMaxInput := rl.Rectangle{X: float32(xStart), Y: float32(yStartTop), Width: 200, Height: 30}
-
-		MassMultiplierMaxEdited := gui.TextBox(MassMultiplierMaxInput, &massMaxText, 10, true)
-		yStartTop += 30 + 5
-
-		if MassMultiplierMaxEdited {
-			if MassMultiplierMax, err := utils.CheckTextFloat32(massMaxText); err == nil {
-				s.Config.MassMultiplierMax = MassMultiplierMax
-			}
-		}
-
-	}
-
-	return nil
 
 }
 

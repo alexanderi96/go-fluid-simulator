@@ -105,9 +105,8 @@ func (c *Config) UpdateWindowSettings() {
 
 	c.WindowWidth = currentWidth
 	c.WindowHeight = currentHeight
-	c.SidebarWidth = c.WindowWidth / 5
 
-	c.ViewportX = currentWidth - c.SidebarWidth
+	c.ViewportX = currentWidth
 	c.ViewportY = currentHeight
 
 	c.GameX = c.ViewportX

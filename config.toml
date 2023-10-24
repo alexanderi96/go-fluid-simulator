@@ -22,10 +22,10 @@
   should_be_profiled = true
   use_experimental_quadtree = false
   set_random_radius = true
-  radius_min = 5
-  radius_max = 20
+  radius_min = 3
+  radius_max = 8
   set_random_mass_multiplier = true
-  mass_multiplier_min = 1
+  mass_multiplier_min = 10
   mass_multiplier_max = 100
   set_random_elasticity = true
   elasticity_min = 0.5
