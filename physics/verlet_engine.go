@@ -9,26 +9,23 @@ import (
 
 func (s *Simulation) UpdateWithVerletIntegration() error {
 	// Calcola il numero di step di risoluzione in base al frametime
-	resolutionSteps := 1 //int(math.Max(1, math.Min(10, float64(1/s.Metrics.Frametime))))
+	resolutionSteps := 3 //int(math.Max(1, math.Min(10, float64(1/s.Metrics.Frametime))))
 	//log.Println("Resolution steps:", resolutionSteps)
 	fractionalFrametime := s.Metrics.Frametime / float32(resolutionSteps)
 
-	for _, unit := range s.Fluid {
-		unit.updatePositionWithVerlet(fractionalFrametime)
-	}
-
-	for _, unit := range s.Fluid {
-		if s.Config.ApplyGravity {
-			unit.accelerate(rl.Vector2{X: 0, Y: s.Config.Gravity})
-		}
-	}
-
-	for _, unit := range s.Fluid {
-		unit.checkWallCollisionVerlet(s.Config, fractionalFrametime)
-
-	}
-
 	for step := 0; step < resolutionSteps; step++ {
+		for _, unit := range s.Fluid {
+			unit.updatePositionWithVerlet(fractionalFrametime)
+		}
+		for _, unit := range s.Fluid {
+			if s.Config.ApplyGravity {
+				unit.accelerate(rl.Vector2{X: 0, Y: s.Config.Gravity})
+			}
+		}
+		for _, unit := range s.Fluid {
+			unit.checkWallCollisionVerlet(s.Config, fractionalFrametime)
+
+		}
 		for _, unitA := range s.Fluid {
 			if unitA == nil {
 				continue
@@ -44,17 +41,16 @@ func (s *Simulation) UpdateWithVerletIntegration() error {
 				}
 
 				if s.Config.UnitsEmitGravity {
-					applyGravitationalAttraction(unitA, unitB, s.Config.UnitGravitationalMultiplier)
+					applyGravitationalAttraction(unitA, unitB, s.Config.UnitGravitationalMultiplier, s.Config.UnitInitialSpacing)
 				}
 			}
 		}
-
 	}
 
 	return nil
 }
 
-func applyGravitationalAttraction(a, b *Unit, G float32) {
+func applyGravitationalAttraction(a, b *Unit, G, spacing float32) {
 	dx := b.Position.X - a.Position.X
 	dy := b.Position.Y - a.Position.Y
 	distanceSquared := dx*dx + dy*dy
@@ -67,14 +63,14 @@ func applyGravitationalAttraction(a, b *Unit, G float32) {
 	// areOverlapping := distanceSquared < totalRadius*totalRadius
 
 	// Evita la divisione per zero e le forze estremamente forti a distanze molto piccole
-	if distance == 0 {
+	if distance <= 0 {
 		return
 	}
 
 	forceMagnitude := G * (a.Mass() * b.Mass()) / distanceSquared
 
 	// Se le unità sono sovrapposte, inverte la direzione della forza e moltiplica la magnitudine per 10
-	if distance < totalRadius+10 {
+	if distance < totalRadius+spacing {
 		//forceMagnitude = -forceMagnitude * 2
 		// Ottieni la massa media delle due unità
 		averageMass := (a.Mass() + b.Mass()) / 2
@@ -82,9 +78,6 @@ func applyGravitationalAttraction(a, b *Unit, G float32) {
 		// Modifica la magnitudine della forza in base al reciproco della massa media
 		forceMagnitude *= -1 / averageMass // Aggiungi 1 per evitare la divisione per zero
 	}
-	// if distance < totalRadius {
-	// 	forceMagnitude = -forceMagnitude
-	// }
 
 	forceX := forceMagnitude * (dx / distance)
 	forceY := forceMagnitude * (dy / distance)
