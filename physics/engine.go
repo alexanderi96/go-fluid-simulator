@@ -51,19 +51,20 @@ func (s *Simulation) HandleInput() {
 	} else if rl.IsKeyPressed(rl.KeySpace) {
 		s.IsPause = !s.IsPause
 	} else if rl.IsMouseButtonPressed(rl.MouseLeftButton) {
-		s.MouseButtonPressed = true
 		s.InitialMousePosition = rl.GetMousePosition()
 
-		for rl.IsMouseButtonDown(rl.MouseLeftButton) && s.InitialMousePosition.X > 0 && s.InitialMousePosition.X < float32(s.Config.WindowWidth-s.Config.SidebarWidth) &&
-			s.InitialMousePosition.Y > 0 && s.InitialMousePosition.Y < float32(s.Config.WindowHeight) {
+		for rl.IsMouseButtonDown(rl.MouseLeftButton) && s.InitialMousePosition.X > 0 && s.InitialMousePosition.X < float32(s.Config.ViewportX) &&
+			s.InitialMousePosition.Y > 0 && s.InitialMousePosition.Y < float32(s.Config.ViewportY) {
+			s.MouseButtonPressed = true
+
 			s.CurrentMousePosition = rl.GetMousePosition()
 		}
 
 	} else if s.MouseButtonPressed && rl.IsMouseButtonReleased(rl.MouseLeftButton) {
 		s.MouseButtonPressed = false
 
-		if s.InitialMousePosition.X > 0 && s.InitialMousePosition.X < float32(s.Config.WindowWidth-s.Config.SidebarWidth) &&
-			s.InitialMousePosition.Y > 0 && s.InitialMousePosition.Y < float32(s.Config.WindowHeight) {
+		if s.InitialMousePosition.X > 0 && s.InitialMousePosition.X < float32(s.Config.ViewportX) &&
+			s.InitialMousePosition.Y > 0 && s.InitialMousePosition.Y < float32(s.Config.ViewportY) {
 
 			delta := rl.Vector2Subtract(s.CurrentMousePosition, s.InitialMousePosition)
 			acceleration := rl.Vector2{}
@@ -79,7 +80,7 @@ func (s *Simulation) HandleInput() {
 
 		}
 	} else if rl.IsMouseButtonPressed(rl.MouseRightButton) {
-		if s.CurrentMousePosition.X > 0 && s.CurrentMousePosition.X < float32(s.Config.WindowWidth-s.Config.SidebarWidth) && s.CurrentMousePosition.Y > 0 && s.CurrentMousePosition.Y < float32(s.Config.WindowHeight) {
+		if s.CurrentMousePosition.X > 0 && s.CurrentMousePosition.X < float32(s.Config.ViewportX) && s.CurrentMousePosition.Y > 0 && s.CurrentMousePosition.Y < float32(s.Config.WindowHeight) {
 			go spawnUnitsWithVelocity(&s.Fluid, s.CurrentMousePosition, s.Config)
 		}
 	}

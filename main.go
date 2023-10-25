@@ -47,7 +47,6 @@ func main() {
 	}
 
 	for !rl.WindowShouldClose() {
-		s.Config.UpdateWindowSettings()
 
 		if !s.IsInputBeingHandled {
 			go s.HandleInput()
@@ -61,6 +60,8 @@ func main() {
 		}
 
 		gui.Draw(s)
+		s.Config.UpdateWindowSettings()
+
 	}
 
 	rl.CloseWindow()

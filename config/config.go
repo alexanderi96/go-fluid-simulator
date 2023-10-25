@@ -106,13 +106,15 @@ func (c *Config) UpdateWindowSettings() {
 	c.WindowWidth = currentWidth
 	c.WindowHeight = currentHeight
 
-	c.ViewportX = currentWidth
-	c.ViewportY = currentHeight
-
-	c.GameX = c.ViewportX
-	c.GameY = c.ViewportY
-
 	if c.FullScreen {
 		rl.ToggleFullscreen()
 	}
+}
+
+func (c *Config) ResizeViewport(X, Y int32) {
+	c.ViewportX = c.WindowWidth + X
+	c.ViewportY = c.WindowHeight + Y
+
+	c.GameX = c.ViewportX
+	c.GameY = c.ViewportY
 }
