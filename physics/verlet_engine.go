@@ -8,9 +8,8 @@ import (
 )
 
 func (s *Simulation) UpdateWithVerletIntegration() error {
-	// Calcola il numero di step di risoluzione in base al frametime
-	resolutionSteps := 3 //int(math.Max(1, math.Min(10, float64(1/s.Metrics.Frametime))))
-	//log.Println("Resolution steps:", resolutionSteps)
+	// Calcola il numero di step
+	resolutionSteps := 3
 	fractionalFrametime := s.Metrics.Frametime / float32(resolutionSteps)
 
 	for step := 0; step < resolutionSteps; step++ {
