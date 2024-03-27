@@ -14,9 +14,9 @@ import (
 
 type Unit struct {
 	Id               uuid.UUID
-	Position         rl.Vector2
-	PreviousPosition rl.Vector2
-	Acceleration     rl.Vector2
+	Position         rl.Vector3
+	PreviousPosition rl.Vector3
+	Acceleration     rl.Vector3
 	Elasticity       float32
 	Radius           float32
 	MassMultiplier   float32
@@ -24,8 +24,8 @@ type Unit struct {
 }
 
 func (u *Unit) Volume() float32 {
-	// Calcola il volume come area del cerchio (π * r^2)
-	return math.Pi * u.Radius * u.Radius
+	// Calcola il volume della sfera (4/3 * π * r^3)
+	return float32((4.0 / 3.0) * math.Pi * math.Pow(float64(u.Radius), 3))
 }
 
 func (u *Unit) Mass() float32 {
@@ -33,19 +33,21 @@ func (u *Unit) Mass() float32 {
 	return u.Volume() * u.MassMultiplier
 }
 
-func (u *Unit) Velocity(dt float32) rl.Vector2 {
-	return rl.Vector2{
+func (u *Unit) Velocity(dt float32) rl.Vector3 {
+	return rl.Vector3{
 		X: (u.Position.X - u.PreviousPosition.X) / dt,
 		Y: (u.Position.Y - u.PreviousPosition.Y) / dt,
+		Z: (u.Position.Z - u.PreviousPosition.Z) / dt,
 	}
 }
 
-func (u *Unit) accelerate(a rl.Vector2) {
+func (u *Unit) accelerate(a rl.Vector3) {
 	u.Acceleration.X += a.X
 	u.Acceleration.Y += a.Y
+	u.Acceleration.Z += a.Z
 }
 
-func newUnitWithPropertiesAndAcceleration(cfg *config.Config, acceleration rl.Vector2) *Unit {
+func newUnitWithPropertiesAndAcceleration(cfg *config.Config, acceleration rl.Vector3) *Unit {
 	currentRadius := cfg.UnitRadius
 	currentMassMultiplier := cfg.UnitMassMultiplier
 	currentElasticity := cfg.UnitElasticity
@@ -76,43 +78,48 @@ func newUnitWithPropertiesAndAcceleration(cfg *config.Config, acceleration rl.Ve
 	}
 }
 
-func findClosestAvailablePosition(newUnit *Unit, existingUnits []*Unit, step float32) rl.Vector2 {
+func findClosestAvailablePosition(newUnit *Unit, existingUnits []*Unit, step float32) rl.Vector3 {
 	for radiusMultiplier := 1; ; radiusMultiplier++ {
 		for _, unit := range existingUnits {
 			for angle := 0.0; angle <= 2*math.Pi; angle += 0.1 {
-				dx := step * float32(math.Cos(angle)) * float32(radiusMultiplier)
-				dy := step * float32(math.Sin(angle)) * float32(radiusMultiplier)
+				for zMultiplier := -radiusMultiplier; zMultiplier <= radiusMultiplier; zMultiplier++ {
+					dx := step * float32(math.Cos(angle)) * float32(radiusMultiplier)
+					dy := step * float32(math.Sin(angle)) * float32(radiusMultiplier)
+					dz := step * float32(zMultiplier)
 
-				candidateX := unit.Position.X + dx
-				candidateY := unit.Position.Y + dy
+					candidateX := unit.Position.X + dx
+					candidateY := unit.Position.Y + dy
+					candidateZ := unit.Position.Z + dz
 
-				newUnit.Position = rl.Vector2{X: candidateX, Y: candidateY}
+					newUnit.Position = rl.Vector3{X: candidateX, Y: candidateY, Z: candidateZ}
 
-				overlap := false
-				for _, existingUnit := range existingUnits {
-					if areOverlapping(newUnit, existingUnit) {
-						overlap = true
-						break
+					overlap := false
+					for _, existingUnit := range existingUnits {
+						if areOverlapping(newUnit, existingUnit) {
+							overlap = true
+							break
+						}
 					}
-				}
-				if !overlap {
-					return newUnit.Position
+					if !overlap {
+						return newUnit.Position
+					}
 				}
 			}
 		}
 	}
 }
 
-func newUnitsWithAcceleration(spawnPosition rl.Vector2, cfg *config.Config, acceleration rl.Vector2) *[]*Unit {
+func newUnitsWithAcceleration(spawnPosition rl.Vector3, cfg *config.Config, acceleration rl.Vector3) *[]*Unit {
 	units := make([]*Unit, 0, cfg.UnitNumber)
 	centerX := spawnPosition.X
 	centerY := spawnPosition.Y
+	centerZ := spawnPosition.Z
 
 	for i := 0; i < int(cfg.UnitNumber); i++ {
 		newUnit := *newUnitWithPropertiesAndAcceleration(cfg, acceleration)
 
 		if len(units) == 0 {
-			newUnit.Position = rl.Vector2{X: centerX, Y: centerY}
+			newUnit.Position = rl.Vector3{X: centerX, Y: centerY, Z: centerZ}
 			newUnit.PreviousPosition = newUnit.Position
 		} else {
 			newPosition := findClosestAvailablePosition(&newUnit, units, newUnit.Radius*2)
@@ -126,36 +133,40 @@ func newUnitsWithAcceleration(spawnPosition rl.Vector2, cfg *config.Config, acce
 	return &units
 }
 
-func calculateInitialVelocity(position rl.Vector2, gameX, GameY int32) rl.Vector2 {
+func calculateInitialVelocity(position rl.Vector3, gameX, gameY, gameZ int32) rl.Vector3 {
 	const maxSpeed float32 = 800.0
 
 	d_left := position.X
 	d_right := float32(gameX) - position.X
-	d_top := position.Y
-	d_bottom := float32(GameY) - position.Y
+	d_front := position.Y // In uno spazio 3D, Y potrebbe rappresentare la profondità/front-back
+	d_back := float32(gameY) - position.Y
+	d_bottom := position.Z // Assumendo che Z rappresenti l'asse verticale
+	d_top := float32(gameZ) - position.Z
 
-	var velocityX, velocityY float32
+	var velocityX, velocityY, velocityZ float32
 
 	velocityX = maxSpeed*(d_right/float32(gameX)) - maxSpeed*(d_left/float32(gameX))
-	velocityY = maxSpeed*(d_bottom/float32(GameY)) - maxSpeed*(d_top/float32(GameY))
+	velocityY = maxSpeed*(d_back/float32(gameY)) - maxSpeed*(d_front/float32(gameY))
+	velocityZ = maxSpeed*(d_top/float32(gameZ)) - maxSpeed*(d_bottom/float32(gameZ))
 
-	return rl.Vector2{X: velocityX, Y: velocityY}
+	return rl.Vector3{X: velocityX, Y: velocityY, Z: velocityZ}
 }
-func spawnUnitsWithVelocity(units *[]*Unit, spawnPosition rl.Vector2, cfg *config.Config) {
+func spawnUnitsWithVelocity(units *[]*Unit, spawnPosition rl.Vector3, cfg *config.Config) {
 	var lastSpawned *Unit = nil
 
 	for i := 0; i < int(cfg.UnitNumber); i++ {
-		unit := *newUnitWithPropertiesAndAcceleration(cfg, rl.Vector2{X: 0, Y: 0})
+		unit := *newUnitWithPropertiesAndAcceleration(cfg, rl.Vector3{X: 0, Y: 0, Z: 0})
 
 		for lastSpawned != nil && distanceBetween(lastSpawned.Position, spawnPosition) < 2*unit.Radius {
 			time.Sleep(100 * time.Millisecond)
 		}
 
-		velocity := calculateInitialVelocity(spawnPosition, cfg.GameX, cfg.GameY)
+		velocity := calculateInitialVelocity(spawnPosition, int32(cfg.GameX), int32(cfg.GameY), int32(cfg.GameZ))
 
-		previousPosition := rl.Vector2{
+		previousPosition := rl.Vector3{
 			X: spawnPosition.X - velocity.X/float32(rl.GetFPS()),
 			Y: spawnPosition.Y - velocity.Y/float32(rl.GetFPS()),
+			Z: spawnPosition.Z - velocity.Z/float32(rl.GetFPS()),
 		}
 
 		unit.Position = spawnPosition

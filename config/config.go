@@ -13,9 +13,9 @@ type Config struct {
 	SidebarWidth                int32
 	ViewportX                   int32
 	ViewportY                   int32
-	GameX                       int32
-	GameY                       int32
-	GameZ                       int32
+	GameX                       float32
+	GameY                       float32
+	GameZ                       float32
 	TargetFPS                   int32
 	IsResizable                 bool
 	UnitNumber                  int32
@@ -60,9 +60,9 @@ func ReadConfig(filepath string) (*Config, error) {
 		FullScreen:                  viper.GetBool("full_screen"),
 		WindowWidth:                 viper.GetInt32("window_width"),
 		WindowHeight:                viper.GetInt32("window_height"),
-		GameX:                       viper.GetInt32("game_x"),
-		GameY:                       viper.GetInt32("game_y"),
-		GameZ:                       viper.GetInt32("game_z"),
+		GameX:                       float32(viper.GetInt32("game_x")),
+		GameY:                       float32(viper.GetInt32("game_y")),
+		GameZ:                       float32(viper.GetInt32("game_z")),
 		TargetFPS:                   viper.GetInt32("target_fps"),
 		IsResizable:                 viper.GetBool("is_resizable"),
 		UnitNumber:                  viper.GetInt32("unit_number"),
@@ -115,6 +115,6 @@ func (c *Config) ResizeViewport(X, Y int32) {
 	c.ViewportX = c.WindowWidth + X
 	c.ViewportY = c.WindowHeight + Y
 
-	c.GameX = c.ViewportX
-	c.GameY = c.ViewportY
+	// c.GameX = c.ViewportX
+	// c.GameY = c.ViewportY
 }

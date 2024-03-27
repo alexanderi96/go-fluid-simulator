@@ -23,8 +23,8 @@ func RandomRaylibColor() rl.Color {
 	return rl.NewColor(r, g, b, a)
 }
 
-func GetColorFromVelocity(v rl.Vector2) color.RGBA {
-	magnitude := math.Sqrt(float64(v.X*v.X + v.Y*v.Y))
+func GetColorFromVelocity(v rl.Vector3) color.RGBA {
+	magnitude := math.Sqrt(float64(v.X*v.X + v.Y*v.Y + v.Z*v.Z))
 
 	// Aggiungi 1 a magnitude per evitare log(0)
 	// Utilizza una costante k per controllare la velocità della transizione verso il rosso
