@@ -22,8 +22,16 @@ type Simulation struct {
 	// variables added for the 3d branch
 
 	Camera    rl.Camera
-	Angle     float64
-	Direction rl.Vector3
+
+	// Variabili per tenere traccia degli angoli di rotazione (in radianti)
+	Angle float32  // Rotazione sull'asse Y
+	Pitch float32  // Rotazione sull'asse X
+	Distance float32  // Distanza dalla camera al centro del cubo
+
+	// Velocità di rotazione
+	MovementSpeed float32
+
+	CubeCenter rl.Vector3
 }
 
 func NewSimulation(config *config.Config) (*Simulation, error) {
@@ -34,7 +42,26 @@ func NewSimulation(config *config.Config) (*Simulation, error) {
 		Metrics: &metrics.Metrics{},
 		Config:  config,
 		IsPause: false,
+
+		Camera: rl.Camera{
+			Target:   rl.NewVector3(float32(config.GameX)/2, float32(config.GameY)/2, float32(config.GameZ)/2),
+			Up:       rl.NewVector3(0, 0, 1),
+			Fovy: 45,
+			Projection: rl.CameraPerspective,
+		},
+
+		Angle: 0,
+		Pitch: 0,
+		MovementSpeed: 0.01,
+
+		CubeCenter: rl.NewVector3(float32(config.GameX)/2, float32(config.GameY)/2, float32(config.GameZ)/2),
+
 	}
+
+	fovyRadians := sim.Camera.Fovy * (math.Pi / 180)
+
+	sim.Distance = float32((math.Sqrt(3) * math.Max(float64(config.GameX), math.Max(float64(config.GameY), float64(config.GameZ)))) / (2 * math.Tan(float64(fovyRadians) / 2)))
+	sim.Camera.Position = rl.NewVector3(float32(config.GameX)/2, float32(sim.Distance), float32(config.GameZ)/2)
 
 	return sim, nil
 }
@@ -94,52 +121,11 @@ func (s *Simulation) HandleInput() {
 		}
 	}
 
-	if rl.IsMouseButtonPressed(rl.MouseRightButton) {
-		println("Camera Position:", s.Camera.Position.X, s.Camera.Position.Y, s.Camera.Position.Z)
-		println("Camera Target:", s.Camera.Target.X, s.Camera.Target.Y, s.Camera.Target.Z)
-
-		// Calcolo del delta del mouse
-		mouseDelta := rl.GetMouseDelta()
-
-		// Aggiornamento dell'angolo di rotazione basato sul movimento orizzontale del mouse
-		s.Angle += float64(mouseDelta.X) * 0.01
-
-		// Calcolo della nuova direzione della camera
-		cameraDirection := rl.Vector3{
-			X: float32(math.Sin(s.Angle)), // Calcola la componente X
-			Y: 0,                          // Mantiene la camera all'altezza corrente
-			Z: float32(math.Cos(s.Angle)), // Calcola la componente Z
-		}
-
-		// Aggiornamento del target della camera basato sulla nuova direzione
-		s.Camera.Target = rl.Vector3Add(s.Camera.Position, cameraDirection)
-
-		// Assicurati di aggiornare la camera in ogni frame
-		rl.UpdateCamera(&s.Camera, rl.CameraMode(rl.CameraPerspective))
-	}
-
-	s.Direction = rl.Vector3{
-		X: float32(math.Sin(s.Angle)),
-		Z: float32(-math.Cos(s.Angle)),
-	}
-	// Controllo della posizione della camera con WASD
-	if rl.IsKeyDown(rl.KeyW) {
-		s.Camera.Position = rl.Vector3Add(s.Camera.Position, rl.Vector3Scale(s.Direction, 0.05))
-		s.Camera.Target = rl.Vector3Add(s.Camera.Target, rl.Vector3Scale(s.Direction, 0.05))
-	}
-	if rl.IsKeyDown(rl.KeyS) {
-		s.Camera.Position = rl.Vector3Add(s.Camera.Position, rl.Vector3Scale(s.Direction, -0.05))
-		s.Camera.Target = rl.Vector3Add(s.Camera.Target, rl.Vector3Scale(s.Direction, -0.05))
-	}
-	// Aggiunta di movimento laterale (strafe)
-	right := rl.Vector3Normalize(rl.Vector3CrossProduct(s.Direction, s.Camera.Up))
-	if rl.IsKeyDown(rl.KeyA) {
-		s.Camera.Position = rl.Vector3Add(s.Camera.Position, rl.Vector3Scale(right, -0.05))
-		s.Camera.Target = rl.Vector3Add(s.Camera.Target, rl.Vector3Scale(right, -0.05))
-	}
-	if rl.IsKeyDown(rl.KeyD) {
-		s.Camera.Position = rl.Vector3Add(s.Camera.Position, rl.Vector3Scale(right, 0.05))
-		s.Camera.Target = rl.Vector3Add(s.Camera.Target, rl.Vector3Scale(right, 0.05))
-	}
 	s.IsInputBeingHandled = false
+}
+
+func (s *Simulation) UpdateCameraPosition() error {
+	rl.UpdateCamera(&s.Camera, rl.CameraFree)
+
+	return nil
 }
