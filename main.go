@@ -62,8 +62,6 @@ func main() {
 
 		}
 
-		s.UpdateCameraPosition()
-
 		gui.Draw(s)
 		s.Config.UpdateWindowSettings()
 	}

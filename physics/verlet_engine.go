@@ -18,7 +18,7 @@ func (s *Simulation) UpdateWithVerletIntegration() error {
 		}
 		for _, unit := range s.Fluid {
 			if s.Config.ApplyGravity {
-				unit.accelerate(rl.Vector3{X: 0, Y: s.Config.Gravity, Z: 0})
+				unit.accelerate(rl.Vector3{X: 0, Y: -s.Config.Gravity, Z: 0})
 			}
 		}
 		for _, unit := range s.Fluid {

@@ -157,7 +157,7 @@ func drawDisplayConfigSection(s *physics.Simulation) {
 }
 
 func drawGameConfigSection(s *physics.Simulation) {
-	gameSizes := fmt.Sprintf("Game size: %dx%dx%d", s.Config.GameX, s.Config.GameY, s.Config.GameZ)
+	gameSizes := fmt.Sprintf("Game size: %.1fx%.1fx%.1f", s.Config.GameX, s.Config.GameY, s.Config.GameZ)
 	rl.DrawText(gameSizes, xContentStart, yContentStartTop, 20, rl.Black)
 	yContentStartTop += 40 + 5
 

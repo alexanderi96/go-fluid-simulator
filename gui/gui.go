@@ -29,6 +29,22 @@ func Draw(s *physics.Simulation) {
 	// 	}
 	// }
 
+	// if s.ControlMode == physics.UnitSpawnMode {
+	color := rl.Red
+	if s.IsSpawnInRange() {
+		color = rl.Green
+	}
+	rl.DrawCube(s.SpawnPosition, 1, 1, 1, color) // Modifica le dimensioni e il colore come preferisci
+	// }
+
+	// Calcola i punti più vicini sul cubo di gioco
+	xNear, yNear, zNear := calculateNearestCubePoints(s)
+
+	// Disegna le linee tratteggiate
+	drawDashedLine(xNear, s.SpawnPosition, 0.1, 0.1)
+	drawDashedLine(yNear, s.SpawnPosition, 0.1, 0.1)
+	drawDashedLine(zNear, s.SpawnPosition, 0.1, 0.1)
+
 	if s.MouseButtonPressed && s.InitialMousePosition.X > 0 && s.InitialMousePosition.X < float32(s.Config.WindowWidth-s.Config.SidebarWidth) {
 		rl.DrawLineEx(s.InitialMousePosition, s.CurrentMousePosition, 5, rl.Black)
 	}
@@ -124,4 +140,31 @@ func drawGameArea(s *physics.Simulation) {
 	rl.DrawLine3D(v6, v7, rl.Black)
 	rl.DrawLine3D(v7, v8, rl.Black)
 	rl.DrawLine3D(v8, v5, rl.Black)
+}
+
+func calculateNearestCubePoints(s *physics.Simulation) (rl.Vector3, rl.Vector3, rl.Vector3) {
+	xNear := rl.NewVector3(float32(s.Config.GameX), s.SpawnPosition.Y, s.SpawnPosition.Z)
+	yNear := rl.NewVector3(s.SpawnPosition.X, float32(s.Config.GameY), s.SpawnPosition.Z)
+	zNear := rl.NewVector3(s.SpawnPosition.X, s.SpawnPosition.Y, float32(s.Config.GameZ))
+
+	return xNear, yNear, zNear
+}
+
+func drawDashedLine(start, end rl.Vector3, dashesLength, spaceLength float32) {
+	direction := rl.Vector3Subtract(end, start)
+	totalLength := rl.Vector3Length(direction)
+	direction = rl.Vector3Normalize(direction)
+
+	for currentLength := float32(0); currentLength < totalLength; {
+		nextDashEnd := currentLength + dashesLength
+		if nextDashEnd > totalLength {
+			nextDashEnd = totalLength
+		}
+
+		dashStart := rl.Vector3Add(start, rl.Vector3Scale(direction, currentLength))
+		dashEnd := rl.Vector3Add(start, rl.Vector3Scale(direction, nextDashEnd))
+		rl.DrawLine3D(dashStart, dashEnd, rl.Black) // Cambia il colore se necessario
+
+		currentLength = nextDashEnd + spaceLength
+	}
 }

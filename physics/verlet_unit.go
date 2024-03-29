@@ -4,7 +4,6 @@ import (
 	"image/color"
 	"math"
 	"math/rand"
-	"time"
 
 	"github.com/alexanderi96/go-fluid-simulator/config"
 	"github.com/alexanderi96/go-fluid-simulator/utils"
@@ -133,46 +132,46 @@ func newUnitsWithAcceleration(spawnPosition rl.Vector3, cfg *config.Config, acce
 	return &units
 }
 
-func calculateInitialVelocity(position rl.Vector3, gameX, gameY, gameZ int32) rl.Vector3 {
-	const maxSpeed float32 = 800.0
+// func calculateInitialVelocity(position rl.Vector3, gameX, gameY, gameZ int32) rl.Vector3 {
+// 	const maxSpeed float32 = 800.0
 
-	d_left := position.X
-	d_right := float32(gameX) - position.X
-	d_front := position.Y // In uno spazio 3D, Y potrebbe rappresentare la profondità/front-back
-	d_back := float32(gameY) - position.Y
-	d_bottom := position.Z // Assumendo che Z rappresenti l'asse verticale
-	d_top := float32(gameZ) - position.Z
+// 	d_left := position.X
+// 	d_right := float32(gameX) - position.X
+// 	d_front := position.Y // In uno spazio 3D, Y potrebbe rappresentare la profondità/front-back
+// 	d_back := float32(gameY) - position.Y
+// 	d_bottom := position.Z // Assumendo che Z rappresenti l'asse verticale
+// 	d_top := float32(gameZ) - position.Z
 
-	var velocityX, velocityY, velocityZ float32
+// 	var velocityX, velocityY, velocityZ float32
 
-	velocityX = maxSpeed*(d_right/float32(gameX)) - maxSpeed*(d_left/float32(gameX))
-	velocityY = maxSpeed*(d_back/float32(gameY)) - maxSpeed*(d_front/float32(gameY))
-	velocityZ = maxSpeed*(d_top/float32(gameZ)) - maxSpeed*(d_bottom/float32(gameZ))
+// 	velocityX = maxSpeed*(d_right/float32(gameX)) - maxSpeed*(d_left/float32(gameX))
+// 	velocityY = maxSpeed*(d_back/float32(gameY)) - maxSpeed*(d_front/float32(gameY))
+// 	velocityZ = maxSpeed*(d_top/float32(gameZ)) - maxSpeed*(d_bottom/float32(gameZ))
 
-	return rl.Vector3{X: velocityX, Y: velocityY, Z: velocityZ}
-}
-func spawnUnitsWithVelocity(units *[]*Unit, spawnPosition rl.Vector3, cfg *config.Config) {
-	var lastSpawned *Unit = nil
+// 	return rl.Vector3{X: velocityX, Y: velocityY, Z: velocityZ}
+// }
+// func spawnUnitsWithVelocity(units *[]*Unit, spawnPosition rl.Vector3, cfg *config.Config) {
+// 	var lastSpawned *Unit = nil
 
-	for i := 0; i < int(cfg.UnitNumber); i++ {
-		unit := *newUnitWithPropertiesAndAcceleration(cfg, rl.Vector3{X: 0, Y: 0, Z: 0})
+// 	for i := 0; i < int(cfg.UnitNumber); i++ {
+// 		unit := *newUnitWithPropertiesAndAcceleration(cfg, rl.Vector3{X: 0, Y: 0, Z: 0})
 
-		for lastSpawned != nil && distanceBetween(lastSpawned.Position, spawnPosition) < 2*unit.Radius {
-			time.Sleep(100 * time.Millisecond)
-		}
+// 		for lastSpawned != nil && distanceBetween(lastSpawned.Position, spawnPosition) < 2*unit.Radius {
+// 			time.Sleep(100 * time.Millisecond)
+// 		}
 
-		velocity := calculateInitialVelocity(spawnPosition, int32(cfg.GameX), int32(cfg.GameY), int32(cfg.GameZ))
+// 		velocity := calculateInitialVelocity(spawnPosition, int32(cfg.GameX), int32(cfg.GameY), int32(cfg.GameZ))
 
-		previousPosition := rl.Vector3{
-			X: spawnPosition.X - velocity.X/float32(rl.GetFPS()),
-			Y: spawnPosition.Y - velocity.Y/float32(rl.GetFPS()),
-			Z: spawnPosition.Z - velocity.Z/float32(rl.GetFPS()),
-		}
+// 		previousPosition := rl.Vector3{
+// 			X: spawnPosition.X - velocity.X/float32(rl.GetFPS()),
+// 			Y: spawnPosition.Y - velocity.Y/float32(rl.GetFPS()),
+// 			Z: spawnPosition.Z - velocity.Z/float32(rl.GetFPS()),
+// 		}
 
-		unit.Position = spawnPosition
-		unit.PreviousPosition = previousPosition
+// 		unit.Position = spawnPosition
+// 		unit.PreviousPosition = previousPosition
 
-		*units = append(*units, &unit)
-		lastSpawned = &unit
-	}
-}
+// 		*units = append(*units, &unit)
+// 		lastSpawned = &unit
+// 	}
+// }
