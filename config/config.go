@@ -46,6 +46,9 @@ type Config struct {
 	ShowSpeedColor              bool
 	UnitsEmitGravity            bool
 	UnitGravitationalMultiplier float32
+	UnitTransitionDuration      float32
+	ClusterThreshold            float32
+	ClusterResistenceFactor     float32
 }
 
 func ReadConfig(filepath string) (*Config, error) {
@@ -93,6 +96,9 @@ func ReadConfig(filepath string) (*Config, error) {
 		ShowSpeedColor:              viper.GetBool("show_speed_color"),
 		UnitsEmitGravity:            viper.GetBool("units_emit_gravity"),
 		UnitGravitationalMultiplier: float32(viper.GetFloat64("unit_gravitational_multiplier")),
+		UnitTransitionDuration:      float32(viper.GetFloat64("unit_transition_duration")),
+		ClusterThreshold:            float32(viper.GetFloat64("cluster_threshold")),
+		ClusterResistenceFactor:     float32(viper.GetFloat64("cluster_resistence_factor")),
 	}
 
 	return config, nil

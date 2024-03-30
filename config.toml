@@ -8,9 +8,9 @@
   target_fps = 999
   is_resizable = true
   unit_number = 10
-  unit_radius = 40
-  unit_mass_multiplier = 5
-  unit_initial_spacing = 1
+  unit_radius = 100
+  unit_mass_multiplier = 10
+  unit_initial_spacing = 0.1
   unit_elasticity = 0.8
   wall_elasticity = 0.8
   show_vectors = false
@@ -35,3 +35,7 @@
   show_speed_color = false
   units_emit_gravity = true
   unit_gravitational_multiplier = 0.5
+
+  unit_transition_duration = 0.5
+  cluster_threshold = 10 # minimum distance in order to create a cluster
+  cluster_resistance_factor = 50000

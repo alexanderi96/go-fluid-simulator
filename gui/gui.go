@@ -60,7 +60,8 @@ func Draw(s *physics.Simulation) {
 func drawFluid(s *physics.Simulation) {
 	for _, unit := range s.Fluid {
 
-		color := unit.Color
+		color := unit.BlendedColor()
+
 		if s.Config.ShowSpeedColor {
 			if s.Config.UseExperimentalQuadtree {
 				//color = utils.GetColorFromVelocity(unit.Velocity)
@@ -168,3 +169,8 @@ func drawDashedLine(start, end rl.Vector3, dashesLength, spaceLength float32) {
 		currentLength = nextDashEnd + spaceLength
 	}
 }
+
+// func blendColor(color1, color2 rl.Color) rl.Color {
+// 	t := u.TransitionTimer / u.TransitionDuration
+// 	return BlendColor(u.Color, clusterColor, t)
+// }

@@ -20,6 +20,17 @@ type Unit struct {
 	Radius           float32
 	MassMultiplier   float32
 	Color            color.RGBA
+	OldColor         color.RGBA
+
+	Cluster		*Cluster
+	OldCluster	*Cluster
+	TransitionTimer float32 // Timer per la transizione del colore
+	TransitionDuration float32 // Durata della transizione
+}
+
+type Cluster struct {
+	Id uuid.UUID
+	Color  rl.Color
 }
 
 func (u *Unit) Volume() float32 {
@@ -50,6 +61,8 @@ func newUnitWithPropertiesAndAcceleration(cfg *config.Config, acceleration rl.Ve
 	currentRadius := cfg.UnitRadius
 	currentMassMultiplier := cfg.UnitMassMultiplier
 	currentElasticity := cfg.UnitElasticity
+	currentTransitionDuration := cfg.UnitTransitionDuration
+
 
 	if cfg.SetRandomRadius {
 		currentRadius = cfg.RadiusMin + rand.Float32()*(cfg.RadiusMax-cfg.RadiusMin)
@@ -74,6 +87,8 @@ func newUnitWithPropertiesAndAcceleration(cfg *config.Config, acceleration rl.Ve
 		MassMultiplier: currentMassMultiplier,
 		Elasticity:     currentElasticity,
 		Color:          color,
+		TransitionTimer: 0,
+		TransitionDuration: float32(currentTransitionDuration),
 	}
 }
 
@@ -175,3 +190,33 @@ func newUnitsWithAcceleration(spawnPosition rl.Vector3, cfg *config.Config, acce
 // 		lastSpawned = &unit
 // 	}
 // }
+
+
+func(u *Unit) BlendedColor() rl.Color {
+    // Assicurati che t sia compreso tra 0 e 1
+	t := u.TransitionTimer / u.TransitionDuration
+
+    if t <= 0 {
+        return u.Color
+    } else if t > 1 {
+		return u.Cluster.Color
+        t = 1
+    }
+
+	color1, color2 := u.Color, u.OldColor
+	if u.Cluster != nil {
+		color2 = u.Cluster.Color
+	} else if u.OldCluster != nil {
+		color2 = u.OldCluster.Color
+	}
+
+    // Calcola i componenti del nuovo colore interpolando linearmente tra color1 e clusterColor
+    r := float32(color1.R) + (float32(color2.R) - float32(color1.R)) * t
+    g := float32(color1.G) + (float32(color2.G) - float32(color1.G)) * t
+    b := float32(color1.B) + (float32(color2.B) - float32(color1.B)) * t
+    a := float32(color1.A) + (float32(color2.A) - float32(color1.A)) * t
+
+	u.OldColor = rl.NewColor(uint8(r), uint8(g), uint8(b), uint8(a))
+    // Crea e ritorna il nuovo colore
+    return u.OldColor
+}

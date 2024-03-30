@@ -2,54 +2,89 @@ package physics
 
 import (
 	"math"
+	"image/color"
 
 	"github.com/alexanderi96/go-fluid-simulator/config"
+	// "github.com/alexanderi96/go-fluid-simulator/utils"
+
 	rl "github.com/gen2brain/raylib-go/raylib"
+	"github.com/google/uuid"
+	
+
 )
 
 func (s *Simulation) UpdateWithVerletIntegration() error {
 	// Calcola il numero di step
-	resolutionSteps := 3
-	fractionalFrametime := s.Metrics.Frametime / float32(resolutionSteps)
+resolutionSteps := 3
+fractionalFrametime := s.Metrics.Frametime / float32(resolutionSteps)
 
-	for step := 0; step < resolutionSteps; step++ {
-		for _, unit := range s.Fluid {
-			unit.updatePositionWithVerlet(fractionalFrametime)
-		}
-		for _, unit := range s.Fluid {
-			if s.Config.ApplyGravity {
-				unit.accelerate(rl.Vector3{X: 0, Y: -s.Config.Gravity, Z: 0})
-			}
-		}
-		for _, unit := range s.Fluid {
-			unit.checkWallCollisionVerlet(s.Config, fractionalFrametime)
+s.ClusterMasses = make(map[uuid.UUID]float32)
 
+for step := 0; step < resolutionSteps; step++ {
+	
+
+	for _, unit := range s.Fluid {
+		unit.updatePositionWithVerlet(fractionalFrametime)
+		if s.Config.ApplyGravity {
+			unit.accelerate(rl.Vector3{X: 0, Y: -s.Config.Gravity, Z: 0})
 		}
-		for _, unitA := range s.Fluid {
-			if unitA == nil {
+		unit.checkWallCollisionVerlet(s.Config, fractionalFrametime)
+
+		if unit.Cluster != nil {
+			s.ClusterMasses[unit.Cluster.Id] += unit.Mass()/float32(resolutionSteps)
+		}
+	}
+
+	for _, unitA := range s.Fluid {
+		if unitA == nil {
+			continue
+		}
+
+		nearestUnit := Unit{}
+		nearestValidDistance := float32(math.Inf(-1))
+
+		for _, unitB := range s.Fluid {
+			if unitB == nil || unitA.Id == unitB.Id  {
 				continue
 			}
 
-			for _, unitB := range s.Fluid {
-				if unitB == nil {
-					continue
-				}
+			if areOverlapping(unitA, unitB) {
+				handleCollision(unitA, unitB, fractionalFrametime)
+			}
 
-				if unitA.Id != unitB.Id && areOverlapping(unitA, unitB) {
-					handleCollision(unitA, unitB, fractionalFrametime)
-				}
+			if s.Config.UnitsEmitGravity {
+				applyGravitationalAttraction(unitA, unitB, s.Config)
+			}
 
-				if s.Config.UnitsEmitGravity {
-					applyGravitationalAttraction(unitA, unitB, s.Config.UnitGravitationalMultiplier, s.Config.UnitInitialSpacing)
-				}
+			distance := getSurfaceDistance(unitA, unitB)
+			
+			if (nearestUnit == Unit{} || (nearestUnit != *unitB && distance < nearestValidDistance)) {
+				nearestUnit = *unitB
+				nearestValidDistance = distance
 			}
 		}
+
+		// TODO: find nearest unit in order to determin if unitA is in cluster
+		if nearestValidDistance <= s.Config.ClusterThreshold {
+			// in questo caso consideriamo le 2 unit appartenenti allo stesso cluster
+			updateClusters(unitA, &nearestUnit, s.ClusterMasses)
+
+		} else {
+			unitA.OldCluster = unitA.Cluster
+			unitA.Cluster = nil
+		}
+		unitA.update(fractionalFrametime)
 	}
+}
 
 	return nil
 }
 
-func applyGravitationalAttraction(a, b *Unit, G, spacing float32) {
+func getSurfaceDistance(unitA, unitB *Unit) float32 {
+	return rl.Vector3Distance(unitA.Position, unitB.Position) - (unitA.Radius + unitB.Radius)
+}
+
+func applyGravitationalAttraction(a, b *Unit, config *config.Config) {
 	dx := b.Position.X - a.Position.X
 	dy := b.Position.Y - a.Position.Y
 	dz := b.Position.Z - a.Position.Z
@@ -67,10 +102,10 @@ func applyGravitationalAttraction(a, b *Unit, G, spacing float32) {
 		return
 	}
 
-	forceMagnitude := G * (a.Mass() * b.Mass()) / distanceSquared
+	forceMagnitude := config.UnitGravitationalMultiplier * (a.Mass() * b.Mass()) / distanceSquared
 
 	// Se le unità sono sovrapposte, inverte la direzione della forza e moltiplica la magnitudine per 10
-	if distance < totalRadius+spacing {
+	if distance < totalRadius+ config.UnitInitialSpacing {
 		//forceMagnitude = -forceMagnitude * 2
 		// Ottieni la massa media delle due unità
 		averageMass := (a.Mass() + b.Mass()) / 2
@@ -89,15 +124,44 @@ func applyGravitationalAttraction(a, b *Unit, G, spacing float32) {
 	b.Acceleration.X -= forceX / b.Mass()
 	b.Acceleration.Y -= forceY / b.Mass()
 	b.Acceleration.Z -= forceZ / b.Mass()
+
+	// Se le unità appartengono allo stesso cluster, applica la forza di resistenza
+    if a.Cluster != nil && b.Cluster != nil && a.Cluster.Id == b.Cluster.Id {
+        distance := getSurfaceDistance(a, b)
+        if distance < config.ClusterThreshold {
+            // Calcola la forza di resistenza in base alla distanza e al ClusterResistenceFactor
+            resistanceForceMagnitude := config.ClusterResistenceFactor * (config.ClusterThreshold - distance)
+            // Applica la forza di resistenza alle accelerazioni delle unità
+            applyResistanceForce(a, b, resistanceForceMagnitude, distance)
+        }
+    }
+}
+
+func applyResistanceForce(a, b *Unit, forceMagnitude, distance float32) {
+    dx := b.Position.X - a.Position.X
+    dy := b.Position.Y - a.Position.Y
+    dz := b.Position.Z - a.Position.Z
+
+    // Normalizza la direzione della forza
+    distanceNormalized := float32(math.Sqrt(float64(dx*dx + dy*dy + dz*dz)))
+    if distanceNormalized == 0 {
+        return
+    }
+    dx /= distanceNormalized
+    dy /= distanceNormalized
+    dz /= distanceNormalized
+
+    // Applica la forza di resistenza alle accelerazioni delle unità
+    a.Acceleration.X -= dx * forceMagnitude / a.Mass()
+    a.Acceleration.Y -= dy * forceMagnitude / a.Mass()
+    a.Acceleration.Z -= dz * forceMagnitude / a.Mass()
+    b.Acceleration.X += dx * forceMagnitude / b.Mass()
+    b.Acceleration.Y += dy * forceMagnitude / b.Mass()
+    b.Acceleration.Z += dz * forceMagnitude / b.Mass()
 }
 
 func areOverlapping(a, b *Unit) bool {
-	deltaX := b.Position.X - a.Position.X
-	deltaY := b.Position.Y - a.Position.Y
-	deltaZ := b.Position.Z - a.Position.Z
-	distanceSquared := deltaX*deltaX + deltaY*deltaY + deltaZ*deltaZ
-	totalRadius := a.Radius + b.Radius
-	return distanceSquared < totalRadius*totalRadius
+	return getSurfaceDistance(a, b) <= 0
 }
 
 func handleCollision(a, b *Unit, dt float32) {
@@ -200,4 +264,85 @@ func distanceBetween(p1, p2 rl.Vector3) float32 {
 	dy := p2.Y - p1.Y
 	dz := p2.Z - p1.Z
 	return float32(math.Sqrt(float64(dx*dx + dy*dy + dz*dz)))
+}
+
+func(u *Unit) update(dt float32) {
+	if u.TransitionTimer < u.TransitionDuration && u.Cluster != nil {
+		u.TransitionTimer += dt
+		if u.TransitionTimer > u.TransitionDuration {
+			u.TransitionTimer = u.TransitionDuration
+		}
+	} else if u.Cluster == nil && u.TransitionTimer > 0 {
+		u.TransitionTimer -= dt
+		if u.TransitionTimer < 0 {
+			u.TransitionTimer = 0
+			u.OldCluster = &Cluster{}
+		}
+	}
+}
+
+func newCluster(unitA, unitB *Unit) *Cluster {
+	return &Cluster{
+		Id:             uuid.New(),
+		Color:          blendedColorBasedOnMasses(unitA, unitB),
+	}
+}
+
+func blendedColorBasedOnMasses(unitA, unitB *Unit) color.RGBA {
+	// Assicurati che t sia compreso tra 0 e 1
+	t := unitA.Mass() / unitB.Mass()
+
+	unitAColor := unitA.BlendedColor()
+	unitBColor := unitB.BlendedColor()
+    if t <= 0 {
+        return unitAColor
+    } else if t > 1 {
+		return unitBColor
+    }
+
+    // Calcola i componenti del nuovo colore interpolando linearmente tra color1 e clusterColor
+    r := float32(unitAColor.R) + (float32(unitBColor.R) - float32(unitAColor.R)) * t
+    g := float32(unitAColor.G) + (float32(unitBColor.G) - float32(unitAColor.G)) * t
+    b := float32(unitAColor.B) + (float32(unitBColor.B) - float32(unitAColor.B)) * t
+    a := float32(unitAColor.A) + (float32(unitBColor.A) - float32(unitAColor.A)) * t
+
+	return rl.NewColor(uint8(r), uint8(g), uint8(b), uint8(a))
+}
+
+func updateClusters(unitA, unitB *Unit, clusterMasses map[uuid.UUID]float32) {
+	if unitA.Cluster != nil && unitB.Cluster != nil && unitA.Cluster.Id != unitB.Cluster.Id {
+		if clusterMasses[unitA.Cluster.Id] < clusterMasses[unitB.Cluster.Id] {
+			unitA.TransitionTimer = 0
+			unitA.OldCluster = unitA.Cluster
+			unitA.Cluster = unitB.Cluster
+		} else {
+			unitB.TransitionTimer = 0
+			unitB.OldCluster = unitB.Cluster
+			unitB.Cluster = unitA.Cluster
+		}
+	} else if unitA.Cluster == nil && unitB.Cluster != nil {
+		unitA.TransitionTimer = 0
+		unitA.Cluster = unitB.Cluster
+	 } else if unitB.Cluster == nil && unitA.Cluster != nil {
+		unitB.TransitionTimer = 0
+		unitB.Cluster = unitA.Cluster
+	} else if unitA.Cluster == nil && unitB.Cluster == nil {
+		c := *newCluster(unitA, unitB)
+		unitA.Cluster = &c
+		unitB.Cluster = &c
+	}
+}
+
+func(s *Simulation) GetClusterMass(clusterId uuid.UUID) float32 {
+	mass := float32(0)
+	for _, unit := range s.Fluid {
+		if unit.Cluster == nil {
+			continue
+		}
+		if unit.Cluster.Id != clusterId {
+			continue
+		}
+		mass += unit.Mass()
+	}
+	return mass
 }

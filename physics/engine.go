@@ -7,6 +7,7 @@ import (
 	"github.com/alexanderi96/go-fluid-simulator/config"
 	"github.com/alexanderi96/go-fluid-simulator/metrics"
 	rl "github.com/gen2brain/raylib-go/raylib"
+	"github.com/google/uuid"
 )
 
 const (
@@ -18,6 +19,7 @@ type ControlMode int
 
 type Simulation struct {
 	Fluid                []*Unit
+	ClusterMasses        map[uuid.UUID]float32
 	Metrics              *metrics.Metrics
 	Config               *config.Config
 	IsPause              bool
@@ -74,6 +76,8 @@ func (s *Simulation) ResetCameraPosition() {
 		Fovy:       fovy,
 		Projection: rl.CameraPerspective,
 	}
+
+	s.SpawnDistance = rl.Vector3Distance(s.CubeCenter, s.Camera.Position)
 }
 
 func (s *Simulation) Update() error {
