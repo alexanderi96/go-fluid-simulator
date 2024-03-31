@@ -9,7 +9,7 @@
   is_resizable = true
   unit_number = 100
   unit_radius = 100
-  unit_mass_multiplier = 100
+  unit_mass_multiplier = 1000
   unit_initial_spacing = 0.1
   unit_elasticity = 0.8
   wall_elasticity = 0.8

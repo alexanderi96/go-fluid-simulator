@@ -27,11 +27,6 @@ for step := 0; step < resolutionSteps; step++ {
 			continue
 		}
 
-		unitA.updatePositionWithVerlet(fractionalFrametime)
-		if s.Config.ApplyGravity {
-			unitA.accelerate(rl.Vector3{X: 0, Y: -s.Config.Gravity, Z: 0})
-		}
-
 		unitA.checkWallCollisionVerlet(s.Config, fractionalFrametime)
 
 		if unitA.Cluster != nil {
@@ -71,7 +66,8 @@ for step := 0; step < resolutionSteps; step++ {
 			unitA.OldCluster = unitA.Cluster
 			unitA.Cluster = nil
 		}
-		unitA.update(fractionalFrametime)
+
+		unitA.update(s.Config.ApplyGravity, s.Config.Gravity, fractionalFrametime)
 	}
 }
 
@@ -156,6 +152,45 @@ func handleCollision(a, b *Unit, surfaceDistance, dt float32) {
 	b.Position.Z += normalZ * correction * inverseMassB
 }
 
+func handleCollisionAcceleration(a, b *Unit, surfaceDistance, dt float32) {
+    dx := b.Position.X - a.Position.X
+    dy := b.Position.Y - a.Position.Y
+    dz := b.Position.Z - a.Position.Z
+    distanceSquared := dx*dx + dy*dy + dz*dz
+    distance := float32(math.Sqrt(float64(distanceSquared)))
+
+    if distanceSquared == 0 {
+        return
+    }
+
+    normalX := dx / distance
+    normalY := dy / distance
+    normalZ := dz / distance
+
+    overlap := -surfaceDistance // Sovrapposizione positiva
+
+    // Calcola la forza di correzione basata sulla sovrapposizione
+    // Assumiamo una costante k per la forza elastica (può essere adattata per il tuo caso specifico)
+    k := float32(100.0) // Costante elastica
+    forceMagnitude := k * overlap
+
+    // Calcola l'accelerazione basata sulla forza di correzione
+    // e la massa delle unità
+    accelerationX := forceMagnitude * normalX
+    accelerationY := forceMagnitude * normalY
+    accelerationZ := forceMagnitude * normalZ
+
+    // Applica l'accelerazione alle unità
+    // L'accelerazione viene aggiunta perché assumiamo che la forza di correzione agisca in aggiunta alle forze esistenti
+    a.Acceleration.X -= accelerationX / a.Mass
+    a.Acceleration.Y -= accelerationY / a.Mass
+    a.Acceleration.Z -= accelerationZ / a.Mass
+    b.Acceleration.X += accelerationX / b.Mass
+    b.Acceleration.Y += accelerationY / b.Mass
+    b.Acceleration.Z += accelerationZ / b.Mass
+}
+
+
 
 func (u *Unit) updatePositionWithVerlet(dt float32) {
 	newPosition := rl.Vector3{}
@@ -225,7 +260,14 @@ func distanceBetween(p1, p2 rl.Vector3) float32 {
 	return float32(math.Sqrt(float64(dx*dx + dy*dy + dz*dz)))
 }
 
-func(u *Unit) update(dt float32) {
+func(u *Unit) update(applyGravity bool, gravity, dt float32) {
+
+	if applyGravity {
+		u.accelerate(rl.Vector3{X: 0, Y: -gravity, Z: 0})
+	}
+	u.updatePositionWithVerlet(dt)
+
+
 	if u.TransitionTimer < u.TransitionDuration && u.Cluster != nil {
 		u.TransitionTimer += dt
 		if u.TransitionTimer > u.TransitionDuration {
