@@ -43,10 +43,6 @@ for step := 0; step < resolutionSteps; step++ {
 
 			surfaceDistance := getSurfaceDistance(unitA, unitB)
 
-			if surfaceDistance < 0 {
-				handleCollision(unitA, unitB, surfaceDistance, fractionalFrametime)
-			}
-
 			if s.Config.UnitsEmitGravity {
 				applyGravitationalAttraction(unitA, unitB, s.Config)
 			}
@@ -54,6 +50,10 @@ for step := 0; step < resolutionSteps; step++ {
 			if (nearestUnit == Unit{} || (nearestUnit != *unitB && surfaceDistance < nearestValidDistance)) {
 				nearestUnit = *unitB
 				nearestValidDistance = surfaceDistance
+			}
+
+			if surfaceDistance < 0 {
+				handleCollision(unitA, unitB, surfaceDistance, fractionalFrametime)
 			}
 		}
 
@@ -151,46 +151,6 @@ func handleCollision(a, b *Unit, surfaceDistance, dt float32) {
 	b.Position.Y += normalY * correction * inverseMassB
 	b.Position.Z += normalZ * correction * inverseMassB
 }
-
-func handleCollisionAcceleration(a, b *Unit, surfaceDistance, dt float32) {
-    dx := b.Position.X - a.Position.X
-    dy := b.Position.Y - a.Position.Y
-    dz := b.Position.Z - a.Position.Z
-    distanceSquared := dx*dx + dy*dy + dz*dz
-    distance := float32(math.Sqrt(float64(distanceSquared)))
-
-    if distanceSquared == 0 {
-        return
-    }
-
-    normalX := dx / distance
-    normalY := dy / distance
-    normalZ := dz / distance
-
-    overlap := -surfaceDistance // Sovrapposizione positiva
-
-    // Calcola la forza di correzione basata sulla sovrapposizione
-    // Assumiamo una costante k per la forza elastica (può essere adattata per il tuo caso specifico)
-    k := float32(100.0) // Costante elastica
-    forceMagnitude := k * overlap
-
-    // Calcola l'accelerazione basata sulla forza di correzione
-    // e la massa delle unità
-    accelerationX := forceMagnitude * normalX
-    accelerationY := forceMagnitude * normalY
-    accelerationZ := forceMagnitude * normalZ
-
-    // Applica l'accelerazione alle unità
-    // L'accelerazione viene aggiunta perché assumiamo che la forza di correzione agisca in aggiunta alle forze esistenti
-    a.Acceleration.X -= accelerationX / a.Mass
-    a.Acceleration.Y -= accelerationY / a.Mass
-    a.Acceleration.Z -= accelerationZ / a.Mass
-    b.Acceleration.X += accelerationX / b.Mass
-    b.Acceleration.Y += accelerationY / b.Mass
-    b.Acceleration.Z += accelerationZ / b.Mass
-}
-
-
 
 func (u *Unit) updatePositionWithVerlet(dt float32) {
 	newPosition := rl.Vector3{}
