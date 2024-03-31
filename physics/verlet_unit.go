@@ -19,6 +19,8 @@ type Unit struct {
 	Elasticity       float32
 	Radius           float32
 	MassMultiplier   float32
+	Mass             float32
+	Volume float32
 	Color            color.RGBA
 	OldColor         color.RGBA
 
@@ -33,14 +35,14 @@ type Cluster struct {
 	Color  rl.Color
 }
 
-func (u *Unit) Volume() float32 {
+func (u *Unit) GetVolume() float32 {
 	// Calcola il volume della sfera (4/3 * π * r^3)
 	return float32((4.0 / 3.0) * math.Pi * math.Pow(float64(u.Radius), 3))
 }
 
-func (u *Unit) Mass() float32 {
+func (u *Unit) GetMass() float32 {
 	// Calcola la massa utilizzando il volume e il MassMultiplier
-	return u.Volume() * u.MassMultiplier
+	return u.Volume * u.MassMultiplier
 }
 
 func (u *Unit) Velocity(dt float32) rl.Vector3 {
@@ -80,7 +82,7 @@ func newUnitWithPropertiesAndAcceleration(cfg *config.Config, acceleration rl.Ve
 		color = utils.RandomRaylibColor()
 	}
 
-	return &Unit{
+	unit := &Unit{
 		Id:             uuid.New(),
 		Acceleration:   acceleration,
 		Radius:         currentRadius,
@@ -90,6 +92,11 @@ func newUnitWithPropertiesAndAcceleration(cfg *config.Config, acceleration rl.Ve
 		TransitionTimer: 0,
 		TransitionDuration: float32(currentTransitionDuration),
 	}
+
+	unit.Volume = unit.GetVolume()
+	unit.Mass = unit.GetMass()
+	
+	return unit
 }
 
 func findClosestAvailablePosition(newUnit *Unit, existingUnits []*Unit, step float32) rl.Vector3 {
