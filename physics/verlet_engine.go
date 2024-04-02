@@ -1,75 +1,73 @@
 package physics
 
 import (
-	"math"
 	"image/color"
+	"math"
 
 	"github.com/alexanderi96/go-fluid-simulator/config"
 	// "github.com/alexanderi96/go-fluid-simulator/utils"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 	"github.com/google/uuid"
-	
-
 )
 
 func (s *Simulation) UpdateWithVerletIntegration() error {
 	// Calcola il numero di step
-resolutionSteps := 3
-fractionalFrametime := s.Metrics.Frametime / float32(resolutionSteps)
+	resolutionSteps := 3
+	fractionalFrametime := s.Metrics.Frametime / float32(resolutionSteps)
 
-s.ClusterMasses = make(map[uuid.UUID]float32)
+	s.ClusterMasses = make(map[uuid.UUID]float32)
 
-for step := 0; step < resolutionSteps; step++ {
+	for step := 0; step < resolutionSteps; step++ {
 
-	for _, unitA := range s.Fluid {
-		if unitA == nil {
-			continue
-		}
-
-		unitA.checkWallCollisionVerlet(s.Config, fractionalFrametime)
-
-		if unitA.Cluster != nil {
-			s.ClusterMasses[unitA.Cluster.Id] += unitA.Mass/float32(resolutionSteps)
-		}
-
-		nearestUnit := Unit{}
-		nearestValidDistance := float32(math.Inf(-1))
-
-		for _, unitB := range s.Fluid {
-			if unitB == nil || unitA.Id == unitB.Id  {
+		for _, unitA := range s.Fluid {
+			if unitA == nil {
 				continue
 			}
 
-			surfaceDistance := getSurfaceDistance(unitA, unitB)
+			unitA.checkWallCollisionVerlet(s.Config, fractionalFrametime)
 
-			if s.Config.UnitsEmitGravity {
-				applyGravitationalAttraction(unitA, unitB, s.Config)
-			}
-			
-			if (nearestUnit == Unit{} || (nearestUnit != *unitB && surfaceDistance < nearestValidDistance)) {
-				nearestUnit = *unitB
-				nearestValidDistance = surfaceDistance
+			if unitA.Cluster != nil {
+				s.ClusterMasses[unitA.Cluster.Id] += unitA.Mass / float32(resolutionSteps)
 			}
 
-			if surfaceDistance < 0 {
-				handleCollision(unitA, unitB, surfaceDistance, fractionalFrametime)
+			nearestUnit := Unit{}
+			nearestValidDistance := float32(math.Inf(-1))
+
+			for _, unitB := range s.Fluid {
+				if unitB == nil || unitA.Id == unitB.Id {
+					continue
+				}
+
+				surfaceDistance := getSurfaceDistance(unitA, unitB)
+
+				if s.Config.UnitsEmitGravity {
+					applyGravitationalAttraction(unitA, unitB, s.Config)
+				}
+
+				if (nearestUnit == Unit{} || (nearestUnit != *unitB && surfaceDistance < nearestValidDistance)) {
+					nearestUnit = *unitB
+					nearestValidDistance = surfaceDistance
+				}
+
+				if surfaceDistance < 0 {
+					handleCollision(unitA, unitB, surfaceDistance, fractionalFrametime)
+				}
 			}
+
+			// TODO: find nearest unit in order to determin if unitA is in cluster
+			if nearestValidDistance <= s.Config.ClusterThreshold {
+				// in questo caso consideriamo le 2 unit appartenenti allo stesso cluster
+				updateClusters(unitA, &nearestUnit, s.ClusterMasses)
+
+			} else {
+				unitA.OldCluster = unitA.Cluster
+				unitA.Cluster = nil
+			}
+
+			unitA.update(s.Config.ApplyGravity, s.Config.Gravity, fractionalFrametime)
 		}
-
-		// TODO: find nearest unit in order to determin if unitA is in cluster
-		if nearestValidDistance <= s.Config.ClusterThreshold {
-			// in questo caso consideriamo le 2 unit appartenenti allo stesso cluster
-			updateClusters(unitA, &nearestUnit, s.ClusterMasses)
-
-		} else {
-			unitA.OldCluster = unitA.Cluster
-			unitA.Cluster = nil
-		}
-
-		unitA.update(s.Config.ApplyGravity, s.Config.Gravity, fractionalFrametime)
 	}
-}
 
 	return nil
 }
@@ -101,7 +99,7 @@ func applyGravitationalAttraction(a, b *Unit, config *config.Config) {
 	totalRadius := a.Radius + b.Radius
 
 	// Evita la divisione per zero e le forze estremamente forti a distanze molto piccole
-	if distance + totalRadius <= 0 {
+	if distance+totalRadius <= 0 {
 		return
 	}
 
@@ -144,12 +142,55 @@ func handleCollision(a, b *Unit, surfaceDistance, dt float32) {
 	inverseTotalMass := inverseMassA + inverseMassB
 	correction := overlap / inverseTotalMass
 
+	// Applica la correzione alla posizione corrente
 	a.Position.X -= normalX * correction * inverseMassA
 	a.Position.Y -= normalY * correction * inverseMassA
 	a.Position.Z -= normalZ * correction * inverseMassA
 	b.Position.X += normalX * correction * inverseMassB
 	b.Position.Y += normalY * correction * inverseMassB
 	b.Position.Z += normalZ * correction * inverseMassB
+}
+
+func handleCollisionV(u1, u2 *Unit, deltaTime float32) {
+	// Calcola la distanza tra i centri delle due unità
+	dx := u2.Position.X - u1.Position.X
+	dy := u2.Position.Y - u1.Position.Y
+	dz := u2.Position.Z - u1.Position.Z
+	distance := float32(math.Sqrt(float64(dx*dx + dy*dy + dz*dz)))
+
+	// Calcola la somma dei raggi
+	sumRadii := u1.Radius + u2.Radius
+
+	// Verifica se c'è una collisione
+	if distance < sumRadii {
+		// Calcola l'overlap (quanto le sfere sono sovrapposte)
+		overlap := sumRadii - distance
+
+		// Calcola la direzione della correzione
+		nx := dx / distance
+		ny := dy / distance
+		nz := dz / distance
+
+		// Applica la correzione alle posizioni per separare le unità
+		correction := overlap / 2
+		u1.Position.X -= nx * correction
+		u1.Position.Y -= ny * correction
+		u1.Position.Z -= nz * correction
+		u2.Position.X += nx * correction
+		u2.Position.Y += ny * correction
+		u2.Position.Z += nz * correction
+
+		// Calcola le nuove velocità applicando la restituzione
+		// Assumiamo che entrambe le unità abbiano la stessa restituzione per semplicità
+		v1 := u1.GetVelocity(deltaTime)
+		v2 := u2.GetVelocity(deltaTime)
+		u1.PreviousPosition.X = u1.Position.X - (v1.X-nx*u1.Elasticity)*deltaTime
+		u1.PreviousPosition.Y = u1.Position.Y - (v1.Y-ny*u1.Elasticity)*deltaTime
+		u1.PreviousPosition.Z = u1.Position.Z - (v1.Z-nz*u1.Elasticity)*deltaTime
+		u2.PreviousPosition.X = u2.Position.X - (v2.X+nx*u2.Elasticity)*deltaTime
+		u2.PreviousPosition.Y = u2.Position.Y - (v2.Y+ny*u2.Elasticity)*deltaTime
+		u2.PreviousPosition.Z = u2.Position.Z - (v2.Z+nz*u2.Elasticity)*deltaTime
+	}
 }
 
 func (u *Unit) updatePositionWithVerlet(dt float32) {
@@ -165,7 +206,7 @@ func (u *Unit) updatePositionWithVerlet(dt float32) {
 
 func (u *Unit) checkWallCollisionVerlet(cfg *config.Config, deltaTime float32) {
 	// Calcola la velocità
-	velocity := u.Velocity(deltaTime)
+	velocity := u.GetVelocity(deltaTime)
 
 	// Correzione asse X
 	if u.Position.X-u.Radius < 0 {
@@ -220,13 +261,12 @@ func distanceBetween(p1, p2 rl.Vector3) float32 {
 	return float32(math.Sqrt(float64(dx*dx + dy*dy + dz*dz)))
 }
 
-func(u *Unit) update(applyGravity bool, gravity, dt float32) {
+func (u *Unit) update(applyGravity bool, gravity, dt float32) {
 
 	if applyGravity {
 		u.accelerate(rl.Vector3{X: 0, Y: -gravity, Z: 0})
 	}
 	u.updatePositionWithVerlet(dt)
-
 
 	if u.TransitionTimer < u.TransitionDuration && u.Cluster != nil {
 		u.TransitionTimer += dt
@@ -244,8 +284,8 @@ func(u *Unit) update(applyGravity bool, gravity, dt float32) {
 
 func newCluster(unitA, unitB *Unit) *Cluster {
 	return &Cluster{
-		Id:             uuid.New(),
-		Color:          blendedColorBasedOnMasses(unitA, unitB),
+		Id:    uuid.New(),
+		Color: blendedColorBasedOnMasses(unitA, unitB),
 	}
 }
 
@@ -255,17 +295,17 @@ func blendedColorBasedOnMasses(unitA, unitB *Unit) color.RGBA {
 
 	unitAColor := unitA.BlendedColor()
 	unitBColor := unitB.BlendedColor()
-    if t <= 0 {
-        return unitAColor
-    } else if t > 1 {
+	if t <= 0 {
+		return unitAColor
+	} else if t > 1 {
 		return unitBColor
-    }
+	}
 
-    // Calcola i componenti del nuovo colore interpolando linearmente tra color1 e clusterColor
-    r := float32(unitAColor.R) + (float32(unitBColor.R) - float32(unitAColor.R)) * t
-    g := float32(unitAColor.G) + (float32(unitBColor.G) - float32(unitAColor.G)) * t
-    b := float32(unitAColor.B) + (float32(unitBColor.B) - float32(unitAColor.B)) * t
-    a := float32(unitAColor.A) + (float32(unitBColor.A) - float32(unitAColor.A)) * t
+	// Calcola i componenti del nuovo colore interpolando linearmente tra color1 e clusterColor
+	r := float32(unitAColor.R) + (float32(unitBColor.R)-float32(unitAColor.R))*t
+	g := float32(unitAColor.G) + (float32(unitBColor.G)-float32(unitAColor.G))*t
+	b := float32(unitAColor.B) + (float32(unitBColor.B)-float32(unitAColor.B))*t
+	a := float32(unitAColor.A) + (float32(unitBColor.A)-float32(unitAColor.A))*t
 
 	return rl.NewColor(uint8(r), uint8(g), uint8(b), uint8(a))
 }
@@ -284,7 +324,7 @@ func updateClusters(unitA, unitB *Unit, clusterMasses map[uuid.UUID]float32) {
 	} else if unitA.Cluster == nil && unitB.Cluster != nil {
 		unitA.TransitionTimer = 0
 		unitA.Cluster = unitB.Cluster
-	 } else if unitB.Cluster == nil && unitA.Cluster != nil {
+	} else if unitB.Cluster == nil && unitA.Cluster != nil {
 		unitB.TransitionTimer = 0
 		unitB.Cluster = unitA.Cluster
 	} else if unitA.Cluster == nil && unitB.Cluster == nil {
@@ -294,7 +334,7 @@ func updateClusters(unitA, unitB *Unit, clusterMasses map[uuid.UUID]float32) {
 	}
 }
 
-func(s *Simulation) GetClusterMass(clusterId uuid.UUID) float32 {
+func (s *Simulation) GetClusterMass(clusterId uuid.UUID) float32 {
 	mass := float32(0)
 	for _, unit := range s.Fluid {
 		if unit.Cluster == nil {

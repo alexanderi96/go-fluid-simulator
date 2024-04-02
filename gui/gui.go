@@ -66,7 +66,7 @@ func drawFluid(s *physics.Simulation) {
 			if s.Config.UseExperimentalQuadtree {
 				//color = utils.GetColorFromVelocity(unit.Velocity)
 			} else {
-				color = utils.GetColorFromVelocity(unit.Velocity(s.Metrics.Frametime))
+				color = utils.GetColorFromVelocity(unit.GetVelocity(s.Metrics.Frametime))
 			}
 		}
 
@@ -103,16 +103,16 @@ func drawFluid(s *physics.Simulation) {
 // 	}
 // }
 
-// func drawVectors(u *physics.Unit, dt float32) {
+func drawVectors(u *physics.Unit, dt float32) {
 
-// 	endVelocity := rl.Vector2Add(u.Position, rl.Vector2Scale(u.Velocity(dt), 0.1))
+	endVelocity := rl.Vector3Add(u.Position, rl.Vector3Scale(u.GetVelocity(dt), 0.1))
 
-// 	rl.DrawLineEx(u.Position, endVelocity, 5, rl.Blue)
+	rl.DrawLineEx(rl.NewVector2(u.Position.X, u.Position.Y), rl.NewVector2(endVelocity.X, endVelocity.Y), 5, rl.Blue)
 
-// 	endAcceleration := rl.Vector2Add(u.Position, rl.Vector2Scale(u.Acceleration, 0.1))
+	endAcceleration := rl.Vector3Add(u.Position, rl.Vector3Scale(u.Acceleration, 0.1))
 
-// 	rl.DrawLineEx(u.Position, endAcceleration, 5, rl.Orange)
-// }
+	rl.DrawLineEx(rl.NewVector2(u.Position.X, u.Position.Y), rl.NewVector2(endAcceleration.X, endAcceleration.Y), 5, rl.Orange)
+}
 
 func drawGameArea(s *physics.Simulation) {
 	// Vertici del cubo

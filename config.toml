@@ -1,41 +1,52 @@
-
-  full_screen = false
-  window_width = 1280
-  window_height = 720
-  game_x = 200
-  game_y = 200
-  game_z = 200
+# simulation config
   target_fps = 999
+  full_screen = false
+  window_width = 1920
+  window_height = 1280
   is_resizable = true
-  unit_number = 250
-  unit_radius = 100
-  unit_mass_multiplier = 500
-  unit_initial_spacing = 0
-  unit_elasticity = 0.8
+  should_be_profiled = true
+
+# world config
+  game_x = 100
+  game_y = 100
+  game_z = 100
   wall_elasticity = 0.8
-  show_vectors = false
-  scale_factor = 1 # 1 pixel = 1 cm
   apply_gravity = false
   gravity = 9.81
-  show_quadtree = false
-  show_trail = false
-  should_be_profiled = true
   use_experimental_quadtree = false
+  show_quadtree = false
+  
+# unit config
+  unit_number = 500
+  unit_initial_spacing = 0
+
+  unit_radius = 0.1
   set_random_radius = true
-  radius_min = 0.1
+  radius_min = 0.5
   radius_max = 1
+  
+  unit_mass_multiplier = 1
   set_random_mass_multiplier = true
   mass_multiplier_min = 1
   mass_multiplier_max = 10
+
+  units_emit_gravity = true
+  unit_gravitational_multiplier = 1
+  
+  unit_elasticity = 0.8
   set_random_elasticity = true
   elasticity_min = 0.5
   elasticity_max = 0.7
+  
+
+  show_vectors = true
+  scale_factor = 1 # 1 pixel = 1 cm
+  show_trail = true
   show_overlay = true
   set_random_color = true
   show_speed_color = false
-  units_emit_gravity = true
-  unit_gravitational_multiplier = 1
-
+  
+# cluster config
   unit_transition_duration = 5
   cluster_threshold = 1 # minimum distance in order to create a cluster
   cluster_resistance_factor = 50
