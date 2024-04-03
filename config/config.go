@@ -28,10 +28,10 @@ type Config struct {
 	WallElasticity              float32
 	ApplyGravity                bool
 	Gravity                     float32
-	ShowQuadtree                bool
+	ShowOctree                  bool
 	ShowTrail                   bool
 	ShouldBeProfiled            bool
-	UseExperimentalQuadtree     bool
+	UseExperimentalOctree       bool
 	SetRandomRadius             bool
 	RadiusMin                   float32
 	RadiusMax                   float32
@@ -49,7 +49,10 @@ type Config struct {
 	UnitTransitionDuration      float32
 	ClusterThreshold            float32
 	ClusterResistenceFactor     float32
-	UNitRadiusMultiplier        float32
+	UnitRadiusMultiplier        float32
+	ShowClusterColor            bool
+	ShowMassColor               bool
+	OctreeLevel                 int32
 }
 
 func ReadConfig(filepath string) (*Config, error) {
@@ -79,10 +82,10 @@ func ReadConfig(filepath string) (*Config, error) {
 		WallElasticity:              float32(viper.GetFloat64("wall_elasticity")),
 		ApplyGravity:                viper.GetBool("apply_gravity"),
 		Gravity:                     float32(viper.GetFloat64("gravity")),
-		ShowQuadtree:                viper.GetBool("show_quadtree"),
+		ShowOctree:                  viper.GetBool("show_octree"),
 		ShowTrail:                   viper.GetBool("show_trail"),
 		ShouldBeProfiled:            viper.GetBool("should_be_profiled"),
-		UseExperimentalQuadtree:     viper.GetBool("use_experimental_quadtree"),
+		UseExperimentalOctree:       viper.GetBool("use_experimental_octree"),
 		SetRandomRadius:             viper.GetBool("set_random_radius"),
 		RadiusMin:                   float32(viper.GetFloat64("radius_min")),
 		RadiusMax:                   float32(viper.GetFloat64("radius_max")),
@@ -100,7 +103,10 @@ func ReadConfig(filepath string) (*Config, error) {
 		UnitTransitionDuration:      float32(viper.GetFloat64("unit_transition_duration")),
 		ClusterThreshold:            float32(viper.GetFloat64("cluster_threshold")),
 		ClusterResistenceFactor:     float32(viper.GetFloat64("cluster_resistence_factor")),
-		UNitRadiusMultiplier:        float32(viper.GetFloat64("unit_radius_multiplier")),
+		UnitRadiusMultiplier:        float32(viper.GetFloat64("unit_radius_multiplier")),
+		ShowClusterColor:            viper.GetBool("show_cluster_color"),
+		ShowMassColor:               viper.GetBool("show_mass_color"),
+		OctreeLevel:                 viper.GetInt32("octree_level"),
 	}
 
 	return config, nil

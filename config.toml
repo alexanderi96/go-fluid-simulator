@@ -5,6 +5,7 @@
   window_height = 720
   is_resizable = true
   should_be_profiled = true
+  octree_level = 5
 
 # world config
   game_x = 50
@@ -13,15 +14,15 @@
   wall_elasticity = 0.8
   apply_gravity = false
   gravity = 9.81
-  use_experimental_quadtree = false
-  show_quadtree = false
+  use_experimental_octree = true
+  show_octree = true
   
 # unit config
-  unit_number = 250
-  unit_initial_spacing = 1
+  unit_number = 1
+  unit_initial_spacing = 0
 
   unit_radius = 1
-  unit_radius_multiplier = 0.05
+  unit_radius_multiplier = 0.2
   set_random_radius = true
   radius_min = 1
   radius_max = 5
@@ -29,7 +30,8 @@
   unit_mass_multiplier = 1
   set_random_mass_multiplier = true
   mass_multiplier_min = 1
-  mass_multiplier_max = 100
+  mass_multiplier_max = 10
+  show_mass_color = false
 
   units_emit_gravity = true
   unit_gravitational_multiplier = 1
@@ -40,10 +42,10 @@
   elasticity_max = 0.7
   
 
-  show_vectors = true
+  show_vectors = false
   scale_factor = 1 # 1 pixel = 1 cm
-  show_trail = true
-  show_overlay = true
+  show_trail = false
+  show_overlay = false
   set_random_color = true
   show_speed_color = false
   
@@ -51,3 +53,4 @@
   unit_transition_duration = 5
   cluster_threshold = 1 # minimum distance in order to create a cluster
   cluster_resistance_factor = 50
+  show_cluster_color = false

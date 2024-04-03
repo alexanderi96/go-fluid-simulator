@@ -103,7 +103,7 @@ func drawDebugSection(s *physics.Simulation) {
 	s.Config.ShowVectors = gui.CheckBox(rl.Rectangle{X: float32(xContentStart), Y: float32(yContentStartTop), Width: 20, Height: 20}, "Show Vectors", s.Config.ShowVectors)
 	yContentStartTop += 20 + 5
 
-	s.Config.ShowQuadtree = gui.CheckBox(rl.Rectangle{X: float32(xContentStart), Y: float32(yContentStartTop), Width: 20, Height: 20}, "Show Quadtree", s.Config.ShowQuadtree)
+	s.Config.ShowOctree = gui.CheckBox(rl.Rectangle{X: float32(xContentStart), Y: float32(yContentStartTop), Width: 20, Height: 20}, "Show Octree", s.Config.ShowOctree)
 	yContentStartTop += 20 + 5
 
 	s.Config.ShowTrail = gui.CheckBox(rl.Rectangle{X: float32(xContentStart), Y: float32(yContentStartTop), Width: 20, Height: 20}, "Show Trail", s.Config.ShowTrail)
@@ -112,7 +112,7 @@ func drawDebugSection(s *physics.Simulation) {
 	s.Config.ShouldBeProfiled = gui.CheckBox(rl.Rectangle{X: float32(xContentStart), Y: float32(yContentStartTop), Width: 20, Height: 20}, "Should be profiled", s.Config.ShouldBeProfiled)
 	yContentStartTop += 20 + 5
 
-	quadtree := fmt.Sprintf("Using qTree: %t", s.Config.UseExperimentalQuadtree)
+	quadtree := fmt.Sprintf("Using qTree: %t", s.Config.UseExperimentalOctree)
 	rl.DrawText(quadtree, xContentStart, yContentStartTop, 20, rl.Black)
 	yContentStartTop += 40 + 5
 
@@ -179,6 +179,12 @@ func drawGameConfigSection(s *physics.Simulation) {
 	yContentStartTop += 20 + 5
 
 	s.Config.ShowSpeedColor = gui.CheckBox(rl.Rectangle{X: float32(xContentStart), Y: float32(yContentStartTop), Width: 20, Height: 20}, "Show Speed Color", s.Config.ShowSpeedColor)
+	yContentStartTop += 20 + 5
+
+	s.Config.ShowClusterColor = gui.CheckBox(rl.Rectangle{X: float32(xContentStart), Y: float32(yContentStartTop), Width: 20, Height: 20}, "Show Cluster Color", s.Config.ShowClusterColor)
+	yContentStartTop += 20 + 5
+
+	s.Config.ShowMassColor = gui.CheckBox(rl.Rectangle{X: float32(xContentStart), Y: float32(yContentStartTop), Width: 20, Height: 20}, "Show Mass Color", s.Config.ShowMassColor)
 	yContentStartTop += 20 + 5
 
 	s.Config.UnitsEmitGravity = gui.CheckBox(rl.Rectangle{X: float32(xContentStart), Y: float32(yContentStartTop), Width: 20, Height: 20}, "Unit Emit Gravity", s.Config.UnitsEmitGravity)

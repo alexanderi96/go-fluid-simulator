@@ -1,7 +1,6 @@
 package physics
 
 import (
-	"fmt"
 	"math"
 
 	"github.com/alexanderi96/go-fluid-simulator/config"
@@ -18,10 +17,13 @@ const (
 type ControlMode int
 
 type Simulation struct {
-	Fluid                []*Unit
-	ClusterMasses        map[uuid.UUID]float32
-	Metrics              *metrics.Metrics
-	Config               *config.Config
+	Fluid         []*Unit
+	ClusterMasses map[uuid.UUID]float32
+	Metrics       *metrics.Metrics
+	Config        *config.Config
+
+	Octree *Octree
+
 	IsPause              bool
 	InitialMousePosition rl.Vector2
 	CurrentMousePosition rl.Vector2
@@ -29,13 +31,13 @@ type Simulation struct {
 	IsInputBeingHandled  bool
 
 	// variables added for the 3d branch
-
 	Camera rl.Camera
 
 	// Velocità di rotazione
 	MovementSpeed float32
 
-	CubeCenter rl.Vector3
+	WorldBoundray rl.BoundingBox
+	CubeCenter    rl.Vector3
 
 	ControlMode   ControlMode
 	SpawnDistance float32
@@ -52,12 +54,15 @@ func NewSimulation(config *config.Config) (*Simulation, error) {
 		Config:  config,
 		IsPause: false,
 
-		CubeCenter: cubeCenter,
+		WorldBoundray: rl.NewBoundingBox(rl.NewVector3(0, 0, 0), rl.NewVector3(float32(config.GameX), float32(config.GameY), float32(config.GameZ))),
+		CubeCenter:    cubeCenter,
 
 		ControlMode:   UnitSpawnMode,
 		SpawnDistance: 0,
 		SpawnPosition: cubeCenter,
 	}
+
+	sim.Octree = NewOctree(int(config.OctreeLevel), sim.WorldBoundray)
 
 	sim.ResetCameraPosition()
 
@@ -83,26 +88,13 @@ func (s *Simulation) ResetCameraPosition() {
 func (s *Simulation) Update() error {
 	s.Metrics.Update()
 
-	if s.Config.UseExperimentalQuadtree {
-		return fmt.Errorf("quadtree not implemented yet")
+	if s.Config.UseExperimentalOctree {
+		return s.UpdateWithOctrees()
 	} else {
 		return s.UpdateWithVerletIntegration()
 	}
 
 }
-
-// Funzione ausiliaria per calcolare il vettore di accelerazione
-// func CalculateAccelerationVector(displacement rl.Vector3) rl.Vector3 {
-// 	// Implementa qui la logica per calcolare l'accelerazione in base allo spostamento
-// 	// e ad altri fattori come il tempo trascorso e la velocità del movimento del mouse.
-// 	// Questo è solo un esempio e potrebbe richiedere un'implementazione specifica.
-// 	acceleration := rl.Vector3{
-// 		X: displacement.X / 2, // Esempio di calcolo
-// 		Y: displacement.Y / 2, // Esempio di calcolo
-// 		Z: 0,
-// 	}
-// 	return acceleration
-// }
 
 func (s *Simulation) HandleInput() {
 	s.IsInputBeingHandled = true
@@ -143,7 +135,7 @@ func (s *Simulation) HandleInput() {
 		s.UpdateCameraPosition()
 
 	case UnitSpawnMode:
-		s.CalculateSpawnPosition()
+		s.UpdateSpawnPosition()
 	}
 
 	s.IsInputBeingHandled = false
@@ -155,7 +147,7 @@ func (s *Simulation) UpdateCameraPosition() error {
 	return nil
 }
 
-func (s *Simulation) CalculateSpawnPosition() {
+func (s *Simulation) UpdateSpawnPosition() {
 	mouseRay := rl.GetMouseRay(rl.GetMousePosition(), s.Camera)
 
 	// Calcola la distanza basata sulla rotazione della rotella del mouse
@@ -167,6 +159,6 @@ func (s *Simulation) CalculateSpawnPosition() {
 }
 
 func (s *Simulation) IsSpawnInRange() bool {
-	return s.SpawnPosition.X >= 0 && s.SpawnPosition.X <= float32(s.Config.GameX) &&
-		s.SpawnPosition.Y >= 0 && s.SpawnPosition.Y <= float32(s.Config.GameY) && s.SpawnPosition.Z >= 0 && s.SpawnPosition.Z <= float32(s.Config.GameZ)
+	return s.SpawnPosition.X >= s.WorldBoundray.Min.X && s.SpawnPosition.X <= s.WorldBoundray.Max.X &&
+		s.SpawnPosition.Y >= s.WorldBoundray.Min.Y && s.SpawnPosition.Y <= s.WorldBoundray.Max.Y && s.SpawnPosition.Z >= s.WorldBoundray.Min.Z && s.SpawnPosition.Z <= s.WorldBoundray.Max.Z
 }

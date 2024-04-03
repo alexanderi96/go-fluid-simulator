@@ -23,6 +23,16 @@ func RandomRaylibColor() rl.Color {
 	return rl.NewColor(r, g, b, a)
 }
 
+// write a function that return a rl.Color from a ginev mass. the hevier the mass, the darker the color
+func GetColorFromMass(mass float32) color.RGBA {
+	return color.RGBA{
+		R: uint8(mass * 255),
+		G: uint8(mass * 255),
+		B: uint8(mass * 255),
+		A: 255,
+	}
+}
+
 func GetColorFromVelocity(v rl.Vector3) color.RGBA {
 	magnitude := math.Sqrt(float64(v.X*v.X + v.Y*v.Y + v.Z*v.Z))
 

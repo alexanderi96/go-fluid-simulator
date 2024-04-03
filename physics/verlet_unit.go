@@ -60,14 +60,72 @@ func (u *Unit) accelerate(a rl.Vector3) {
 	u.Acceleration.Z += a.Z
 }
 
+func (u *Unit) update(applyGravity bool, gravity, dt float32) {
+
+	if applyGravity {
+		u.accelerate(rl.Vector3{X: 0, Y: -gravity, Z: 0})
+	}
+	u.updatePositionWithVerlet(dt)
+
+	if u.TransitionTimer < u.TransitionDuration && u.Cluster != nil {
+		u.TransitionTimer += dt
+		if u.TransitionTimer > u.TransitionDuration {
+			u.TransitionTimer = u.TransitionDuration
+		}
+	} else if u.Cluster == nil && u.TransitionTimer > 0 {
+		u.TransitionTimer -= dt
+		if u.TransitionTimer < 0 {
+			u.TransitionTimer = 0
+			u.OldCluster = &Cluster{}
+		}
+	}
+}
+
+func (u *Unit) updatePositionWithVerlet(dt float32) {
+	newPosition := rl.Vector3{}
+	newPosition.X = 2*u.Position.X - u.PreviousPosition.X + u.Acceleration.X*dt*dt
+	newPosition.Y = 2*u.Position.Y - u.PreviousPosition.Y + u.Acceleration.Y*dt*dt
+	newPosition.Z = 2*u.Position.Z - u.PreviousPosition.Z + u.Acceleration.Z*dt*dt
+
+	u.PreviousPosition = u.Position
+	u.Position = newPosition
+	u.Acceleration = rl.Vector3{X: 0, Y: 0, Z: 0}
+}
+
+func (u *Unit) checkWallCollisionVerlet(boundary rl.BoundingBox, wallElasticity, deltaTime float32) {
+	// Calcola la velocità
+	velocity := u.GetVelocity(deltaTime)
+	elasticity := float32(math.Min(float64(u.Elasticity), float64(wallElasticity)))
+
+	// Funzione di correzione per ogni asse
+	correctAxis := func(pos, prevPos *float32, vel *float32, min, max float32) {
+		if *pos-u.Radius < min {
+			overlap := u.Radius - *pos
+			*pos += overlap
+			*vel = -*vel * elasticity
+			*prevPos = *pos - *vel*deltaTime
+		} else if *pos+u.Radius > max {
+			overlap := (*pos + u.Radius) - max
+			*pos -= overlap
+			*vel = -*vel * elasticity
+			*prevPos = *pos - *vel*deltaTime
+		}
+	}
+
+	// Correzione per ogni asse
+	correctAxis(&u.Position.X, &u.PreviousPosition.X, &velocity.X, boundary.Min.X, boundary.Max.X)
+	correctAxis(&u.Position.Y, &u.PreviousPosition.Y, &velocity.Y, boundary.Min.Y, boundary.Max.Y)
+	correctAxis(&u.Position.Z, &u.PreviousPosition.Z, &velocity.Z, boundary.Min.Z, boundary.Max.Z)
+}
+
 func newUnitWithPropertiesAndAcceleration(cfg *config.Config, acceleration rl.Vector3) *Unit {
-	currentRadius := cfg.UnitRadius * cfg.UNitRadiusMultiplier
+	currentRadius := cfg.UnitRadius * cfg.UnitRadiusMultiplier
 	currentMassMultiplier := cfg.UnitMassMultiplier
 	currentElasticity := cfg.UnitElasticity
 	currentTransitionDuration := cfg.UnitTransitionDuration
 
 	if cfg.SetRandomRadius {
-		currentRadius = (cfg.RadiusMin + rand.Float32()*(cfg.RadiusMax-cfg.RadiusMin)) * cfg.UNitRadiusMultiplier
+		currentRadius = (cfg.RadiusMin + rand.Float32()*(cfg.RadiusMax-cfg.RadiusMin)) * cfg.UnitRadiusMultiplier
 	}
 	if cfg.SetRandomMassMultiplier {
 		currentMassMultiplier = cfg.MassMultiplierMin + rand.Float32()*(cfg.MassMultiplierMax-cfg.MassMultiplierMin)
