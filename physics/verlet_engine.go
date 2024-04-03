@@ -151,48 +151,6 @@ func handleCollision(a, b *Unit, surfaceDistance, dt float32) {
 	b.Position.Z += normalZ * correction * inverseMassB
 }
 
-func handleCollisionV(u1, u2 *Unit, deltaTime float32) {
-	// Calcola la distanza tra i centri delle due unità
-	dx := u2.Position.X - u1.Position.X
-	dy := u2.Position.Y - u1.Position.Y
-	dz := u2.Position.Z - u1.Position.Z
-	distance := float32(math.Sqrt(float64(dx*dx + dy*dy + dz*dz)))
-
-	// Calcola la somma dei raggi
-	sumRadii := u1.Radius + u2.Radius
-
-	// Verifica se c'è una collisione
-	if distance < sumRadii {
-		// Calcola l'overlap (quanto le sfere sono sovrapposte)
-		overlap := sumRadii - distance
-
-		// Calcola la direzione della correzione
-		nx := dx / distance
-		ny := dy / distance
-		nz := dz / distance
-
-		// Applica la correzione alle posizioni per separare le unità
-		correction := overlap / 2
-		u1.Position.X -= nx * correction
-		u1.Position.Y -= ny * correction
-		u1.Position.Z -= nz * correction
-		u2.Position.X += nx * correction
-		u2.Position.Y += ny * correction
-		u2.Position.Z += nz * correction
-
-		// Calcola le nuove velocità applicando la restituzione
-		// Assumiamo che entrambe le unità abbiano la stessa restituzione per semplicità
-		v1 := u1.GetVelocity(deltaTime)
-		v2 := u2.GetVelocity(deltaTime)
-		u1.PreviousPosition.X = u1.Position.X - (v1.X-nx*u1.Elasticity)*deltaTime
-		u1.PreviousPosition.Y = u1.Position.Y - (v1.Y-ny*u1.Elasticity)*deltaTime
-		u1.PreviousPosition.Z = u1.Position.Z - (v1.Z-nz*u1.Elasticity)*deltaTime
-		u2.PreviousPosition.X = u2.Position.X - (v2.X+nx*u2.Elasticity)*deltaTime
-		u2.PreviousPosition.Y = u2.Position.Y - (v2.Y+ny*u2.Elasticity)*deltaTime
-		u2.PreviousPosition.Z = u2.Position.Z - (v2.Z+nz*u2.Elasticity)*deltaTime
-	}
-}
-
 func (u *Unit) updatePositionWithVerlet(dt float32) {
 	newPosition := rl.Vector3{}
 	newPosition.X = 2*u.Position.X - u.PreviousPosition.X + u.Acceleration.X*dt*dt
@@ -252,13 +210,6 @@ func (u *Unit) checkWallCollisionVerlet(cfg *config.Config, deltaTime float32) {
 		velocity.Z = -velocity.Z * cfg.WallElasticity
 		u.PreviousPosition.Z = u.Position.Z - velocity.Z*deltaTime
 	}
-}
-
-func distanceBetween(p1, p2 rl.Vector3) float32 {
-	dx := p2.X - p1.X
-	dy := p2.Y - p1.Y
-	dz := p2.Z - p1.Z
-	return float32(math.Sqrt(float64(dx*dx + dy*dy + dz*dz)))
 }
 
 func (u *Unit) update(applyGravity bool, gravity, dt float32) {

@@ -70,9 +70,9 @@ func (s *Simulation) ResetCameraPosition() {
 	d := float32((math.Sqrt(3) * math.Max(float64(s.Config.GameX), math.Max(float64(s.Config.GameY), float64(s.Config.GameZ)))) / (2 * math.Tan(float64(fovyRadians)/2)))
 
 	s.Camera = rl.Camera{
-		Position:   rl.NewVector3(float32(s.Config.GameX)/2, float32(d), float32(s.Config.GameZ)/2),
-		Target:     rl.NewVector3(float32(s.Config.GameX)/2, float32(s.Config.GameY)/2, float32(s.Config.GameZ)/2),
-		Up:         rl.NewVector3(0, 0, 1),
+		Position:   rl.NewVector3(s.Config.GameX/2, float32(d), float32(d)),
+		Target:     s.CubeCenter,
+		Up:         rl.NewVector3(0, 1, 0),
 		Fovy:       fovy,
 		Projection: rl.CameraPerspective,
 	}
@@ -91,6 +91,19 @@ func (s *Simulation) Update() error {
 
 }
 
+// Funzione ausiliaria per calcolare il vettore di accelerazione
+// func CalculateAccelerationVector(displacement rl.Vector3) rl.Vector3 {
+// 	// Implementa qui la logica per calcolare l'accelerazione in base allo spostamento
+// 	// e ad altri fattori come il tempo trascorso e la velocità del movimento del mouse.
+// 	// Questo è solo un esempio e potrebbe richiedere un'implementazione specifica.
+// 	acceleration := rl.Vector3{
+// 		X: displacement.X / 2, // Esempio di calcolo
+// 		Y: displacement.Y / 2, // Esempio di calcolo
+// 		Z: 0,
+// 	}
+// 	return acceleration
+// }
+
 func (s *Simulation) HandleInput() {
 	s.IsInputBeingHandled = true
 
@@ -101,29 +114,20 @@ func (s *Simulation) HandleInput() {
 		s.IsPause = !s.IsPause
 	} else if rl.IsMouseButtonPressed(rl.MouseLeftButton) {
 		s.InitialMousePosition = rl.GetMousePosition()
-		s.MouseButtonPressed = true
 
-	} else if s.MouseButtonPressed && rl.IsMouseButtonDown(rl.MouseLeftButton) {
-		// Continua a registrare la posizione corrente del mouse mentre il pulsante è premuto
-		s.CurrentMousePosition = rl.GetMousePosition()
+		for rl.IsMouseButtonDown(rl.MouseLeftButton) && s.InitialMousePosition.X > 0 && s.InitialMousePosition.X < float32(s.Config.ViewportX) &&
+			s.InitialMousePosition.Y > 0 && s.InitialMousePosition.Y < float32(s.Config.ViewportY) {
+			s.MouseButtonPressed = true
 
-	} else if s.MouseButtonPressed && rl.IsMouseButtonReleased(rl.MouseLeftButton) {
-		// Calcola il vettore di spostamento
-		displacementVector := rl.Vector3{
-			X: s.CurrentMousePosition.X - s.InitialMousePosition.X,
-			Y: s.CurrentMousePosition.Y - s.InitialMousePosition.Y,
-			Z: 0, // Assumendo un movimento del mouse in 2D
+			s.CurrentMousePosition = rl.GetMousePosition()
 		}
 
-		// Qui puoi calcolare il vettore di accelerazione in base al vettore di spostamento
-		// e ad altre logiche specifiche del tuo gioco, come la velocità del movimento del mouse
-		// e il tempo trascorso tra il press e il release del pulsante.
-		accelerationVector := CalculateAccelerationVector(displacementVector)
-
-		// Usa il vettore di accelerazione per spawnare le unità
-		s.Fluid = append(s.Fluid, *newUnitsWithAcceleration(s.SpawnPosition, s.Config, accelerationVector)...)
-
+	} else if s.MouseButtonPressed && rl.IsMouseButtonReleased(rl.MouseLeftButton) {
 		s.MouseButtonPressed = false
+
+		if s.IsSpawnInRange() {
+			s.Fluid = append(s.Fluid, *newUnitsWithAcceleration(s.SpawnPosition, rl.Vector3{}, s.Config)...)
+		}
 
 	} else if rl.IsKeyPressed(rl.KeyM) {
 		// Cambio modalità con il tasto M (esempio)
@@ -144,62 +148,6 @@ func (s *Simulation) HandleInput() {
 
 	s.IsInputBeingHandled = false
 }
-
-// Funzione ausiliaria per calcolare il vettore di accelerazione
-func CalculateAccelerationVector(displacement rl.Vector3) rl.Vector3 {
-	// Implementa qui la logica per calcolare l'accelerazione in base allo spostamento
-	// e ad altri fattori come il tempo trascorso e la velocità del movimento del mouse.
-	// Questo è solo un esempio e potrebbe richiedere un'implementazione specifica.
-	acceleration := rl.Vector3{
-		X: displacement.X / 2, // Esempio di calcolo
-		Y: displacement.Y / 2, // Esempio di calcolo
-		Z: 0,
-	}
-	return acceleration
-}
-
-// func (s *Simulation) HandleInput() {
-// 	s.IsInputBeingHandled = true
-
-// 	if rl.IsKeyPressed(rl.KeyR) {
-// 		s.ResetCameraPosition()
-// 		s.Fluid = []*Unit{}
-// 	} else if rl.IsKeyPressed(rl.KeySpace) {
-// 		s.IsPause = !s.IsPause
-// 	} else if rl.IsMouseButtonPressed(rl.MouseLeftButton) {
-// 		s.InitialMousePosition = rl.GetMousePosition()
-
-// 		for rl.IsMouseButtonDown(rl.MouseLeftButton) && s.InitialMousePosition.X > 0 && s.InitialMousePosition.X < float32(s.Config.ViewportX) &&
-// 			s.InitialMousePosition.Y > 0 && s.InitialMousePosition.Y < float32(s.Config.ViewportY) {
-// 			s.MouseButtonPressed = true
-
-// 			s.CurrentMousePosition = rl.GetMousePosition()
-// 		}
-
-// 	} else if s.MouseButtonPressed && rl.IsMouseButtonReleased(rl.MouseLeftButton) {
-// 		s.MouseButtonPressed = false
-
-// 		s.Fluid = append(s.Fluid, *newUnitsWithAcceleration(s.SpawnPosition, s.Config, rl.Vector3{})...)
-
-// 	} else if rl.IsKeyPressed(rl.KeyM) {
-// 		// Cambio modalità con il tasto M (esempio)
-// 		if s.ControlMode == CameraMovementMode {
-// 			s.ControlMode = UnitSpawnMode
-// 		} else {
-// 			s.ControlMode = CameraMovementMode
-// 		}
-// 	}
-
-// 	switch s.ControlMode {
-// 	case CameraMovementMode:
-// 		s.UpdateCameraPosition()
-
-// 	case UnitSpawnMode:
-// 		s.CalculateSpawnPosition()
-// 	}
-
-// 	s.IsInputBeingHandled = false
-// }
 
 func (s *Simulation) UpdateCameraPosition() error {
 	rl.UpdateCamera(&s.Camera, rl.CameraFree)

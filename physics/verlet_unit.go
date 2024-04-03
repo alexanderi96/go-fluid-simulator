@@ -61,13 +61,13 @@ func (u *Unit) accelerate(a rl.Vector3) {
 }
 
 func newUnitWithPropertiesAndAcceleration(cfg *config.Config, acceleration rl.Vector3) *Unit {
-	currentRadius := cfg.UnitRadius
+	currentRadius := cfg.UnitRadius * cfg.UNitRadiusMultiplier
 	currentMassMultiplier := cfg.UnitMassMultiplier
 	currentElasticity := cfg.UnitElasticity
 	currentTransitionDuration := cfg.UnitTransitionDuration
 
 	if cfg.SetRandomRadius {
-		currentRadius = cfg.RadiusMin + rand.Float32()*(cfg.RadiusMax-cfg.RadiusMin)
+		currentRadius = (cfg.RadiusMin + rand.Float32()*(cfg.RadiusMax-cfg.RadiusMin)) * cfg.UNitRadiusMultiplier
 	}
 	if cfg.SetRandomMassMultiplier {
 		currentMassMultiplier = cfg.MassMultiplierMin + rand.Float32()*(cfg.MassMultiplierMax-cfg.MassMultiplierMin)
@@ -130,7 +130,7 @@ func findClosestAvailablePosition(newUnit *Unit, existingUnits []*Unit, step flo
 	}
 }
 
-func newUnitsWithAcceleration(spawnPosition rl.Vector3, cfg *config.Config, acceleration rl.Vector3) *[]*Unit {
+func newUnitsWithAcceleration(spawnPosition, acceleration rl.Vector3, cfg *config.Config) *[]*Unit {
 	units := make([]*Unit, 0, cfg.UnitNumber)
 	centerX := spawnPosition.X
 	centerY := spawnPosition.Y
@@ -154,50 +154,6 @@ func newUnitsWithAcceleration(spawnPosition rl.Vector3, cfg *config.Config, acce
 	return &units
 }
 
-// func calculateInitialVelocity(position rl.Vector3, gameX, gameY, gameZ int32) rl.Vector3 {
-// 	const maxSpeed float32 = 800.0
-
-// 	d_left := position.X
-// 	d_right := float32(gameX) - position.X
-// 	d_front := position.Y // In uno spazio 3D, Y potrebbe rappresentare la profondità/front-back
-// 	d_back := float32(gameY) - position.Y
-// 	d_bottom := position.Z // Assumendo che Z rappresenti l'asse verticale
-// 	d_top := float32(gameZ) - position.Z
-
-// 	var velocityX, velocityY, velocityZ float32
-
-// 	velocityX = maxSpeed*(d_right/float32(gameX)) - maxSpeed*(d_left/float32(gameX))
-// 	velocityY = maxSpeed*(d_back/float32(gameY)) - maxSpeed*(d_front/float32(gameY))
-// 	velocityZ = maxSpeed*(d_top/float32(gameZ)) - maxSpeed*(d_bottom/float32(gameZ))
-
-// 	return rl.Vector3{X: velocityX, Y: velocityY, Z: velocityZ}
-// }
-// func spawnUnitsWithVelocity(units *[]*Unit, spawnPosition rl.Vector3, cfg *config.Config) {
-// 	var lastSpawned *Unit = nil
-
-// 	for i := 0; i < int(cfg.UnitNumber); i++ {
-// 		unit := *newUnitWithPropertiesAndAcceleration(cfg, rl.Vector3{X: 0, Y: 0, Z: 0})
-
-// 		for lastSpawned != nil && distanceBetween(lastSpawned.Position, spawnPosition) < 2*unit.Radius {
-// 			time.Sleep(100 * time.Millisecond)
-// 		}
-
-// 		velocity := calculateInitialVelocity(spawnPosition, int32(cfg.GameX), int32(cfg.GameY), int32(cfg.GameZ))
-
-// 		previousPosition := rl.Vector3{
-// 			X: spawnPosition.X - velocity.X/float32(rl.GetFPS()),
-// 			Y: spawnPosition.Y - velocity.Y/float32(rl.GetFPS()),
-// 			Z: spawnPosition.Z - velocity.Z/float32(rl.GetFPS()),
-// 		}
-
-// 		unit.Position = spawnPosition
-// 		unit.PreviousPosition = previousPosition
-
-// 		*units = append(*units, &unit)
-// 		lastSpawned = &unit
-// 	}
-// }
-
 func (u *Unit) BlendedColor() rl.Color {
 	// Assicurati che t sia compreso tra 0 e 1
 	t := u.TransitionTimer / u.TransitionDuration
@@ -206,7 +162,6 @@ func (u *Unit) BlendedColor() rl.Color {
 		return u.Color
 	} else if t > 1 {
 		return u.Cluster.Color
-		t = 1
 	}
 
 	color1, color2 := u.Color, u.OldColor

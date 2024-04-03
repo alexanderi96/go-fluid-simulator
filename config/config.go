@@ -49,6 +49,7 @@ type Config struct {
 	UnitTransitionDuration      float32
 	ClusterThreshold            float32
 	ClusterResistenceFactor     float32
+	UNitRadiusMultiplier        float32
 }
 
 func ReadConfig(filepath string) (*Config, error) {
@@ -99,6 +100,7 @@ func ReadConfig(filepath string) (*Config, error) {
 		UnitTransitionDuration:      float32(viper.GetFloat64("unit_transition_duration")),
 		ClusterThreshold:            float32(viper.GetFloat64("cluster_threshold")),
 		ClusterResistenceFactor:     float32(viper.GetFloat64("cluster_resistence_factor")),
+		UNitRadiusMultiplier:        float32(viper.GetFloat64("unit_radius_multiplier")),
 	}
 
 	return config, nil
