@@ -62,7 +62,7 @@ func NewSimulation(config *config.Config) (*Simulation, error) {
 		SpawnPosition: cubeCenter,
 	}
 
-	sim.Octree = NewOctree(int(config.OctreeLevel), sim.WorldBoundray)
+	sim.Octree = NewOctree(0, sim.WorldBoundray)
 
 	sim.ResetCameraPosition()
 
@@ -101,6 +101,7 @@ func (s *Simulation) HandleInput() {
 
 	if rl.IsKeyPressed(rl.KeyR) {
 		s.ResetCameraPosition()
+		s.Octree.Clear()
 		s.Fluid = []*Unit{}
 	} else if rl.IsKeyPressed(rl.KeySpace) {
 		s.IsPause = !s.IsPause

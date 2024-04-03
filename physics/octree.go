@@ -1,13 +1,18 @@
 package physics
 
 import (
+	"github.com/alexanderi96/go-fluid-simulator/config"
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
-const (
-	maxObjects = 4
-	maxLevels  = 2
+var (
+	maxObjects, maxLevels int
 )
+
+func InitOctree(config *config.Config) {
+	maxLevels = int(config.OctreeMaxLevel)
+	maxObjects = int(config.MaxUnitNumberPerLevel)
+}
 
 type Octree struct {
 	level    int
@@ -45,99 +50,113 @@ func (ot *Octree) Split() {
 	minY := ot.Bounds.Min.Y
 	minZ := ot.Bounds.Min.Z
 
+	level := ot.level + 1
+
 	// Creazione dei nuovi otto sotto-octrees.
-	ot.Children[0] = NewOctree(ot.level+1, rl.BoundingBox{Min: rl.Vector3{X: minX, Y: minY, Z: minZ}, Max: rl.Vector3{X: minX + subWidth, Y: minY + subHeight, Z: minZ + subDepth}})
-	ot.Children[1] = NewOctree(ot.level+1, rl.BoundingBox{Min: rl.Vector3{X: minX + subWidth, Y: minY, Z: minZ}, Max: rl.Vector3{X: minX + 2*subWidth, Y: minY + subHeight, Z: minZ + subDepth}})
-	ot.Children[2] = NewOctree(ot.level+1, rl.BoundingBox{Min: rl.Vector3{X: minX, Y: minY + subHeight, Z: minZ}, Max: rl.Vector3{X: minX + subWidth, Y: minY + 2*subHeight, Z: minZ + subDepth}})
-	ot.Children[3] = NewOctree(ot.level+1, rl.BoundingBox{Min: rl.Vector3{X: minX + subWidth, Y: minY + subHeight, Z: minZ}, Max: rl.Vector3{X: minX + 2*subWidth, Y: minY + 2*subHeight, Z: minZ + subDepth}})
-	ot.Children[4] = NewOctree(ot.level+1, rl.BoundingBox{Min: rl.Vector3{X: minX, Y: minY, Z: minZ + subDepth}, Max: rl.Vector3{X: minX + subWidth, Y: minY + subHeight, Z: minZ + 2*subDepth}})
-	ot.Children[5] = NewOctree(ot.level+1, rl.BoundingBox{Min: rl.Vector3{X: minX + subWidth, Y: minY, Z: minZ + subDepth}, Max: rl.Vector3{X: minX + 2*subWidth, Y: minY + subHeight, Z: minZ + 2*subDepth}})
-	ot.Children[6] = NewOctree(ot.level+1, rl.BoundingBox{Min: rl.Vector3{X: minX, Y: minY + subHeight, Z: minZ + subDepth}, Max: rl.Vector3{X: minX + subWidth, Y: minY + 2*subHeight, Z: minZ + 2*subDepth}})
-	ot.Children[7] = NewOctree(ot.level+1, rl.BoundingBox{Min: rl.Vector3{X: minX + subWidth, Y: minY + subHeight, Z: minZ + subDepth}, Max: rl.Vector3{X: minX + 2*subWidth, Y: minY + 2*subHeight, Z: minZ + 2*subDepth}})
+	ot.Children[0] = NewOctree(level, rl.BoundingBox{Min: rl.Vector3{X: minX, Y: minY, Z: minZ}, Max: rl.Vector3{X: minX + subWidth, Y: minY + subHeight, Z: minZ + subDepth}})
+	ot.Children[1] = NewOctree(level, rl.BoundingBox{Min: rl.Vector3{X: minX + subWidth, Y: minY, Z: minZ}, Max: rl.Vector3{X: minX + 2*subWidth, Y: minY + subHeight, Z: minZ + subDepth}})
+	ot.Children[2] = NewOctree(level, rl.BoundingBox{Min: rl.Vector3{X: minX, Y: minY + subHeight, Z: minZ}, Max: rl.Vector3{X: minX + subWidth, Y: minY + 2*subHeight, Z: minZ + subDepth}})
+	ot.Children[3] = NewOctree(level, rl.BoundingBox{Min: rl.Vector3{X: minX + subWidth, Y: minY + subHeight, Z: minZ}, Max: rl.Vector3{X: minX + 2*subWidth, Y: minY + 2*subHeight, Z: minZ + subDepth}})
+	ot.Children[4] = NewOctree(level, rl.BoundingBox{Min: rl.Vector3{X: minX, Y: minY, Z: minZ + subDepth}, Max: rl.Vector3{X: minX + subWidth, Y: minY + subHeight, Z: minZ + 2*subDepth}})
+	ot.Children[5] = NewOctree(level, rl.BoundingBox{Min: rl.Vector3{X: minX + subWidth, Y: minY, Z: minZ + subDepth}, Max: rl.Vector3{X: minX + 2*subWidth, Y: minY + subHeight, Z: minZ + 2*subDepth}})
+	ot.Children[6] = NewOctree(level, rl.BoundingBox{Min: rl.Vector3{X: minX, Y: minY + subHeight, Z: minZ + subDepth}, Max: rl.Vector3{X: minX + subWidth, Y: minY + 2*subHeight, Z: minZ + 2*subDepth}})
+	ot.Children[7] = NewOctree(level, rl.BoundingBox{Min: rl.Vector3{X: minX + subWidth, Y: minY + subHeight, Z: minZ + subDepth}, Max: rl.Vector3{X: minX + 2*subWidth, Y: minY + 2*subHeight, Z: minZ + 2*subDepth}})
 }
 
 // Insert inserisce un oggetto nel Octree.
+// Insert inserisce un oggetto nel Octree.
 func (qt *Octree) Insert(obj *Unit) {
-	// Se i figli sono nil, dividere il Octree
-	if qt.Children[0] == nil && qt.Children[1] == nil && qt.Children[2] == nil && qt.Children[3] == nil && qt.Children[4] == nil && qt.Children[5] == nil && qt.Children[6] == nil && qt.Children[7] == nil {
+
+	if qt.Children[0] == nil {
+		if len(qt.objects) < maxObjects || qt.level >= maxLevels {
+			// Se il nodo corrente ha spazio o abbiamo raggiunto il livello massimo, aggiungi qui.
+			qt.objects = append(qt.objects, obj)
+			return
+		}
+
+		// Se il nodo corrente è pieno e non al livello massimo, dividi.
 		qt.Split()
 	}
 
-	index := qt.getIndex(*obj)
-	if index != -1 {
-		qt.Children[index].Insert(obj)
-		return
-	}
-
-	if len(qt.objects) > maxObjects && qt.level < maxLevels {
-		if len(qt.Children) == 0 {
-			qt.Split()
-		}
-
-		i := 0
-		for i < len(qt.objects) {
-			index := qt.getIndex(*qt.objects[i])
-			if index != -1 {
-				qt.Children[index].Insert(qt.objects[i])
-				qt.objects = append(qt.objects[:i], qt.objects[i+1:]...)
-			} else {
-				i++
-			}
+	// Prova ad inserire l'oggetto nei figli.
+	indices := qt.getIndices(*obj)
+	inserted := false
+	for _, index := range indices {
+		if index != -1 {
+			qt.Children[index].Insert(obj)
+			inserted = true
+			break // L'oggetto va inserito in un solo figlio, quindi interrompiamo il ciclo.
 		}
 	}
-	qt.objects = append(qt.objects, obj)
+
+	// Se l'oggetto non è stato inserito in nessun figlio, aggiungilo a questo nodo.
+	if !inserted {
+		qt.objects = append(qt.objects, obj)
+	}
 }
 
 // getIndex determina in quale sotto-Octree un oggetto appartiene.
-func (ot *Octree) getIndex(obj Unit) int {
+func (ot *Octree) getIndices(obj Unit) []int {
 	midX := (ot.Bounds.Min.X + ot.Bounds.Max.X) / 2
 	midY := (ot.Bounds.Min.Y + ot.Bounds.Max.Y) / 2
 	midZ := (ot.Bounds.Min.Z + ot.Bounds.Max.Z) / 2
 
-	// Determina in quale ottante dell'Octree l'oggetto si trova.
-	inLeft := obj.Position.X < midX
-	inRight := !inLeft
-	inBottom := obj.Position.Y < midY
-	inTop := !inBottom
-	inBack := obj.Position.Z < midZ
-	inFront := !inBack
+	var indices []int
 
-	switch {
-	case inTop && inRight && inFront:
-		return 0
-	case inTop && inLeft && inFront:
-		return 1
-	case inBottom && inLeft && inFront:
-		return 2
-	case inBottom && inRight && inFront:
-		return 3
-	case inTop && inRight && inBack:
-		return 4
-	case inTop && inLeft && inBack:
-		return 5
-	case inBottom && inLeft && inBack:
-		return 6
-	case inBottom && inRight && inBack:
-		return 7
+	// Estendi la verifica agli estremi dell'oggetto, considerando il raggio.
+	minX := obj.Position.X - obj.Radius
+	maxX := obj.Position.X + obj.Radius
+	minY := obj.Position.Y - obj.Radius
+	maxY := obj.Position.Y + obj.Radius
+	minZ := obj.Position.Z - obj.Radius
+	maxZ := obj.Position.Z + obj.Radius
+
+	// Verifica l'intersezione con gli ottanti.
+	inLeft := minX < midX
+	inRight := maxX > midX
+	inBottom := minY < midY
+	inTop := maxY > midY
+	inBack := minZ < midZ
+	inFront := maxZ > midZ
+
+	// Aggiungi gli indici basati sulle intersezioni.
+	if inTop && inRight && inFront {
+		indices = append(indices, 0)
+	}
+	if inTop && inLeft && inFront {
+		indices = append(indices, 1)
+	}
+	if inBottom && inLeft && inFront {
+		indices = append(indices, 2)
+	}
+	if inBottom && inRight && inFront {
+		indices = append(indices, 3)
+	}
+	if inTop && inRight && inBack {
+		indices = append(indices, 4)
+	}
+	if inTop && inLeft && inBack {
+		indices = append(indices, 5)
+	}
+	if inBottom && inLeft && inBack {
+		indices = append(indices, 6)
+	}
+	if inBottom && inRight && inBack {
+		indices = append(indices, 7)
 	}
 
-	return -1 // Se l'oggetto non rientra in nessun ottante.
+	if len(indices) == 0 {
+		return []int{-1} // Se l'oggetto non rientra in nessun ottante.
+	}
+	return indices
 }
 
 // Retrieve restituisce tutti gli oggetti che potrebbero collidere con l'oggetto dato.
 func (ot *Octree) Retrieve(returnObjects *[]*Unit, obj *Unit) {
-	index := ot.getIndex(*obj)
-
-	// Se l'oggetto si trova in un ottante specifico e quel figlio esiste, cercare ricorsivamente in quel figlio.
-	if index != -1 && ot.Children[index] != nil {
-		ot.Children[index].Retrieve(returnObjects, obj)
-	} else {
-		// Se l'oggetto non si adatta a un singolo ottante (potrebbe sovrapporsi a più ottanti) o l'indice è -1,
-		// dobbiamo controllare tutti i figli perché l'oggetto potrebbe intersecarsi con più ottanti.
-		for i := 0; i < len(ot.Children); i++ {
-			if ot.Children[i] != nil {
-				ot.Children[i].Retrieve(returnObjects, obj)
-			}
+	indices := ot.getIndices(*obj)
+	for _, index := range indices {
+		if index != -1 && ot.Children[index] != nil {
+			ot.Children[index].Retrieve(returnObjects, obj)
 		}
 	}
 

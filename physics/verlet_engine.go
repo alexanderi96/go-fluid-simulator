@@ -27,10 +27,11 @@ func (s *Simulation) UpdateWithOctrees() error {
 		nearestValidDistance := float32(math.Inf(-1))
 
 		nearUnits := []*Unit{}
+		unitA.checkWallCollisionVerlet(s.WorldBoundray, s.Config.WallElasticity, s.Metrics.Frametime)
+
 		s.Octree.Retrieve(&nearUnits, unitA)
 		for _, unitB := range nearUnits {
 			if unitB != nil || unitA.Id != unitB.Id {
-
 				surfaceDistance := getSurfaceDistance(unitA, unitB)
 				if surfaceDistance < 0 {
 					handleCollision(unitA, unitB, surfaceDistance, s.Metrics.Frametime)

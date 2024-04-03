@@ -27,6 +27,7 @@ func init() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	physics.InitOctree(config)
 	gui.Init(s)
 
 }

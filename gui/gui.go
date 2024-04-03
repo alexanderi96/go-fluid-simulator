@@ -1,8 +1,6 @@
 package gui
 
 import (
-	"log"
-
 	"github.com/alexanderi96/go-fluid-simulator/physics"
 	"github.com/alexanderi96/go-fluid-simulator/utils"
 
@@ -85,7 +83,6 @@ func drawFluid(s *physics.Simulation) {
 			color = unit.BlendedColor()
 		} else if s.Config.ShowMassColor {
 			color = utils.GetColorFromMass(unit.Mass)
-			log.Print(unit.Mass, color)
 		}
 
 		if s.Config.ShowVectors {

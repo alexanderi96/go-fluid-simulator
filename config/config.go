@@ -52,7 +52,8 @@ type Config struct {
 	UnitRadiusMultiplier        float32
 	ShowClusterColor            bool
 	ShowMassColor               bool
-	OctreeLevel                 int32
+	OctreeMaxLevel              int32
+	MaxUnitNumberPerLevel       int32
 }
 
 func ReadConfig(filepath string) (*Config, error) {
@@ -106,7 +107,8 @@ func ReadConfig(filepath string) (*Config, error) {
 		UnitRadiusMultiplier:        float32(viper.GetFloat64("unit_radius_multiplier")),
 		ShowClusterColor:            viper.GetBool("show_cluster_color"),
 		ShowMassColor:               viper.GetBool("show_mass_color"),
-		OctreeLevel:                 viper.GetInt32("octree_level"),
+		OctreeMaxLevel:              viper.GetInt32("octree_max_level"),
+		MaxUnitNumberPerLevel:       viper.GetInt32("max_unit_number_per_level"),
 	}
 
 	return config, nil

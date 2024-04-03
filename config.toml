@@ -5,7 +5,8 @@
   window_height = 720
   is_resizable = true
   should_be_profiled = true
-  octree_level = 5
+  octree_max_level = 5
+  max_unit_number_per_level = 3
 
 # world config
   game_x = 50
@@ -14,11 +15,11 @@
   wall_elasticity = 0.8
   apply_gravity = false
   gravity = 9.81
-  use_experimental_octree = true
+  use_experimental_octree = false
   show_octree = true
   
 # unit config
-  unit_number = 1
+  unit_number = 100
   unit_initial_spacing = 0
 
   unit_radius = 1
