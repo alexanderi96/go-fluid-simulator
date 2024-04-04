@@ -7,17 +7,6 @@ import (
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
-func Init(s *physics.Simulation) {
-
-	if s.Config.IsResizable {
-		rl.SetConfigFlags(rl.FlagWindowResizable)
-	}
-
-	rl.InitWindow(s.Config.WindowWidth, s.Config.WindowHeight, "Go Fluid Simulator")
-	rl.SetTargetFPS(s.Config.TargetFPS)
-
-}
-
 func Draw(s *physics.Simulation) {
 	rl.BeginDrawing()
 	rl.ClearBackground(rl.RayWhite)

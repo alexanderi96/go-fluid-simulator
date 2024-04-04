@@ -23,12 +23,18 @@ func init() {
 		log.Fatal(err)
 	}
 
+	if config.IsResizable {
+		rl.SetConfigFlags(rl.FlagWindowResizable)
+	}
+
+	rl.InitWindow(config.WindowWidth, config.WindowHeight, "Go Fluid Simulator")
+	rl.SetTargetFPS(config.TargetFPS)
+
 	s, err = physics.NewSimulation(config)
 	if err != nil {
 		log.Fatal(err)
 	}
 	physics.InitOctree(config)
-	gui.Init(s)
 
 }
 
