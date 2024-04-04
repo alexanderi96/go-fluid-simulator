@@ -13,9 +13,9 @@ func (s *Simulation) UpdateWithOctrees() error {
 
 	s.ClusterMasses = make(map[uuid.UUID]float32)
 
-	// Costruisci il Octree
-	for i := range s.Fluid {
-		s.Octree.Insert(s.Fluid[i])
+	// Costruisci l'Octree
+	for _, unit := range s.Fluid {
+		s.Octree.Insert(unit)
 	}
 
 	// Controlla le collisioni tra particelle e aggiorna le velocità utilizzando il Octree
@@ -23,11 +23,12 @@ func (s *Simulation) UpdateWithOctrees() error {
 		if unitA == nil {
 			continue
 		}
+		unitA.checkWallCollisionVerlet(s.WorldBoundray, s.Config.WallElasticity, s.Metrics.Frametime)
+
 		nearestUnit := Unit{}
-		nearestValidDistance := float32(math.Inf(-1))
+		nearestValidDistance := float32(math.Inf(1))
 
 		nearUnits := []*Unit{}
-		unitA.checkWallCollisionVerlet(s.WorldBoundray, s.Config.WallElasticity, s.Metrics.Frametime)
 
 		s.Octree.Retrieve(&nearUnits, unitA)
 		for _, unitB := range nearUnits {
@@ -47,21 +48,17 @@ func (s *Simulation) UpdateWithOctrees() error {
 			unitA.OldCluster = unitA.Cluster
 			unitA.Cluster = nil
 		}
+
+		unitA.update(s.Config.ApplyGravity, s.Config.Gravity, s.Metrics.Frametime)
 	}
 
-	// Aggiorna la posizione delle particelle in base alla loro velocità
-	for _, unit := range s.Fluid {
-		// TODO: find nearest unit in order to determin if unitA is in cluster
-
-		unit.update(s.Config.ApplyGravity, s.Config.Gravity, s.Metrics.Frametime)
-	}
 	return nil
 
 }
 
 func (s *Simulation) UpdateWithVerletIntegration() error {
 	// Calcola il numero di step
-	resolutionSteps := 8
+	resolutionSteps := int(s.Config.ResolutionSteps)
 	fractionalFrametime := s.Metrics.Frametime / float32(resolutionSteps)
 
 	s.ClusterMasses = make(map[uuid.UUID]float32)

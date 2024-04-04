@@ -112,7 +112,10 @@ func drawDebugSection(s *physics.Simulation) {
 	s.Config.ShouldBeProfiled = gui.CheckBox(rl.Rectangle{X: float32(xContentStart), Y: float32(yContentStartTop), Width: 20, Height: 20}, "Should be profiled", s.Config.ShouldBeProfiled)
 	yContentStartTop += 20 + 5
 
-	quadtree := fmt.Sprintf("Using qTree: %t", s.Config.UseExperimentalOctree)
+	s.Config.UseExperimentalOctree = gui.CheckBox(rl.Rectangle{X: float32(xContentStart), Y: float32(yContentStartTop), Width: 20, Height: 20}, "Use Experimental Octree", s.Config.UseExperimentalOctree)
+	yContentStartTop += 20 + 5
+
+	quadtree := fmt.Sprintf("Using oTree: %t", s.Config.UseExperimentalOctree)
 	rl.DrawText(quadtree, xContentStart, yContentStartTop, 20, rl.Black)
 	yContentStartTop += 40 + 5
 

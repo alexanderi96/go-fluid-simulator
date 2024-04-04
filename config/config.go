@@ -54,6 +54,7 @@ type Config struct {
 	ShowMassColor               bool
 	OctreeMaxLevel              int32
 	MaxUnitNumberPerLevel       int32
+	ResolutionSteps             int32
 }
 
 func ReadConfig(filepath string) (*Config, error) {
@@ -109,6 +110,7 @@ func ReadConfig(filepath string) (*Config, error) {
 		ShowMassColor:               viper.GetBool("show_mass_color"),
 		OctreeMaxLevel:              viper.GetInt32("octree_max_level"),
 		MaxUnitNumberPerLevel:       viper.GetInt32("max_unit_number_per_level"),
+		ResolutionSteps:             viper.GetInt32("resolution_steps"),
 	}
 
 	return config, nil

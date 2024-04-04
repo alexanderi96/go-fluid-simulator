@@ -43,11 +43,17 @@ func Draw(s *physics.Simulation) {
 		rl.DrawLineEx(s.InitialMousePosition, s.CurrentMousePosition, 5, rl.Black)
 	}
 
-	if s.Config.ShowOctree {
+	if s.Config.UseExperimentalOctree && s.Config.ShowOctree {
 		drawOctree(s.Octree)
 	} else {
-		rl.DrawBoundingBox(s.WorldBoundray, rl.Green)
+		rl.DrawBoundingBox(s.WorldBoundray, rl.Black)
 	}
+
+	rl.DrawCube(s.WorldBoundray.Min, 1, 1, 1, rl.Blue)
+	rl.DrawCube(s.WorldBoundray.Max, 1, 1, 1, rl.Red)
+	rl.DrawLine3D(s.WorldBoundray.Min, rl.NewVector3(s.WorldBoundray.Max.X, 0, 0), rl.Red)
+	rl.DrawLine3D(s.WorldBoundray.Min, rl.NewVector3(0, s.WorldBoundray.Max.Y, 0), rl.Green)
+	rl.DrawLine3D(s.WorldBoundray.Min, rl.NewVector3(0, 0, s.WorldBoundray.Max.Z), rl.Blue)
 
 	rl.EndMode3D()
 	drawSidebar(s)
@@ -63,11 +69,7 @@ func drawFluid(s *physics.Simulation) {
 		color := unit.Color
 
 		if s.Config.ShowSpeedColor {
-			if s.Config.UseExperimentalOctree {
-				//color = utils.GetColorFromVelocity(unit.Velocity)
-			} else {
-				color = utils.GetColorFromVelocity(unit.GetVelocity(s.Metrics.Frametime))
-			}
+			color = utils.GetColorFromVelocity(unit.GetVelocity(s.Metrics.Frametime))
 		} else if s.Config.ShowClusterColor {
 			color = unit.BlendedColor()
 		} else if s.Config.ShowMassColor {
@@ -88,7 +90,7 @@ func drawOctree(octree *physics.Octree) {
 	}
 
 	// Disegna il BoundingBox dell'Octree corrente
-	rl.DrawBoundingBox(octree.Bounds, rl.Red)
+	rl.DrawBoundingBox(octree.Bounds, rl.Gray)
 
 	// Disegna ricorsivamente i BoundingBox dei sotto-Octrees
 	for _, child := range octree.Children {

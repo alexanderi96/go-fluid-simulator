@@ -5,25 +5,29 @@
   window_height = 720
   is_resizable = true
   should_be_profiled = true
-  octree_max_level = 5
-  max_unit_number_per_level = 3
+  octree_max_level = 6
+  max_unit_number_per_level = 10
+  resolution_steps = 3
+  use_experimental_octree = true
+  scale_factor = 1 # 1 pixel = 1 cm
 
 # world config
   game_x = 50
   game_y = 50
   game_z = 50
   wall_elasticity = 0.8
-  apply_gravity = false
+  apply_gravity = true
   gravity = 9.81
-  use_experimental_octree = false
   show_octree = true
   
 # unit config
   unit_number = 100
   unit_initial_spacing = 0
+  units_emit_gravity = false
+  unit_gravitational_multiplier = 1
 
   unit_radius = 1
-  unit_radius_multiplier = 0.2
+  unit_radius_multiplier = 0.5
   set_random_radius = true
   radius_min = 1
   radius_max = 5
@@ -33,9 +37,6 @@
   mass_multiplier_min = 1
   mass_multiplier_max = 10
   show_mass_color = false
-
-  units_emit_gravity = true
-  unit_gravitational_multiplier = 1
   
   unit_elasticity = 0.8
   set_random_elasticity = true
@@ -44,7 +45,6 @@
   
 
   show_vectors = false
-  scale_factor = 1 # 1 pixel = 1 cm
   show_trail = false
   show_overlay = false
   set_random_color = true

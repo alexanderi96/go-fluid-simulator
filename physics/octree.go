@@ -30,12 +30,12 @@ func NewOctree(level int, bounds rl.BoundingBox) *Octree {
 }
 
 // Clear pulisce il Octree.
-func (qt *Octree) Clear() {
-	qt.objects = qt.objects[:0]
+func (ot *Octree) Clear() {
+	ot.objects = ot.objects[:0]
 	for i := 0; i < 8; i++ {
-		if qt.Children[i] != nil {
-			qt.Children[i].Clear()
-			qt.Children[i] = nil
+		if ot.Children[i] != nil {
+			ot.Children[i].Clear()
+			ot.Children[i] = nil
 		}
 	}
 }
@@ -53,37 +53,45 @@ func (ot *Octree) Split() {
 	level := ot.level + 1
 
 	// Creazione dei nuovi otto sotto-octrees.
+	// children[0] = inBottom && inLeft && inBack
 	ot.Children[0] = NewOctree(level, rl.BoundingBox{Min: rl.Vector3{X: minX, Y: minY, Z: minZ}, Max: rl.Vector3{X: minX + subWidth, Y: minY + subHeight, Z: minZ + subDepth}})
+	// children[1] = inBottom && inRight && inBack
 	ot.Children[1] = NewOctree(level, rl.BoundingBox{Min: rl.Vector3{X: minX + subWidth, Y: minY, Z: minZ}, Max: rl.Vector3{X: minX + 2*subWidth, Y: minY + subHeight, Z: minZ + subDepth}})
+	// children[2] = inTop && inLeft && inBack
 	ot.Children[2] = NewOctree(level, rl.BoundingBox{Min: rl.Vector3{X: minX, Y: minY + subHeight, Z: minZ}, Max: rl.Vector3{X: minX + subWidth, Y: minY + 2*subHeight, Z: minZ + subDepth}})
+	// children[3] = inTop && inRight && inBack
 	ot.Children[3] = NewOctree(level, rl.BoundingBox{Min: rl.Vector3{X: minX + subWidth, Y: minY + subHeight, Z: minZ}, Max: rl.Vector3{X: minX + 2*subWidth, Y: minY + 2*subHeight, Z: minZ + subDepth}})
+	// children[4] = inBottom && inLeft && inFront
 	ot.Children[4] = NewOctree(level, rl.BoundingBox{Min: rl.Vector3{X: minX, Y: minY, Z: minZ + subDepth}, Max: rl.Vector3{X: minX + subWidth, Y: minY + subHeight, Z: minZ + 2*subDepth}})
+	// children[5] = inBottom && inRight && inFront
 	ot.Children[5] = NewOctree(level, rl.BoundingBox{Min: rl.Vector3{X: minX + subWidth, Y: minY, Z: minZ + subDepth}, Max: rl.Vector3{X: minX + 2*subWidth, Y: minY + subHeight, Z: minZ + 2*subDepth}})
+	// children[6] = inTop && inLeft && inFront
 	ot.Children[6] = NewOctree(level, rl.BoundingBox{Min: rl.Vector3{X: minX, Y: minY + subHeight, Z: minZ + subDepth}, Max: rl.Vector3{X: minX + subWidth, Y: minY + 2*subHeight, Z: minZ + 2*subDepth}})
+	// children[7] = inTop && inRight && inFront
 	ot.Children[7] = NewOctree(level, rl.BoundingBox{Min: rl.Vector3{X: minX + subWidth, Y: minY + subHeight, Z: minZ + subDepth}, Max: rl.Vector3{X: minX + 2*subWidth, Y: minY + 2*subHeight, Z: minZ + 2*subDepth}})
 }
 
 // Insert inserisce un oggetto nel Octree.
 // Insert inserisce un oggetto nel Octree.
-func (qt *Octree) Insert(obj *Unit) {
+func (ot *Octree) Insert(obj *Unit) {
 
-	if qt.Children[0] == nil {
-		if len(qt.objects) < maxObjects || qt.level >= maxLevels {
+	if ot.Children[0] == nil {
+		if len(ot.objects) < maxObjects || ot.level >= maxLevels {
 			// Se il nodo corrente ha spazio o abbiamo raggiunto il livello massimo, aggiungi qui.
-			qt.objects = append(qt.objects, obj)
+			ot.objects = append(ot.objects, obj)
 			return
 		}
 
 		// Se il nodo corrente è pieno e non al livello massimo, dividi.
-		qt.Split()
+		ot.Split()
 	}
 
 	// Prova ad inserire l'oggetto nei figli.
-	indices := qt.getIndices(*obj)
+	indices := ot.getIndices(*obj)
 	inserted := false
 	for _, index := range indices {
 		if index != -1 {
-			qt.Children[index].Insert(obj)
+			ot.Children[index].Insert(obj)
 			inserted = true
 			break // L'oggetto va inserito in un solo figlio, quindi interrompiamo il ciclo.
 		}
@@ -91,7 +99,7 @@ func (qt *Octree) Insert(obj *Unit) {
 
 	// Se l'oggetto non è stato inserito in nessun figlio, aggiungilo a questo nodo.
 	if !inserted {
-		qt.objects = append(qt.objects, obj)
+		ot.objects = append(ot.objects, obj)
 	}
 }
 
@@ -112,37 +120,45 @@ func (ot *Octree) getIndices(obj Unit) []int {
 	maxZ := obj.Position.Z + obj.Radius
 
 	// Verifica l'intersezione con gli ottanti.
-	inLeft := minX < midX
-	inRight := maxX > midX
-	inBottom := minY < midY
-	inTop := maxY > midY
-	inBack := minZ < midZ
-	inFront := maxZ > midZ
+	inLeft := minX <= midX
+	inRight := maxX >= midX
+	inBottom := minY <= midY
+	inTop := maxY >= midY
+	inBack := minZ <= midZ
+	inFront := maxZ >= midZ
 
 	// Aggiungi gli indici basati sulle intersezioni.
+	// 7: inTop && inRight && inFront
+	// 6: inTop && inLeft && inFront
+	// 4: inBottom && inLeft && inFront
+	// 5: inBottom && inRight && inFront
+	// 3: inTop && inRight && inBack
+	// 2: inTop && inLeft && inBack
+	// 0: inBottom && inLeft && inBack
+	// 1: inBottom && inRight && inBack
 	if inTop && inRight && inFront {
-		indices = append(indices, 0)
+		indices = append(indices, 7)
 	}
 	if inTop && inLeft && inFront {
-		indices = append(indices, 1)
-	}
-	if inBottom && inLeft && inFront {
-		indices = append(indices, 2)
-	}
-	if inBottom && inRight && inFront {
-		indices = append(indices, 3)
-	}
-	if inTop && inRight && inBack {
-		indices = append(indices, 4)
-	}
-	if inTop && inLeft && inBack {
-		indices = append(indices, 5)
-	}
-	if inBottom && inLeft && inBack {
 		indices = append(indices, 6)
 	}
+	if inBottom && inLeft && inFront {
+		indices = append(indices, 4)
+	}
+	if inBottom && inRight && inFront {
+		indices = append(indices, 5)
+	}
+	if inTop && inRight && inBack {
+		indices = append(indices, 3)
+	}
+	if inTop && inLeft && inBack {
+		indices = append(indices, 2)
+	}
+	if inBottom && inLeft && inBack {
+		indices = append(indices, 0)
+	}
 	if inBottom && inRight && inBack {
-		indices = append(indices, 7)
+		indices = append(indices, 1)
 	}
 
 	if len(indices) == 0 {
