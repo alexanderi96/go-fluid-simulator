@@ -7,7 +7,6 @@ import (
 	"github.com/alexanderi96/go-fluid-simulator/config"
 	"github.com/alexanderi96/go-fluid-simulator/metrics"
 	rl "github.com/gen2brain/raylib-go/raylib"
-	"github.com/google/uuid"
 )
 
 const (
@@ -18,10 +17,9 @@ const (
 type ControlMode int
 
 type Simulation struct {
-	Fluid         []*Unit
-	ClusterMasses map[uuid.UUID]float32
-	Metrics       *metrics.Metrics
-	Config        *config.Config
+	Fluid   []*Unit
+	Metrics *metrics.Metrics
+	Config  *config.Config
 
 	Octree *Octree
 

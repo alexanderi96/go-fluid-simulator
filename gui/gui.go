@@ -70,8 +70,6 @@ func drawFluid(s *physics.Simulation) {
 
 		if s.Config.ShowSpeedColor {
 			color = utils.GetColorFromVelocity(unit.GetVelocity(s.Metrics.Frametime))
-		} else if s.Config.ShowClusterColor {
-			color = unit.BlendedColor()
 		} else if s.Config.ShowMassColor {
 			color = utils.GetColorFromMass(unit.Mass)
 		}

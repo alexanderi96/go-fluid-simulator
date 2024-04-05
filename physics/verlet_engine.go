@@ -5,13 +5,10 @@ import (
 
 	"github.com/alexanderi96/go-fluid-simulator/config"
 	rl "github.com/gen2brain/raylib-go/raylib"
-	"github.com/google/uuid"
 )
 
 func (s *Simulation) UpdateWithOctrees() error {
 	s.Octree.Clear() // Pulisce il Octree all'inizio di ogni frame
-
-	s.ClusterMasses = make(map[uuid.UUID]float32)
 
 	// Costruisci l'Octree
 	for _, unit := range s.Fluid {
@@ -23,10 +20,11 @@ func (s *Simulation) UpdateWithOctrees() error {
 		if unitA == nil {
 			continue
 		}
-		unitA.checkWallCollisionVerlet(s.WorldBoundray, s.Config.WallElasticity, s.Metrics.Frametime)
+		if s.Config.ApplyGravity {
+			unitA.accelerate(rl.Vector3{X: 0, Y: s.Config.Gravity, Z: 0})
+		}
 
-		nearestUnit := Unit{}
-		nearestValidDistance := float32(math.Inf(1))
+		unitA.checkWallCollisionVerlet(s.WorldBoundray, s.Config.WallElasticity, s.Metrics.Frametime)
 
 		nearUnits := []*Unit{}
 
@@ -39,29 +37,16 @@ func (s *Simulation) UpdateWithOctrees() error {
 				}
 			}
 		}
-
-		if nearestValidDistance <= s.Config.ClusterThreshold {
-			// in questo caso consideriamo le 2 unit appartenenti allo stesso cluster
-			updateClusters(unitA, &nearestUnit, s.ClusterMasses)
-
-		} else {
-			unitA.OldCluster = unitA.Cluster
-			unitA.Cluster = nil
-		}
-
-		unitA.update(s.Config.ApplyGravity, s.Config.Gravity, s.Metrics.Frametime)
+		unitA.updatePositionWithVerlet(s.Metrics.Frametime)
 	}
 
 	return nil
-
 }
 
 func (s *Simulation) UpdateWithVerletIntegration() error {
 	// Calcola il numero di step
 	resolutionSteps := int(s.Config.ResolutionSteps)
 	fractionalFrametime := s.Metrics.Frametime / float32(resolutionSteps)
-
-	s.ClusterMasses = make(map[uuid.UUID]float32)
 
 	for step := 0; step < resolutionSteps; step++ {
 
@@ -70,14 +55,11 @@ func (s *Simulation) UpdateWithVerletIntegration() error {
 				continue
 			}
 
-			unitA.checkWallCollisionVerlet(s.WorldBoundray, s.Config.WallElasticity, fractionalFrametime)
-
-			if unitA.Cluster != nil {
-				s.ClusterMasses[unitA.Cluster.Id] += unitA.Mass / float32(resolutionSteps)
+			if s.Config.ApplyGravity {
+				unitA.accelerate(rl.Vector3{X: 0, Y: s.Config.Gravity, Z: 0})
 			}
 
-			nearestUnit := Unit{}
-			nearestValidDistance := float32(math.Inf(-1))
+			unitA.checkWallCollisionVerlet(s.WorldBoundray, s.Config.WallElasticity, fractionalFrametime)
 
 			for _, unitB := range s.Fluid {
 				if unitB == nil || unitA.Id == unitB.Id {
@@ -90,27 +72,12 @@ func (s *Simulation) UpdateWithVerletIntegration() error {
 					applyGravitationalAttraction(unitA, unitB, s.Config)
 				}
 
-				if (nearestUnit == Unit{} || (nearestUnit != *unitB && surfaceDistance < nearestValidDistance)) {
-					nearestUnit = *unitB
-					nearestValidDistance = surfaceDistance
-				}
-
 				if surfaceDistance < 0 {
 					handleCollision(unitA, unitB, surfaceDistance, fractionalFrametime)
 				}
 			}
 
-			// TODO: find nearest unit in order to determin if unitA is in cluster
-			if nearestValidDistance <= s.Config.ClusterThreshold {
-				// in questo caso consideriamo le 2 unit appartenenti allo stesso cluster
-				updateClusters(unitA, &nearestUnit, s.ClusterMasses)
-
-			} else {
-				unitA.OldCluster = unitA.Cluster
-				unitA.Cluster = nil
-			}
-
-			unitA.update(s.Config.ApplyGravity, s.Config.Gravity, fractionalFrametime)
+			unitA.updatePositionWithVerlet(fractionalFrametime)
 		}
 	}
 

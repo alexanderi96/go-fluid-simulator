@@ -21,19 +21,7 @@ type Unit struct {
 	Radius           float32
 	MassMultiplier   float32
 	Mass             float32
-	Volume           float32
 	Color            color.RGBA
-	OldColor         color.RGBA
-
-	Cluster            *Cluster
-	OldCluster         *Cluster
-	TransitionTimer    float32 // Timer per la transizione del colore
-	TransitionDuration float32 // Durata della transizione
-}
-
-type Cluster struct {
-	Id    uuid.UUID
-	Color rl.Color
 }
 
 func (u *Unit) GetVolume() float32 {
@@ -43,7 +31,7 @@ func (u *Unit) GetVolume() float32 {
 
 func (u *Unit) GetMass() float32 {
 	// Calcola la massa utilizzando il volume e il MassMultiplier
-	return u.Volume * u.MassMultiplier
+	return u.GetVolume() * u.MassMultiplier
 }
 
 func (u *Unit) GetVelocity(dt float32) rl.Vector3 {
@@ -58,27 +46,6 @@ func (u *Unit) accelerate(a rl.Vector3) {
 	u.Acceleration.X += a.X
 	u.Acceleration.Y += a.Y
 	u.Acceleration.Z += a.Z
-}
-
-func (u *Unit) update(applyGravity bool, gravity, dt float32) {
-
-	if applyGravity {
-		u.accelerate(rl.Vector3{X: 0, Y: -gravity, Z: 0})
-	}
-	u.updatePositionWithVerlet(dt)
-
-	if u.TransitionTimer < u.TransitionDuration && u.Cluster != nil {
-		u.TransitionTimer += dt
-		if u.TransitionTimer > u.TransitionDuration {
-			u.TransitionTimer = u.TransitionDuration
-		}
-	} else if u.Cluster == nil && u.TransitionTimer > 0 {
-		u.TransitionTimer -= dt
-		if u.TransitionTimer < 0 {
-			u.TransitionTimer = 0
-			u.OldCluster = &Cluster{}
-		}
-	}
 }
 
 func (u *Unit) updatePositionWithVerlet(dt float32) {
@@ -122,7 +89,6 @@ func newUnitWithPropertiesAndAcceleration(cfg *config.Config, acceleration rl.Ve
 	currentRadius := cfg.UnitRadius * cfg.UnitRadiusMultiplier
 	currentMassMultiplier := cfg.UnitMassMultiplier
 	currentElasticity := cfg.UnitElasticity
-	currentTransitionDuration := cfg.UnitTransitionDuration
 
 	if cfg.SetRandomRadius {
 		currentRadius = (cfg.RadiusMin + rand.Float32()*(cfg.RadiusMax-cfg.RadiusMin)) * cfg.UnitRadiusMultiplier
@@ -141,17 +107,14 @@ func newUnitWithPropertiesAndAcceleration(cfg *config.Config, acceleration rl.Ve
 	}
 
 	unit := &Unit{
-		Id:                 uuid.New(),
-		Acceleration:       acceleration,
-		Radius:             currentRadius,
-		MassMultiplier:     currentMassMultiplier,
-		Elasticity:         currentElasticity,
-		Color:              color,
-		TransitionTimer:    0,
-		TransitionDuration: float32(currentTransitionDuration),
+		Id:             uuid.New(),
+		Acceleration:   acceleration,
+		Radius:         currentRadius,
+		MassMultiplier: currentMassMultiplier,
+		Elasticity:     currentElasticity,
+		Color:          color,
 	}
 
-	unit.Volume = unit.GetVolume()
 	unit.Mass = unit.GetMass()
 
 	return unit
@@ -159,16 +122,14 @@ func newUnitWithPropertiesAndAcceleration(cfg *config.Config, acceleration rl.Ve
 
 func newUnitWithPropertiesAtPosition(position rl.Vector3, acceleration rl.Vector3, radius, massMultiplier, elasticity float32, color color.RGBA) *Unit {
 	return &Unit{
-		Id:                 uuid.New(),
-		Position:           position,
-		PreviousPosition:   position,
-		Acceleration:       acceleration,
-		Radius:             radius,
-		MassMultiplier:     massMultiplier,
-		Elasticity:         elasticity,
-		Color:              color,
-		TransitionTimer:    0,
-		TransitionDuration: 0,
+		Id:               uuid.New(),
+		Position:         position,
+		PreviousPosition: position,
+		Acceleration:     acceleration,
+		Radius:           radius,
+		MassMultiplier:   massMultiplier,
+		Elasticity:       elasticity,
+		Color:            color,
 	}
 }
 
@@ -225,32 +186,4 @@ func newUnitsWithAcceleration(spawnPosition, acceleration rl.Vector3, cfg *confi
 	}
 
 	return &units
-}
-
-func (u *Unit) BlendedColor() rl.Color {
-	// Assicurati che t sia compreso tra 0 e 1
-	t := u.TransitionTimer / u.TransitionDuration
-
-	if t <= 0 {
-		return u.Color
-	} else if t > 1 {
-		return u.Cluster.Color
-	}
-
-	color1, color2 := u.Color, u.OldColor
-	if u.Cluster != nil {
-		color2 = u.Cluster.Color
-	} else if u.OldCluster != nil {
-		color2 = u.OldCluster.Color
-	}
-
-	// Calcola i componenti del nuovo colore interpolando linearmente tra color1 e clusterColor
-	r := float32(color1.R) + (float32(color2.R)-float32(color1.R))*t
-	g := float32(color1.G) + (float32(color2.G)-float32(color1.G))*t
-	b := float32(color1.B) + (float32(color2.B)-float32(color1.B))*t
-	a := float32(color1.A) + (float32(color2.A)-float32(color1.A))*t
-
-	u.OldColor = rl.NewColor(uint8(r), uint8(g), uint8(b), uint8(a))
-	// Crea e ritorna il nuovo colore
-	return u.OldColor
 }

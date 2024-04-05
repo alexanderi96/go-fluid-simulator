@@ -17,11 +17,11 @@
   game_z = 50
   wall_elasticity = 1
   apply_gravity = true
-  gravity = 9.81
+  gravity = -9.81
   show_octree = true
   
 # unit config
-  unit_number = 1
+  unit_number = 100
   unit_initial_spacing = 0
   units_emit_gravity = false
   unit_gravitational_multiplier = 1
@@ -49,12 +49,6 @@
   show_overlay = false
   set_random_color = true
   show_speed_color = false
-  
-# cluster config
-  unit_transition_duration = 5
-  cluster_threshold = 1 # minimum distance in order to create a cluster
-  cluster_resistance_factor = 50
-  show_cluster_color = false
 
 # testing
   test_duration = 5
