@@ -5,8 +5,8 @@
   window_height = 720
   is_resizable = true
   should_be_profiled = true
-  octree_max_level = 6
-  max_unit_number_per_level = 10
+  octree_max_level = 8
+  max_unit_number_per_level = 5
   resolution_steps = 3
   use_experimental_octree = true
   scale_factor = 1 # 1 pixel = 1 cm
@@ -15,31 +15,31 @@
   game_x = 50
   game_y = 50
   game_z = 50
-  wall_elasticity = 0.8
+  wall_elasticity = 1
   apply_gravity = true
   gravity = 9.81
   show_octree = true
   
 # unit config
-  unit_number = 100
+  unit_number = 1
   unit_initial_spacing = 0
   units_emit_gravity = false
   unit_gravitational_multiplier = 1
 
   unit_radius = 1
-  unit_radius_multiplier = 0.5
-  set_random_radius = true
+  unit_radius_multiplier = 0.2
+  set_random_radius = false
   radius_min = 1
   radius_max = 5
   
   unit_mass_multiplier = 1
-  set_random_mass_multiplier = true
+  set_random_mass_multiplier = false
   mass_multiplier_min = 1
   mass_multiplier_max = 10
   show_mass_color = false
   
-  unit_elasticity = 0.8
-  set_random_elasticity = true
+  unit_elasticity = 1
+  set_random_elasticity = false
   elasticity_min = 0.5
   elasticity_max = 0.7
   
@@ -55,3 +55,7 @@
   cluster_threshold = 1 # minimum distance in order to create a cluster
   cluster_resistance_factor = 50
   show_cluster_color = false
+
+# testing
+  test_duration = 5
+  test_iterations = 10

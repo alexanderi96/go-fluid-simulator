@@ -1,6 +1,7 @@
 package physics
 
 import (
+	"image/color"
 	"math"
 
 	"github.com/alexanderi96/go-fluid-simulator/config"
@@ -31,7 +32,8 @@ type Simulation struct {
 	IsInputBeingHandled  bool
 
 	// variables added for the 3d branch
-	Camera rl.Camera
+	Camera     rl.Camera
+	CameraMode rl.CameraMode
 
 	// Velocità di rotazione
 	MovementSpeed float32
@@ -100,9 +102,15 @@ func (s *Simulation) HandleInput() {
 	s.IsInputBeingHandled = true
 
 	if rl.IsKeyPressed(rl.KeyR) {
+		s.ResetSimulation()
+	} else if rl.IsKeyPressed(rl.KeyC) {
 		s.ResetCameraPosition()
-		s.Octree.Clear()
-		s.Fluid = []*Unit{}
+	} else if rl.IsKeyPressed(rl.KeyOne) {
+		s.CameraMode = rl.CameraFree
+	} else if rl.IsKeyPressed(rl.KeyTwo) {
+		s.CameraMode = rl.CameraOrbital
+	} else if rl.IsKeyPressed(rl.KeyThree) {
+		s.CameraMode = rl.CameraFirstPerson
 	} else if rl.IsKeyPressed(rl.KeySpace) {
 		s.IsPause = !s.IsPause
 	} else if rl.IsMouseButtonPressed(rl.MouseLeftButton) {
@@ -143,7 +151,8 @@ func (s *Simulation) HandleInput() {
 }
 
 func (s *Simulation) UpdateCameraPosition() error {
-	rl.UpdateCamera(&s.Camera, rl.CameraFree)
+
+	rl.UpdateCamera(&s.Camera, s.CameraMode)
 
 	return nil
 }
@@ -162,4 +171,13 @@ func (s *Simulation) UpdateSpawnPosition() {
 func (s *Simulation) IsSpawnInRange() bool {
 	return s.SpawnPosition.X >= s.WorldBoundray.Min.X && s.SpawnPosition.X <= s.WorldBoundray.Max.X &&
 		s.SpawnPosition.Y >= s.WorldBoundray.Min.Y && s.SpawnPosition.Y <= s.WorldBoundray.Max.Y && s.SpawnPosition.Z >= s.WorldBoundray.Min.Z && s.SpawnPosition.Z <= s.WorldBoundray.Max.Z
+}
+
+func (s *Simulation) InitTest() {
+	s.Fluid = append(s.Fluid, newUnitWithPropertiesAtPosition(s.CubeCenter, rl.Vector3{}, 1, 1, 1, color.RGBA{R: 255, G: 0, B: 0, A: 255}))
+}
+
+func (s *Simulation) ResetSimulation() {
+	s.Octree.Clear()
+	s.Fluid = []*Unit{}
 }

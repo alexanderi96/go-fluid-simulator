@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"os"
 	"runtime/pprof"
 
@@ -15,9 +16,17 @@ import (
 
 var (
 	s *physics.Simulation
+
+	testing = flag.Bool("testing", false, "Enable testing mode")
 )
 
+type TestData struct {
+	Position rl.Vector3
+	Duration float32
+}
+
 func init() {
+	flag.Parse()
 	config, err := config.ReadConfig("./config.toml")
 	if err != nil {
 		log.Fatal(err)
@@ -49,9 +58,17 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
+	if *testing {
+		testLoop()
+	} else {
+		runLoop()
+	}
+
+	rl.CloseWindow()
+}
+
+func runLoop() {
 	for !rl.WindowShouldClose() {
-		// s.Angle += 0.01 // Velocità di rotazione
-		// s.Camera.Position = rl.NewVector3(float32(math.Sin(s.Angle)*10.0), 5.0, float32(math.Cos(s.Angle)*10.0))
 
 		if !s.IsInputBeingHandled {
 			go s.HandleInput()
@@ -67,6 +84,40 @@ func main() {
 		gui.Draw(s)
 		s.Config.UpdateWindowSettings()
 	}
+}
 
-	rl.CloseWindow()
+func testLoop() {
+	testsData := make([]*TestData, 0)
+	testsNumber := int32(0)
+	testDuration := s.Config.TestDuration
+	log.Printf("Test duration: %f\nTesting...\n\n", testDuration)
+
+	for !rl.WindowShouldClose() && testsNumber < s.Config.TestIterations {
+		s.InitTest()
+
+		duration := float32(0)
+		log.Printf("Test %d of %d...", testsNumber+1, s.Config.TestIterations)
+		for testDuration > duration {
+			if err := s.Update(); err != nil {
+				log.Fatal("Errore durante l'update della simulazione %w", err)
+			}
+
+			gui.Draw(s)
+			s.Config.UpdateWindowSettings()
+			duration += float32(rl.GetFrameTime())
+		}
+
+		testsData = append(testsData, &TestData{
+			Position: s.Fluid[len(s.Fluid)-1].Position,
+			Duration: duration,
+		})
+		s.ResetSimulation()
+		testsNumber++
+	}
+
+	log.Print("Test results:")
+	for test := range testsData {
+		log.Printf("Test %d of %d Position: %v Duration: %f", test+1, s.Config.TestIterations, testsData[test].Position, testsData[test].Duration)
+	}
+
 }

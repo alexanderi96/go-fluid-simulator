@@ -157,6 +157,21 @@ func newUnitWithPropertiesAndAcceleration(cfg *config.Config, acceleration rl.Ve
 	return unit
 }
 
+func newUnitWithPropertiesAtPosition(position rl.Vector3, acceleration rl.Vector3, radius, massMultiplier, elasticity float32, color color.RGBA) *Unit {
+	return &Unit{
+		Id:                 uuid.New(),
+		Position:           position,
+		PreviousPosition:   position,
+		Acceleration:       acceleration,
+		Radius:             radius,
+		MassMultiplier:     massMultiplier,
+		Elasticity:         elasticity,
+		Color:              color,
+		TransitionTimer:    0,
+		TransitionDuration: 0,
+	}
+}
+
 func findClosestAvailablePosition(newUnit *Unit, existingUnits []*Unit, step float32) rl.Vector3 {
 	for radiusMultiplier := 1; ; radiusMultiplier++ {
 		for _, unit := range existingUnits {

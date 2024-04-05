@@ -105,13 +105,12 @@ func (ot *Octree) Insert(obj *Unit) {
 
 // getIndex determina in quale sotto-Octree un oggetto appartiene.
 func (ot *Octree) getIndices(obj Unit) []int {
+	// Calcola il punto medio dell'Octree per le tre dimensioni.
 	midX := (ot.Bounds.Min.X + ot.Bounds.Max.X) / 2
 	midY := (ot.Bounds.Min.Y + ot.Bounds.Max.Y) / 2
 	midZ := (ot.Bounds.Min.Z + ot.Bounds.Max.Z) / 2
 
-	var indices []int
-
-	// Estendi la verifica agli estremi dell'oggetto, considerando il raggio.
+	// Calcola gli estremi dell'oggetto considerando il suo raggio.
 	minX := obj.Position.X - obj.Radius
 	maxX := obj.Position.X + obj.Radius
 	minY := obj.Position.Y - obj.Radius
@@ -119,7 +118,7 @@ func (ot *Octree) getIndices(obj Unit) []int {
 	minZ := obj.Position.Z - obj.Radius
 	maxZ := obj.Position.Z + obj.Radius
 
-	// Verifica l'intersezione con gli ottanti.
+	// Determina la posizione dell'oggetto rispetto al punto medio per ogni dimensione.
 	inLeft := minX <= midX
 	inRight := maxX >= midX
 	inBottom := minY <= midY
@@ -127,43 +126,53 @@ func (ot *Octree) getIndices(obj Unit) []int {
 	inBack := minZ <= midZ
 	inFront := maxZ >= midZ
 
-	// Aggiungi gli indici basati sulle intersezioni.
-	// 7: inTop && inRight && inFront
-	// 6: inTop && inLeft && inFront
-	// 4: inBottom && inLeft && inFront
-	// 5: inBottom && inRight && inFront
-	// 3: inTop && inRight && inBack
-	// 2: inTop && inLeft && inBack
-	// 0: inBottom && inLeft && inBack
-	// 1: inBottom && inRight && inBack
-	if inTop && inRight && inFront {
-		indices = append(indices, 7)
+	// Inizializza un array vuoto per gli indici.
+	var indices []int
+
+	// Assegna un indice basato sulla posizione dell'oggetto.
+	// Utilizza una struttura condizionale compatta per verificare tutte le possibili combinazioni.
+	if inTop {
+		if inRight {
+			if inFront {
+				indices = append(indices, 7)
+			}
+			if inBack {
+				indices = append(indices, 3)
+			}
+		}
+		if inLeft {
+			if inFront {
+				indices = append(indices, 6)
+			}
+			if inBack {
+				indices = append(indices, 2)
+			}
+		}
 	}
-	if inTop && inLeft && inFront {
-		indices = append(indices, 6)
-	}
-	if inBottom && inLeft && inFront {
-		indices = append(indices, 4)
-	}
-	if inBottom && inRight && inFront {
-		indices = append(indices, 5)
-	}
-	if inTop && inRight && inBack {
-		indices = append(indices, 3)
-	}
-	if inTop && inLeft && inBack {
-		indices = append(indices, 2)
-	}
-	if inBottom && inLeft && inBack {
-		indices = append(indices, 0)
-	}
-	if inBottom && inRight && inBack {
-		indices = append(indices, 1)
+	if inBottom {
+		if inRight {
+			if inFront {
+				indices = append(indices, 5)
+			}
+			if inBack {
+				indices = append(indices, 1)
+			}
+		}
+		if inLeft {
+			if inFront {
+				indices = append(indices, 4)
+			}
+			if inBack {
+				indices = append(indices, 0)
+			}
+		}
 	}
 
+	// Se l'array degli indici è vuoto, significa che l'oggetto non appartiene a nessun ottante.
 	if len(indices) == 0 {
-		return []int{-1} // Se l'oggetto non rientra in nessun ottante.
+		return []int{-1}
 	}
+
 	return indices
 }
 
