@@ -20,24 +20,26 @@ func (s *Simulation) UpdateWithOctrees() error {
 		if unitA == nil {
 			continue
 		}
+
+		updatePositionWithVerlet(unitA, s.Metrics.Frametime)
+
 		if s.Config.ApplyGravity {
 			unitA.accelerate(rl.Vector3{X: 0, Y: s.Config.Gravity, Z: 0})
 		}
 
-		unitA.checkWallCollisionVerlet(s.WorldBoundray, s.Config.WallElasticity, s.Metrics.Frametime)
+		checkWallCollisionVerlet(unitA, s.WorldBoundray, s.Config.WallElasticity, s.Metrics.Frametime)
 
 		nearUnits := []*Unit{}
 
 		s.Octree.Retrieve(&nearUnits, unitA)
 		for _, unitB := range nearUnits {
-			if unitB != nil || unitA.Id != unitB.Id {
-				surfaceDistance := getSurfaceDistance(unitA, unitB)
-				if surfaceDistance < 0 {
-					handleCollision(unitA, unitB, surfaceDistance, s.Metrics.Frametime)
+			if unitB != nil && unitA.Id != unitB.Id {
+				distance := getDistance(unitA, unitB)
+				if distance < unitA.Radius+unitB.Radius {
+					handleCollision(unitA, unitB, distance)
 				}
 			}
 		}
-		unitA.updatePositionWithVerlet(s.Metrics.Frametime)
 	}
 
 	return nil
@@ -59,25 +61,25 @@ func (s *Simulation) UpdateWithVerletIntegration() error {
 				unitA.accelerate(rl.Vector3{X: 0, Y: s.Config.Gravity, Z: 0})
 			}
 
-			unitA.checkWallCollisionVerlet(s.WorldBoundray, s.Config.WallElasticity, fractionalFrametime)
+			checkWallCollisionVerlet(unitA, s.WorldBoundray, s.Config.WallElasticity, fractionalFrametime)
 
 			for _, unitB := range s.Fluid {
 				if unitB == nil || unitA.Id == unitB.Id {
 					continue
 				}
 
-				surfaceDistance := getSurfaceDistance(unitA, unitB)
+				distance := getDistance(unitA, unitB)
 
 				if s.Config.UnitsEmitGravity {
 					applyGravitationalAttraction(unitA, unitB, s.Config)
 				}
 
-				if surfaceDistance < 0 {
-					handleCollision(unitA, unitB, surfaceDistance, fractionalFrametime)
+				if distance < unitA.Radius+unitB.Radius {
+					handleCollision(unitA, unitB, distance)
 				}
 			}
+			updatePositionWithVerlet(unitA, fractionalFrametime)
 
-			unitA.updatePositionWithVerlet(fractionalFrametime)
 		}
 	}
 
@@ -88,9 +90,9 @@ func getDistance(unitA, unitB *Unit) float32 {
 	return rl.Vector3Distance(unitA.Position, unitB.Position)
 }
 
-func getSurfaceDistance(unitA, unitB *Unit) float32 {
-	return getDistance(unitA, unitB) - (unitA.Radius + unitB.Radius)
-}
+// func getSurfaceDistance(unitA, unitB *Unit) float32 {
+// 	return getDistance(unitA, unitB) - (unitA.Radius + unitB.Radius)
+// }
 
 func applyGravitationalAttraction(a, b *Unit, config *config.Config) {
 	dx := b.Position.X - a.Position.X
@@ -121,36 +123,89 @@ func applyGravitationalAttraction(a, b *Unit, config *config.Config) {
 	b.Acceleration.Z -= forceZ / b.Mass
 }
 
-func areOverlapping(a, b *Unit) bool {
-	return getSurfaceDistance(a, b) <= 0
-}
+// func areOverlapping(a, b *Unit) bool {
+// 	return getSurfaceDistance(a, b) <= 0
+// }
 
-func handleCollision(a, b *Unit, surfaceDistance, dt float32) {
+func handleCollision(a, b *Unit, distance float32) {
 	dx := b.Position.X - a.Position.X
 	dy := b.Position.Y - a.Position.Y
 	dz := b.Position.Z - a.Position.Z
-	distanceSquared := dx*dx + dy*dy + dz*dz
-	distance := float32(math.Sqrt(float64(distanceSquared)))
-
-	if distanceSquared == 0 {
-		return
-	}
 
 	normalX := dx / distance
 	normalY := dy / distance
 	normalZ := dz / distance
 
-	overlap := -surfaceDistance // Sovrapposizione positiva
-	inverseMassA := 1 / a.Mass
-	inverseMassB := 1 / b.Mass
-	inverseTotalMass := inverseMassA + inverseMassB
-	correction := overlap / inverseTotalMass
+	overlap := (a.Radius + b.Radius) - distance
+	totalMass := a.Mass + b.Mass
+	correction := overlap / totalMass
 
-	// Applica la correzione alla posizione corrente
-	a.Position.X -= normalX * correction * inverseMassA
-	a.Position.Y -= normalY * correction * inverseMassA
-	a.Position.Z -= normalZ * correction * inverseMassA
-	b.Position.X += normalX * correction * inverseMassB
-	b.Position.Y += normalY * correction * inverseMassB
-	b.Position.Z += normalZ * correction * inverseMassB
+	// Applica la correzione alle posizioni delle unità
+	a.Position.X -= normalX * correction * a.Mass
+	a.Position.Y -= normalY * correction * a.Mass
+	a.Position.Z -= normalZ * correction * a.Mass
+	b.Position.X += normalX * correction * b.Mass
+	b.Position.Y += normalY * correction * b.Mass
+	b.Position.Z += normalZ * correction * b.Mass
+}
+
+func updatePositionWithVerlet(u *Unit, dt float32) {
+	newPosition := rl.Vector3{}
+	newPosition.X = 2*u.Position.X - u.PreviousPosition.X + u.Acceleration.X*dt*dt
+	newPosition.Y = 2*u.Position.Y - u.PreviousPosition.Y + u.Acceleration.Y*dt*dt
+	newPosition.Z = 2*u.Position.Z - u.PreviousPosition.Z + u.Acceleration.Z*dt*dt
+
+	u.PreviousPosition = u.Position
+	u.Position = newPosition
+	u.Acceleration = rl.Vector3{X: 0, Y: 0, Z: 0}
+}
+
+func checkWallCollisionVerlet(u *Unit, boundrais rl.BoundingBox, wallElasticity, deltaTime float32) {
+	// Calcola la velocità
+	velocity := u.GetVelocity(deltaTime)
+
+	// Correzione asse X
+	if u.Position.X-u.Radius < boundrais.Min.X {
+		overlapX := u.Radius - u.Position.X + boundrais.Min.X
+		u.Position.X += overlapX
+		// Applica la restituzione
+		velocity.X = -velocity.X * wallElasticity
+		u.PreviousPosition.X = u.Position.X - velocity.X*deltaTime
+	} else if u.Position.X+u.Radius > boundrais.Max.X {
+		overlapX := u.Position.X + u.Radius - boundrais.Max.X
+		u.Position.X -= overlapX
+		// Applica la restituzione
+		velocity.X = -velocity.X * wallElasticity
+		u.PreviousPosition.X = u.Position.X - velocity.X*deltaTime
+	}
+
+	// Correzione asse Y
+	if u.Position.Y-u.Radius < boundrais.Min.Y {
+		overlapY := u.Radius - u.Position.Y + boundrais.Min.Y
+		u.Position.Y += overlapY
+		// Applica la restituzione
+		velocity.Y = -velocity.Y * wallElasticity
+		u.PreviousPosition.Y = u.Position.Y - velocity.Y*deltaTime
+	} else if u.Position.Y+u.Radius > boundrais.Max.Y {
+		overlapY := (u.Position.Y + u.Radius) - boundrais.Max.Y
+		u.Position.Y -= overlapY
+		// Applica la restituzione
+		velocity.Y = -velocity.Y * wallElasticity
+		u.PreviousPosition.Y = u.Position.Y - velocity.Y*deltaTime
+	}
+
+	// Correzione asse Y
+	if u.Position.Z-u.Radius < boundrais.Min.Z {
+		overlapZ := u.Radius - u.Position.Z + boundrais.Min.Z
+		u.Position.Z += overlapZ
+		// Applica la restituzione
+		velocity.Z = -velocity.Z * wallElasticity
+		u.PreviousPosition.Z = u.Position.Z - velocity.Z*deltaTime
+	} else if u.Position.Z+u.Radius > boundrais.Max.Z {
+		overlapZ := (u.Position.Z + u.Radius) - boundrais.Max.Z
+		u.Position.Z -= overlapZ
+		// Applica la restituzione
+		velocity.Z = -velocity.Z * wallElasticity
+		u.PreviousPosition.Z = u.Position.Z - velocity.Z*deltaTime
+	}
 }

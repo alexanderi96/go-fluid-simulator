@@ -14,7 +14,7 @@ func Draw(s *physics.Simulation) {
 	rl.BeginMode3D(s.Camera)
 
 	// Disegno di un pavimento a griglia come punto di riferimento
-	rl.DrawGrid(50, 5)
+	rl.DrawGrid(10, 5)
 
 	drawFluid(s)
 
@@ -51,9 +51,9 @@ func Draw(s *physics.Simulation) {
 
 	rl.DrawCube(s.WorldBoundray.Min, 1, 1, 1, rl.Blue)
 	rl.DrawCube(s.WorldBoundray.Max, 1, 1, 1, rl.Red)
-	rl.DrawLine3D(s.WorldBoundray.Min, rl.NewVector3(s.WorldBoundray.Max.X, 0, 0), rl.Red)
-	rl.DrawLine3D(s.WorldBoundray.Min, rl.NewVector3(0, s.WorldBoundray.Max.Y, 0), rl.Green)
-	rl.DrawLine3D(s.WorldBoundray.Min, rl.NewVector3(0, 0, s.WorldBoundray.Max.Z), rl.Blue)
+	rl.DrawLine3D(s.WorldBoundray.Min, rl.NewVector3(s.WorldBoundray.Max.X, s.WorldBoundray.Min.Y, s.WorldBoundray.Min.Z), rl.Red)
+	rl.DrawLine3D(s.WorldBoundray.Min, rl.NewVector3(s.WorldBoundray.Min.X, s.WorldBoundray.Max.Y, s.WorldBoundray.Min.Z), rl.Green)
+	rl.DrawLine3D(s.WorldBoundray.Min, rl.NewVector3(s.WorldBoundray.Min.X, s.WorldBoundray.Min.Y, s.WorldBoundray.Max.Z), rl.Blue)
 
 	rl.EndMode3D()
 	drawSidebar(s)
@@ -108,17 +108,17 @@ func drawVectors(u *physics.Unit, dt float32) {
 }
 
 func calculateNearestCubePoints(s *physics.Simulation) (xNear, yNear, zNear rl.Vector3) {
-	if s.SpawnPosition.X < s.CubeCenter.X {
+	if s.SpawnPosition.X < s.WorldCenter.X {
 		xNear = rl.NewVector3(float32(s.WorldBoundray.Min.X), s.SpawnPosition.Y, s.SpawnPosition.Z)
 	} else {
 		xNear = rl.NewVector3(float32(s.WorldBoundray.Max.X), s.SpawnPosition.Y, s.SpawnPosition.Z)
 	}
-	if s.SpawnPosition.Y < s.CubeCenter.Y {
+	if s.SpawnPosition.Y < s.WorldCenter.Y {
 		yNear = rl.NewVector3(s.SpawnPosition.X, float32(s.WorldBoundray.Min.Y), s.SpawnPosition.Z)
 	} else {
 		yNear = rl.NewVector3(s.SpawnPosition.X, float32(s.WorldBoundray.Max.Y), s.SpawnPosition.Z)
 	}
-	if s.SpawnPosition.Z < s.CubeCenter.Z {
+	if s.SpawnPosition.Z < s.WorldCenter.Z {
 		zNear = rl.NewVector3(s.SpawnPosition.X, s.SpawnPosition.Y, float32(s.WorldBoundray.Min.Z))
 	} else {
 		zNear = rl.NewVector3(s.SpawnPosition.X, s.SpawnPosition.Y, float32(s.WorldBoundray.Max.Z))

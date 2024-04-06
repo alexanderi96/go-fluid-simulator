@@ -8,7 +8,7 @@
   octree_max_level = 8
   max_unit_number_per_level = 5
   resolution_steps = 3
-  use_experimental_octree = true
+  use_experimental_octree = false
   scale_factor = 1 # 1 pixel = 1 cm
 
 # world config
@@ -27,12 +27,12 @@
   unit_gravitational_multiplier = 1
 
   unit_radius = 1
-  unit_radius_multiplier = 0.2
+  unit_radius_multiplier = 0.3
   set_random_radius = false
   radius_min = 1
   radius_max = 5
   
-  unit_mass_multiplier = 1
+  unit_mass_multiplier = 100
   set_random_mass_multiplier = false
   mass_multiplier_min = 1
   mass_multiplier_max = 10
