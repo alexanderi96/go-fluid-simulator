@@ -1,9 +1,7 @@
 package physics
 
 import (
-	"image/color"
 	"math"
-	"math/rand"
 
 	"github.com/alexanderi96/go-fluid-simulator/config"
 	"github.com/alexanderi96/go-fluid-simulator/metrics"
@@ -46,9 +44,17 @@ type Simulation struct {
 	SpawnPosition rl.Vector3
 }
 
+var (
+	front, top, side rl.Vector3
+	fovy             = float32(60)
+)
+
 func NewSimulation(config *config.Config) (*Simulation, error) {
 	config.UpdateWindowSettings()
-	WorldCenter := rl.NewVector3(float32(config.GameX)/2, float32(config.GameY)/2, float32(config.GameZ)/2)
+
+	InitOctree(config)
+
+	WorldCenter := rl.NewVector3(0, 0, 0)
 
 	sim := &Simulation{
 		Fluid:   make([]*Unit, 0, config.UnitNumber),
@@ -56,7 +62,7 @@ func NewSimulation(config *config.Config) (*Simulation, error) {
 		Config:  config,
 		IsPause: false,
 
-		WorldBoundray: rl.NewBoundingBox(rl.NewVector3(-float32(config.GameX)/2, 0, -float32(config.GameZ)/2), rl.NewVector3(float32(config.GameX)/2, float32(config.GameY), float32(config.GameZ)/2)),
+		WorldBoundray: rl.NewBoundingBox(rl.NewVector3(-float32(config.GameX)/2, -float32(config.GameY)/2, -float32(config.GameZ)/2), rl.NewVector3(float32(config.GameX)/2, float32(config.GameY)/2, float32(config.GameZ)/2)),
 		WorldCenter:   WorldCenter,
 
 		ControlMode:   UnitSpawnMode,
@@ -64,20 +70,23 @@ func NewSimulation(config *config.Config) (*Simulation, error) {
 		SpawnPosition: WorldCenter,
 	}
 
-	sim.Octree = NewOctree(1, sim.WorldBoundray)
+	sim.Octree = NewOctree(0, sim.WorldBoundray)
 
-	sim.ResetCameraPosition()
+	fovyRadians := fovy * (math.Pi / 180)
+	d := float32((math.Sqrt(3) * math.Max(float64(config.GameX), math.Max(float64(config.GameY), float64(config.GameZ)))) / (2 * math.Tan(float64(fovyRadians)/2)))
+
+	front = rl.NewVector3(0, 0, float32(d))
+	top = rl.NewVector3(0, config.GameY, 0)
+	side = rl.NewVector3(float32(d), 0, 0)
+
+	sim.ResetCameraPosition(front, fovy)
 
 	return sim, nil
 }
 
-func (s *Simulation) ResetCameraPosition() {
-	fovy := float32(60)
-	fovyRadians := fovy * (math.Pi / 180)
-	d := float32((math.Sqrt(3) * math.Max(float64(s.Config.GameX), math.Max(float64(s.Config.GameY), float64(s.Config.GameZ)))) / (2 * math.Tan(float64(fovyRadians)/2)))
-
+func (s *Simulation) ResetCameraPosition(position rl.Vector3, fovy float32) {
 	s.Camera = rl.Camera{
-		Position:   rl.NewVector3(0, float32(d), float32(d)),
+		Position:   position,
 		Target:     s.WorldCenter,
 		Up:         rl.NewVector3(0, 1, 0),
 		Fovy:       fovy,
@@ -90,12 +99,7 @@ func (s *Simulation) ResetCameraPosition() {
 func (s *Simulation) Update() error {
 	s.Metrics.Update()
 
-	if s.Config.UseExperimentalOctree {
-		return s.UpdateWithOctrees()
-	} else {
-		return s.UpdateWithVerletIntegration()
-	}
-
+	return s.UpdateWithOctrees()
 }
 
 func (s *Simulation) HandleInput() {
@@ -103,14 +107,12 @@ func (s *Simulation) HandleInput() {
 
 	if rl.IsKeyPressed(rl.KeyR) {
 		s.ResetSimulation()
-	} else if rl.IsKeyPressed(rl.KeyC) {
-		s.ResetCameraPosition()
 	} else if rl.IsKeyPressed(rl.KeyOne) {
-		s.CameraMode = rl.CameraFree
+		s.ResetCameraPosition(front, fovy)
 	} else if rl.IsKeyPressed(rl.KeyTwo) {
-		s.CameraMode = rl.CameraOrbital
+		s.ResetCameraPosition(top, fovy)
 	} else if rl.IsKeyPressed(rl.KeyThree) {
-		s.CameraMode = rl.CameraFirstPerson
+		s.ResetCameraPosition(side, fovy)
 	} else if rl.IsKeyPressed(rl.KeySpace) {
 		s.IsPause = !s.IsPause
 	} else if rl.IsMouseButtonPressed(rl.MouseLeftButton) {
@@ -170,7 +172,8 @@ func (s *Simulation) UpdateSpawnPosition() {
 
 func (s *Simulation) IsSpawnInRange() bool {
 	return s.SpawnPosition.X >= s.WorldBoundray.Min.X && s.SpawnPosition.X <= s.WorldBoundray.Max.X &&
-		s.SpawnPosition.Y >= s.WorldBoundray.Min.Y && s.SpawnPosition.Y <= s.WorldBoundray.Max.Y && s.SpawnPosition.Z >= s.WorldBoundray.Min.Z && s.SpawnPosition.Z <= s.WorldBoundray.Max.Z
+		s.SpawnPosition.Y >= s.WorldBoundray.Min.Y && s.SpawnPosition.Y <= s.WorldBoundray.Max.Y &&
+		s.SpawnPosition.Z >= s.WorldBoundray.Min.Z && s.SpawnPosition.Z <= s.WorldBoundray.Max.Z
 }
 
 func (s *Simulation) SpawnNewUnits() {
@@ -181,31 +184,29 @@ func (s *Simulation) SpawnNewUnits() {
 	unts := make([]*Unit, 0)
 
 	for i := 0; i < int(s.Config.UnitNumber); i++ {
-		if s.Config.SetRandomRadius {
-			currentRadius = (s.Config.RadiusMin + rand.Float32()*(s.Config.RadiusMax-s.Config.RadiusMin)) * s.Config.UnitRadiusMultiplier
-		}
-		if s.Config.SetRandomMassMultiplier {
-			currentMassMultiplier = s.Config.MassMultiplierMin + rand.Float32()*(s.Config.MassMultiplierMax-s.Config.MassMultiplierMin)
-		}
-		if s.Config.SetRandomElasticity {
-			currentElasticity = s.Config.ElasticityMin + rand.Float32()*(s.Config.ElasticityMax-s.Config.ElasticityMin)
-		}
+		// if s.Config.SetRandomRadius {
+		// 	currentRadius = (s.Config.RadiusMin + rand.Float32()*(s.Config.RadiusMax-s.Config.RadiusMin)) * s.Config.UnitRadiusMultiplier
+		// }
+		// if s.Config.SetRandomMassMultiplier {
+		// 	currentMassMultiplier = s.Config.MassMultiplierMin + rand.Float32()*(s.Config.MassMultiplierMax-s.Config.MassMultiplierMin)
+		// }
+		// if s.Config.SetRandomElasticity {
+		// 	currentElasticity = s.Config.ElasticityMin + rand.Float32()*(s.Config.ElasticityMax-s.Config.ElasticityMin)
+		// }
 
-		color := color.RGBA{255, 0, 0, 255}
+		color := rl.RayWhite
 
 		if s.Config.SetRandomColor {
 			color = utils.RandomRaylibColor()
 		}
 
-		unts = append(unts, newUnitWithPropertiesAtPosition(rl.Vector3{}, rl.Vector3{}, currentRadius, currentMassMultiplier, currentElasticity, color))
+		unts = append(unts, newUnitWithPropertiesAtPosition(rl.Vector3{}, rl.Vector3{X: 0, Y: 0, Z: 0}, currentRadius, currentMassMultiplier, currentElasticity, color))
 	}
 
-	positionSpheres(unts, s.SpawnPosition)
-	s.Fluid = append(s.Fluid, unts...)
-}
+	// positionSpheres(unts, s.SpawnPosition)
 
-func (s *Simulation) InitTest() {
-	s.Fluid = append(s.Fluid, newUnitWithPropertiesAtPosition(s.WorldCenter, rl.Vector3{}, 1, 1, 1, color.RGBA{R: 255, G: 0, B: 0, A: 255}))
+	positionUnitsCuboidally(unts, s.SpawnPosition, s.Config.UnitInitialSpacing)
+	s.Fluid = append(s.Fluid, unts...)
 }
 
 func (s *Simulation) ResetSimulation() {
@@ -213,33 +214,70 @@ func (s *Simulation) ResetSimulation() {
 	s.Fluid = []*Unit{}
 }
 
-func positionSpheres(units []*Unit, cubeCenter rl.Vector3) {
-	numSpheres := len(units)
-	cubeSideLength := int(math.Ceil(math.Pow(float64(numSpheres), 1.0/3.0)))
+func positionUnitsCuboidally(units []*Unit, spawnPosition rl.Vector3, spacing float32) error {
+	if len(units) == 0 {
+		return nil
+	}
 
-	// Calcola il lato di ogni cubo in base al numero di sfere
-	cubeSide := float32(cubeSideLength)
+	// Calcoliamo il lato del cubo arrotondando per eccesso
+	sideLength := int(math.Ceil(math.Pow(float64(len(units)), 1.0/3.0)))
+	unitRadius := units[0].Radius
 
-	// Calcola il passo tra ogni sfera
-	step := 2 * cubeSide / float32(cubeSideLength-1)
+	// Calcoliamo lo spazio totale richiesto per le unità
+	totalWidth := float32(sideLength)*(2*unitRadius+spacing) - spacing
+	totalHeight := float32(sideLength)*(2*unitRadius+spacing) - spacing
+	totalDepth := float32(sideLength)*(2*unitRadius+spacing) - spacing
 
-	// Posiziona le sfere all'interno del cubo
+	// Calcoliamo la posizione iniziale del cubo
+	startX := spawnPosition.X - totalWidth/2
+	startY := spawnPosition.Y - totalHeight/2
+	startZ := spawnPosition.Z - totalDepth/2
+
+	// Posizioniamo le unità nel cubo
 	index := 0
-	for x := 0; x < cubeSideLength; x++ {
-		for y := 0; y < cubeSideLength; y++ {
-			for z := 0; z < cubeSideLength; z++ {
-				if index < numSpheres {
-					// Calcola la posizione della sfera rispetto al centro del cubo
-					posX := float32(x)*step - cubeSide + cubeCenter.X
-					posY := float32(y)*step - cubeSide + cubeCenter.Y
-					posZ := float32(z)*step - cubeSide + cubeCenter.Z
+	for x := 0; x < sideLength; x++ {
+		for y := 0; y < sideLength; y++ {
+			for z := 0; z < sideLength; z++ {
+				// Calcoliamo la posizione per questa unità
+				unitX := startX + float32(x)*(2*unitRadius+spacing)
+				unitY := startY + float32(y)*(2*unitRadius+spacing)
+				unitZ := startZ + float32(z)*(2*unitRadius+spacing)
 
-					// Assegna la posizione alla sfera
-					units[index].Position = rl.Vector3{X: posX, Y: posY, Z: posZ}
+				// Assegniamo la posizione alla unità corrente
+				if index < len(units) {
+					units[index].Position = rl.Vector3{X: unitX, Y: unitY, Z: unitZ}
 					units[index].PreviousPosition = units[index].Position
 					index++
+				} else {
+					break
 				}
 			}
 		}
 	}
+
+	return nil
 }
+
+// func positionUnitsInFibonacciSpiral(units []*Unit, center rl.Vector3) {
+// 	phi := float32(math.Phi) // Phi è il rapporto aureo (1.618...)
+// 	angle := float32(0)
+// 	radiusStep := float32(0.3) // Passo di incremento del raggio
+
+// 	for i := 0; i < len(units); i++ {
+// 		// Calcola la posizione della prossima unità sulla spirale di Fibonacci
+// 		radius := float32(math.Sqrt(float64(i))) * radiusStep
+// 		x := center.X + radius*float32(math.Cos(float64(angle)))
+// 		y := center.Y + radius*float32(math.Sin(float64(angle)))
+// 		z := center.Z
+
+// 		// Assegna la posizione alla unità
+// 		units[i].Position = rl.NewVector3(x, y, z)
+// 		units[i].PreviousPosition = units[i].Position
+
+// 		// Aumenta il passo di incremento del raggio
+// 		radiusStep += 0.0005 // Modifica la velocità di aumento a tuo piacimento
+
+// 		// Aggiorna l'angolo per la prossima unità sulla spirale
+// 		angle += phi * 2 * float32(math.Pi) // Incremento dell'angolo utilizzando Phi
+// 	}
+// }

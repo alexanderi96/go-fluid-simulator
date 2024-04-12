@@ -9,14 +9,15 @@ import (
 
 func Draw(s *physics.Simulation) {
 	rl.BeginDrawing()
-	rl.ClearBackground(rl.RayWhite)
+	rl.ClearBackground(rl.DarkGray)
 
 	rl.BeginMode3D(s.Camera)
 
 	// Disegno di un pavimento a griglia come punto di riferimento
-	rl.DrawGrid(10, 5)
+	// rl.DrawGrid(20, 5)
 
 	drawFluid(s)
+	rl.DrawSphere(s.Octree.CenterOfMass, 0.1, rl.Red)
 
 	// if s.Config.ShowOverlay {
 	// 	for _, unit := range s.Fluid {
@@ -26,12 +27,10 @@ func Draw(s *physics.Simulation) {
 
 	// Calcola i punti più vicini sul cubo di gioco
 	xNear, yNear, zNear := calculateNearestCubePoints(s)
-	if s.ControlMode == physics.UnitSpawnMode {
-		// Disegna le linee tratteggiate
-		drawDashedLine(xNear, s.SpawnPosition, 0.1, 0.1)
-		drawDashedLine(yNear, s.SpawnPosition, 0.1, 0.1)
-		drawDashedLine(zNear, s.SpawnPosition, 0.1, 0.1)
-	}
+	// Disegna le linee tratteggiate
+	drawDashedLine(xNear, s.SpawnPosition, 0.1, 0.1)
+	drawDashedLine(yNear, s.SpawnPosition, 0.1, 0.1)
+	drawDashedLine(zNear, s.SpawnPosition, 0.1, 0.1)
 
 	cubeColor := rl.Red
 	if s.IsSpawnInRange() {
@@ -43,10 +42,10 @@ func Draw(s *physics.Simulation) {
 		rl.DrawLineEx(s.InitialMousePosition, s.CurrentMousePosition, 5, rl.Black)
 	}
 
-	if s.Config.UseExperimentalOctree && s.Config.ShowOctree {
+	if s.Config.ShowOctree {
 		drawOctree(s.Octree)
 	} else {
-		rl.DrawBoundingBox(s.WorldBoundray, rl.Black)
+		rl.DrawBoundingBox(s.WorldBoundray, rl.RayWhite)
 	}
 
 	rl.DrawCube(s.WorldBoundray.Min, 1, 1, 1, rl.Blue)
@@ -70,8 +69,6 @@ func drawFluid(s *physics.Simulation) {
 
 		if s.Config.ShowSpeedColor {
 			color = utils.GetColorFromVelocity(unit.GetVelocity(s.Metrics.Frametime))
-		} else if s.Config.ShowMassColor {
-			color = utils.GetColorFromMass(unit.Mass)
 		}
 
 		if s.Config.ShowVectors {
@@ -88,7 +85,8 @@ func drawOctree(octree *physics.Octree) {
 	}
 
 	// Disegna il BoundingBox dell'Octree corrente
-	rl.DrawBoundingBox(octree.Bounds, rl.Gray)
+	rl.DrawBoundingBox(octree.Bounds, rl.Black)
+	rl.DrawSphere(octree.CenterOfMass, 0.2, rl.Red)
 
 	// Disegna ricorsivamente i BoundingBox dei sotto-Octrees
 	for _, child := range octree.Children {
@@ -139,7 +137,7 @@ func drawDashedLine(start, end rl.Vector3, dashesLength, spaceLength float32) {
 
 		dashStart := rl.Vector3Add(start, rl.Vector3Scale(direction, currentLength))
 		dashEnd := rl.Vector3Add(start, rl.Vector3Scale(direction, nextDashEnd))
-		rl.DrawLine3D(dashStart, dashEnd, rl.Black) // Cambia il colore se necessario
+		rl.DrawLine3D(dashStart, dashEnd, rl.RayWhite) // Cambia il colore se necessario
 
 		currentLength = nextDashEnd + spaceLength
 	}

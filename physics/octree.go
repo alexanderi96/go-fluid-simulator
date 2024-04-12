@@ -19,6 +19,9 @@ type Octree struct {
 	Bounds   rl.BoundingBox
 	objects  []*Unit
 	Children [8]*Octree
+
+	CenterOfMass rl.Vector3
+	TotalMass    float32
 }
 
 // Octree crea un nuovo Octree.
@@ -26,12 +29,17 @@ func NewOctree(level int, bounds rl.BoundingBox) *Octree {
 	return &Octree{
 		level:  level,
 		Bounds: bounds,
+
+		CenterOfMass: rl.Vector3{},
+		TotalMass:    0,
 	}
 }
 
 // Clear pulisce il Octree.
 func (ot *Octree) Clear() {
 	ot.objects = ot.objects[:0]
+	ot.TotalMass = 0
+	ot.CenterOfMass = rl.Vector3{}
 	for i := 0; i < 8; i++ {
 		if ot.Children[i] != nil {
 			ot.Children[i].Clear()
@@ -72,8 +80,18 @@ func (ot *Octree) Split() {
 }
 
 // Insert inserisce un oggetto nel Octree.
-// Insert inserisce un oggetto nel Octree.
 func (ot *Octree) Insert(obj *Unit) {
+	// Calcola il nuovo centro di massa come media ponderata
+	newMass := ot.TotalMass + obj.Mass
+	newCenterOfMass := rl.Vector3Add(
+		rl.Vector3Scale(ot.CenterOfMass, ot.TotalMass),
+		rl.Vector3Scale(obj.Position, obj.Mass),
+	)
+	newCenterOfMass = rl.Vector3Scale(newCenterOfMass, 1/newMass)
+
+	// Aggiorna la massa totale e il centro di massa
+	ot.TotalMass = newMass
+	ot.CenterOfMass = newCenterOfMass
 
 	if ot.Children[0] == nil {
 		if len(ot.objects) < maxObjects || ot.level >= maxLevels {
@@ -84,22 +102,36 @@ func (ot *Octree) Insert(obj *Unit) {
 
 		// Se il nodo corrente è pieno e non al livello massimo, dividi.
 		ot.Split()
-	}
 
-	// Prova ad inserire l'oggetto nei figli.
+		// Reinserisci gli oggetti negli octree figli.
+		for _, item := range ot.objects {
+			ot.insertUnitIntoChildren(item)
+		}
+		ot.objects = ot.objects[:0] // Svuota l'elenco degli oggetti nel nodo corrente dopo la suddivisione
+	} else {
+		// Prova ad inserire l'oggetto nei figli.
+		ot.insertUnitIntoChildren(obj)
+	}
+}
+
+// insertUnitIntoChildren inserisce un'unità nei figli dell'octree.
+func (ot *Octree) insertUnitIntoChildren(obj *Unit) {
 	indices := ot.getIndices(*obj)
 	inserted := false
 	for _, index := range indices {
 		if index != -1 {
 			ot.Children[index].Insert(obj)
 			inserted = true
-			break // L'oggetto va inserito in un solo figlio, quindi interrompiamo il ciclo.
 		}
 	}
 
 	// Se l'oggetto non è stato inserito in nessun figlio, aggiungilo a questo nodo.
 	if !inserted {
 		ot.objects = append(ot.objects, obj)
+	} else {
+		// Aggiorna la massa totale e il centro di massa dell'Octree padre.
+		ot.TotalMass += obj.Mass
+		ot.CenterOfMass = rl.Vector3Scale(rl.Vector3Add(rl.Vector3Scale(ot.CenterOfMass, ot.TotalMass-obj.Mass), rl.Vector3Scale(obj.Position, obj.Mass)), 1/ot.TotalMass)
 	}
 }
 
@@ -111,14 +143,15 @@ func (ot *Octree) getIndices(obj Unit) []int {
 	midZ := (ot.Bounds.Min.Z + ot.Bounds.Max.Z) / 2
 
 	// Calcola gli estremi dell'oggetto considerando il suo raggio.
-	minX := obj.Position.X - obj.Radius
-	maxX := obj.Position.X + obj.Radius
-	minY := obj.Position.Y - obj.Radius
-	maxY := obj.Position.Y + obj.Radius
-	minZ := obj.Position.Z - obj.Radius
-	maxZ := obj.Position.Z + obj.Radius
+	minX := obj.Position.X + obj.Radius
+	maxX := obj.Position.X - obj.Radius
+	minY := obj.Position.Y + obj.Radius
+	maxY := obj.Position.Y - obj.Radius
+	minZ := obj.Position.Z + obj.Radius
+	maxZ := obj.Position.Z - obj.Radius
 
-	// Determina la posizione dell'oggetto rispetto al punto medio per ogni dimensione.
+	// Determina la posizione dell'oggetto rispetto al punto medio per ogni dimensione,
+	// tenendo conto dei raggi delle unità.
 	inLeft := minX <= midX
 	inRight := maxX >= midX
 	inBottom := minY <= midY
