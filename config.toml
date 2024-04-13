@@ -15,14 +15,14 @@
   game_y = 10
   game_z = 10
   wall_elasticity = 1
-  apply_gravity = false
+  apply_gravity = true
   gravity = -9.81
   show_octree = false
   
 # unit config
-  unit_number = 125
+  unit_number = 1
   unit_initial_spacing = 0.1
-  units_emit_gravity = true
+  units_emit_gravity = false
   unit_gravitational_multiplier = 1
 
   unit_radius = 1

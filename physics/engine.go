@@ -3,6 +3,7 @@ package physics
 import (
 	"math"
 
+	"github.com/EliCDavis/vector/vector3"
 	"github.com/alexanderi96/go-fluid-simulator/config"
 	"github.com/alexanderi96/go-fluid-simulator/metrics"
 	"github.com/alexanderi96/go-fluid-simulator/utils"
@@ -15,6 +16,10 @@ const (
 )
 
 type ControlMode int
+
+type BoundingBox struct {
+	Min, Max vector3.Vector[float64]
+}
 
 type Simulation struct {
 	Fluid   []*Unit
@@ -36,17 +41,17 @@ type Simulation struct {
 	// Velocità di rotazione
 	MovementSpeed float32
 
-	WorldBoundray rl.BoundingBox
-	WorldCenter   rl.Vector3
+	WorldBoundray BoundingBox
+	WorldCenter   vector3.Vector[float64]
 
 	ControlMode   ControlMode
 	SpawnDistance float32
-	SpawnPosition rl.Vector3
+	SpawnPosition vector3.Vector[float64]
 }
 
 var (
-	front, top, side rl.Vector3
-	fovy             = float32(60)
+	front, top, side vector3.Vector[float64]
+	fovy             = 60.0
 )
 
 func NewSimulation(config *config.Config) (*Simulation, error) {
@@ -54,7 +59,7 @@ func NewSimulation(config *config.Config) (*Simulation, error) {
 
 	InitOctree(config)
 
-	WorldCenter := rl.NewVector3(0, 0, 0)
+	WorldCenter := vector3.New(0.0, 0.0, 0.0)
 
 	sim := &Simulation{
 		Fluid:   make([]*Unit, 0, config.UnitNumber),
@@ -62,8 +67,11 @@ func NewSimulation(config *config.Config) (*Simulation, error) {
 		Config:  config,
 		IsPause: false,
 
-		WorldBoundray: rl.NewBoundingBox(rl.NewVector3(-float32(config.GameX)/2, -float32(config.GameY)/2, -float32(config.GameZ)/2), rl.NewVector3(float32(config.GameX)/2, float32(config.GameY)/2, float32(config.GameZ)/2)),
-		WorldCenter:   WorldCenter,
+		WorldBoundray: BoundingBox{
+			Min: vector3.New(-config.GameX/2, -config.GameY/2, -config.GameZ/2),
+			Max: vector3.New(config.GameX/2, config.GameY/2, config.GameZ/2),
+		},
+		WorldCenter: WorldCenter,
 
 		ControlMode:   UnitSpawnMode,
 		SpawnDistance: 0,
@@ -73,27 +81,28 @@ func NewSimulation(config *config.Config) (*Simulation, error) {
 	sim.Octree = NewOctree(0, sim.WorldBoundray)
 
 	fovyRadians := fovy * (math.Pi / 180)
-	d := float32((math.Sqrt(3) * math.Max(float64(config.GameX), math.Max(float64(config.GameY), float64(config.GameZ)))) / (2 * math.Tan(float64(fovyRadians)/2)))
+	d := (math.Sqrt(3) * math.Max(config.GameX, math.Max(config.GameY, config.GameZ))) / (2 * math.Tan(fovyRadians/2))
 
-	front = rl.NewVector3(0, 0, float32(d))
-	top = rl.NewVector3(0, config.GameY, 0)
-	side = rl.NewVector3(float32(d), 0, 0)
+	front = vector3.New(0, 0, d)
+	top = vector3.New(0, config.GameY, 0)
+	side = vector3.New(d, 0, 0)
 
 	sim.ResetCameraPosition(front, fovy)
 
 	return sim, nil
 }
 
-func (s *Simulation) ResetCameraPosition(position rl.Vector3, fovy float32) {
+func (s *Simulation) ResetCameraPosition(position vector3.Vector[float64], fovy float64) {
+	rlWc := utils.ToRlVector3(s.WorldCenter)
 	s.Camera = rl.Camera{
-		Position:   position,
-		Target:     s.WorldCenter,
+		Position:   utils.ToRlVector3(position),
+		Target:     rlWc,
 		Up:         rl.NewVector3(0, 1, 0),
-		Fovy:       fovy,
+		Fovy:       float32(fovy),
 		Projection: rl.CameraPerspective,
 	}
 
-	s.SpawnDistance = rl.Vector3Distance(s.WorldCenter, s.Camera.Position)
+	s.SpawnDistance = rl.Vector3Distance(rlWc, s.Camera.Position)
 }
 
 func (s *Simulation) Update() error {
@@ -166,14 +175,15 @@ func (s *Simulation) UpdateSpawnPosition() {
 	s.SpawnDistance += rl.GetMouseWheelMove() // Adatta questa formula secondo le tue necessità
 
 	// Calcola la posizione del segnalino di anteprima lungo il raggio
-	s.SpawnPosition = rl.Vector3Add(mouseRay.Position, rl.Vector3Scale(mouseRay.Direction, s.SpawnDistance))
+	s.SpawnPosition = utils.ToVector3FromRlVector3(rl.Vector3Add(mouseRay.Position, rl.Vector3Scale(mouseRay.Direction, s.SpawnDistance)))
 
 }
 
 func (s *Simulation) IsSpawnInRange() bool {
-	return s.SpawnPosition.X >= s.WorldBoundray.Min.X && s.SpawnPosition.X <= s.WorldBoundray.Max.X &&
-		s.SpawnPosition.Y >= s.WorldBoundray.Min.Y && s.SpawnPosition.Y <= s.WorldBoundray.Max.Y &&
-		s.SpawnPosition.Z >= s.WorldBoundray.Min.Z && s.SpawnPosition.Z <= s.WorldBoundray.Max.Z
+
+	return s.SpawnPosition.X() >= s.WorldBoundray.Min.X() && s.SpawnPosition.X() <= s.WorldBoundray.Max.X() &&
+		s.SpawnPosition.Y() >= s.WorldBoundray.Min.Y() && s.SpawnPosition.Y() <= s.WorldBoundray.Max.Y() &&
+		s.SpawnPosition.Z() >= s.WorldBoundray.Min.Z() && s.SpawnPosition.Z() <= s.WorldBoundray.Max.Z()
 }
 
 func (s *Simulation) SpawnNewUnits() {
@@ -200,7 +210,7 @@ func (s *Simulation) SpawnNewUnits() {
 			color = utils.RandomRaylibColor()
 		}
 
-		unts = append(unts, newUnitWithPropertiesAtPosition(rl.Vector3{}, rl.Vector3{X: 0, Y: 0, Z: 0}, currentRadius, currentMassMultiplier, currentElasticity, color))
+		unts = append(unts, newUnitWithPropertiesAtPosition(s.SpawnPosition, vector3.New(0.0, 0.0, 0.0), currentRadius, currentMassMultiplier, currentElasticity, color))
 	}
 
 	// positionSpheres(unts, s.SpawnPosition)
@@ -214,7 +224,7 @@ func (s *Simulation) ResetSimulation() {
 	s.Fluid = []*Unit{}
 }
 
-func positionUnitsCuboidally(units []*Unit, spawnPosition rl.Vector3, spacing float32) error {
+func positionUnitsCuboidally(units []*Unit, spawnPosition vector3.Vector[float64], spacing float64) error {
 	if len(units) == 0 {
 		return nil
 	}
@@ -224,14 +234,14 @@ func positionUnitsCuboidally(units []*Unit, spawnPosition rl.Vector3, spacing fl
 	unitRadius := units[0].Radius
 
 	// Calcoliamo lo spazio totale richiesto per le unità
-	totalWidth := float32(sideLength)*(2*unitRadius+spacing) - spacing
-	totalHeight := float32(sideLength)*(2*unitRadius+spacing) - spacing
-	totalDepth := float32(sideLength)*(2*unitRadius+spacing) - spacing
+	totalWidth := float64(sideLength)*(2*unitRadius+spacing) - spacing
+	totalHeight := float64(sideLength)*(2*unitRadius+spacing) - spacing
+	totalDepth := float64(sideLength)*(2*unitRadius+spacing) - spacing
 
 	// Calcoliamo la posizione iniziale del cubo
-	startX := spawnPosition.X - totalWidth/2
-	startY := spawnPosition.Y - totalHeight/2
-	startZ := spawnPosition.Z - totalDepth/2
+	startX := spawnPosition.X() - totalWidth/2
+	startY := spawnPosition.Y() - totalHeight/2
+	startZ := spawnPosition.Z() - totalDepth/2
 
 	// Posizioniamo le unità nel cubo
 	index := 0
@@ -239,13 +249,13 @@ func positionUnitsCuboidally(units []*Unit, spawnPosition rl.Vector3, spacing fl
 		for y := 0; y < sideLength; y++ {
 			for z := 0; z < sideLength; z++ {
 				// Calcoliamo la posizione per questa unità
-				unitX := startX + float32(x)*(2*unitRadius+spacing)
-				unitY := startY + float32(y)*(2*unitRadius+spacing)
-				unitZ := startZ + float32(z)*(2*unitRadius+spacing)
+				unitX := startX + float64(x)*(2*unitRadius+spacing)
+				unitY := startY + float64(y)*(2*unitRadius+spacing)
+				unitZ := startZ + float64(z)*(2*unitRadius+spacing)
 
 				// Assegniamo la posizione alla unità corrente
 				if index < len(units) {
-					units[index].Position = rl.Vector3{X: unitX, Y: unitY, Z: unitZ}
+					units[index].Position = vector3.New(unitX, unitY, unitZ)
 					units[index].PreviousPosition = units[index].Position
 					index++
 				} else {

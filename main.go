@@ -64,7 +64,6 @@ func runLoop() {
 			}
 
 		}
-
 		gui.Draw(s)
 		s.Config.UpdateWindowSettings()
 	}

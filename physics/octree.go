@@ -1,36 +1,36 @@
 package physics
 
 import (
+	"github.com/EliCDavis/vector/vector3"
 	"github.com/alexanderi96/go-fluid-simulator/config"
-	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
 var (
-	maxObjects, maxLevels int
+	maxObjects, maxLevels int8
 )
 
 func InitOctree(config *config.Config) {
-	maxLevels = int(config.OctreeMaxLevel)
-	maxObjects = int(config.MaxUnitNumberPerLevel)
+	maxLevels = config.OctreeMaxLevel
+	maxObjects = config.MaxUnitNumberPerLevel
 }
 
 type Octree struct {
-	level    int
-	Bounds   rl.BoundingBox
+	level    int8
+	Bounds   BoundingBox
 	objects  []*Unit
 	Children [8]*Octree
 
-	CenterOfMass rl.Vector3
-	TotalMass    float32
+	CenterOfMass vector3.Vector[float64]
+	TotalMass    float64
 }
 
 // Octree crea un nuovo Octree.
-func NewOctree(level int, bounds rl.BoundingBox) *Octree {
+func NewOctree(level int8, bounds BoundingBox) *Octree {
 	return &Octree{
 		level:  level,
 		Bounds: bounds,
 
-		CenterOfMass: rl.Vector3{},
+		CenterOfMass: vector3.Zero[float64](),
 		TotalMass:    0,
 	}
 }
@@ -39,7 +39,7 @@ func NewOctree(level int, bounds rl.BoundingBox) *Octree {
 func (ot *Octree) Clear() {
 	ot.objects = ot.objects[:0]
 	ot.TotalMass = 0
-	ot.CenterOfMass = rl.Vector3{}
+	ot.CenterOfMass = vector3.Zero[float64]()
 	for i := 0; i < 8; i++ {
 		if ot.Children[i] != nil {
 			ot.Children[i].Clear()
@@ -50,51 +50,47 @@ func (ot *Octree) Clear() {
 
 // Split divide il Octree in quattro sotto-Octrees.
 func (ot *Octree) Split() {
-	subWidth := (ot.Bounds.Max.X - ot.Bounds.Min.X) / 2
-	subHeight := (ot.Bounds.Max.Y - ot.Bounds.Min.Y) / 2
-	subDepth := (ot.Bounds.Max.Z - ot.Bounds.Min.Z) / 2
+	subWidth := (ot.Bounds.Max.X() - ot.Bounds.Min.X()) / 2
+	subHeight := (ot.Bounds.Max.Y() - ot.Bounds.Min.Y()) / 2
+	subDepth := (ot.Bounds.Max.Z() - ot.Bounds.Min.Z()) / 2
 
-	minX := ot.Bounds.Min.X
-	minY := ot.Bounds.Min.Y
-	minZ := ot.Bounds.Min.Z
+	minX := ot.Bounds.Min.X()
+	minY := ot.Bounds.Min.Y()
+	minZ := ot.Bounds.Min.Z()
 
 	level := ot.level + 1
 
 	// Creazione dei nuovi otto sotto-octrees.
 	// children[0] = inBottom && inLeft && inBack
-	ot.Children[0] = NewOctree(level, rl.BoundingBox{Min: rl.Vector3{X: minX, Y: minY, Z: minZ}, Max: rl.Vector3{X: minX + subWidth, Y: minY + subHeight, Z: minZ + subDepth}})
+	ot.Children[0] = NewOctree(level, BoundingBox{Min: vector3.New(minX, minY, minZ), Max: vector3.New(minX+subWidth, minY+subHeight, minZ+subDepth)})
 	// children[1] = inBottom && inRight && inBack
-	ot.Children[1] = NewOctree(level, rl.BoundingBox{Min: rl.Vector3{X: minX + subWidth, Y: minY, Z: minZ}, Max: rl.Vector3{X: minX + 2*subWidth, Y: minY + subHeight, Z: minZ + subDepth}})
+	ot.Children[1] = NewOctree(level, BoundingBox{Min: vector3.New(minX+subWidth, minY, minZ), Max: vector3.New(minX+2*subWidth, minY+subHeight, minZ+subDepth)})
 	// children[2] = inTop && inLeft && inBack
-	ot.Children[2] = NewOctree(level, rl.BoundingBox{Min: rl.Vector3{X: minX, Y: minY + subHeight, Z: minZ}, Max: rl.Vector3{X: minX + subWidth, Y: minY + 2*subHeight, Z: minZ + subDepth}})
+	ot.Children[2] = NewOctree(level, BoundingBox{Min: vector3.New(minX, minY+subHeight, minZ), Max: vector3.New(minX+subWidth, minY+2*subHeight, minZ+subDepth)})
 	// children[3] = inTop && inRight && inBack
-	ot.Children[3] = NewOctree(level, rl.BoundingBox{Min: rl.Vector3{X: minX + subWidth, Y: minY + subHeight, Z: minZ}, Max: rl.Vector3{X: minX + 2*subWidth, Y: minY + 2*subHeight, Z: minZ + subDepth}})
+	ot.Children[3] = NewOctree(level, BoundingBox{Min: vector3.New(minX+subWidth, minY+subHeight, minZ), Max: vector3.New(minX+2*subWidth, minY+2*subHeight, minZ+subDepth)})
 	// children[4] = inBottom && inLeft && inFront
-	ot.Children[4] = NewOctree(level, rl.BoundingBox{Min: rl.Vector3{X: minX, Y: minY, Z: minZ + subDepth}, Max: rl.Vector3{X: minX + subWidth, Y: minY + subHeight, Z: minZ + 2*subDepth}})
+	ot.Children[4] = NewOctree(level, BoundingBox{Min: vector3.New(minX, minY, minZ+subDepth), Max: vector3.New(minX+subWidth, minY+subHeight, minZ+2*subDepth)})
 	// children[5] = inBottom && inRight && inFront
-	ot.Children[5] = NewOctree(level, rl.BoundingBox{Min: rl.Vector3{X: minX + subWidth, Y: minY, Z: minZ + subDepth}, Max: rl.Vector3{X: minX + 2*subWidth, Y: minY + subHeight, Z: minZ + 2*subDepth}})
+	ot.Children[5] = NewOctree(level, BoundingBox{Min: vector3.New(minX+subWidth, minY, minZ+subDepth), Max: vector3.New(minX+2*subWidth, minY+subHeight, minZ+2*subDepth)})
 	// children[6] = inTop && inLeft && inFront
-	ot.Children[6] = NewOctree(level, rl.BoundingBox{Min: rl.Vector3{X: minX, Y: minY + subHeight, Z: minZ + subDepth}, Max: rl.Vector3{X: minX + subWidth, Y: minY + 2*subHeight, Z: minZ + 2*subDepth}})
+	ot.Children[6] = NewOctree(level, BoundingBox{Min: vector3.New(minX, minY+subHeight, minZ+subDepth), Max: vector3.New(minX+subWidth, minY+2*subHeight, minZ+2*subDepth)})
 	// children[7] = inTop && inRight && inFront
-	ot.Children[7] = NewOctree(level, rl.BoundingBox{Min: rl.Vector3{X: minX + subWidth, Y: minY + subHeight, Z: minZ + subDepth}, Max: rl.Vector3{X: minX + 2*subWidth, Y: minY + 2*subHeight, Z: minZ + 2*subDepth}})
+	ot.Children[7] = NewOctree(level, BoundingBox{Min: vector3.New(minX+subWidth, minY+subHeight, minZ+subDepth), Max: vector3.New(minX+2*subWidth, minY+2*subHeight, minZ+2*subDepth)})
 }
 
 // Insert inserisce un oggetto nel Octree.
 func (ot *Octree) Insert(obj *Unit) {
 	// Calcola il nuovo centro di massa come media ponderata
 	newMass := ot.TotalMass + obj.Mass
-	newCenterOfMass := rl.Vector3Add(
-		rl.Vector3Scale(ot.CenterOfMass, ot.TotalMass),
-		rl.Vector3Scale(obj.Position, obj.Mass),
-	)
-	newCenterOfMass = rl.Vector3Scale(newCenterOfMass, 1/newMass)
+	newCenterOfMass := ot.CenterOfMass.Scale(ot.TotalMass).Add(obj.Position.Scale(obj.Mass)).Scale(1 / newMass)
 
 	// Aggiorna la massa totale e il centro di massa
 	ot.TotalMass = newMass
 	ot.CenterOfMass = newCenterOfMass
 
 	if ot.Children[0] == nil {
-		if len(ot.objects) < maxObjects || ot.level >= maxLevels {
+		if len(ot.objects) < int(maxObjects) || ot.level >= maxLevels {
 			// Se il nodo corrente ha spazio o abbiamo raggiunto il livello massimo, aggiungi qui.
 			ot.objects = append(ot.objects, obj)
 			return
@@ -131,24 +127,26 @@ func (ot *Octree) insertUnitIntoChildren(obj *Unit) {
 	} else {
 		// Aggiorna la massa totale e il centro di massa dell'Octree padre.
 		ot.TotalMass += obj.Mass
-		ot.CenterOfMass = rl.Vector3Scale(rl.Vector3Add(rl.Vector3Scale(ot.CenterOfMass, ot.TotalMass-obj.Mass), rl.Vector3Scale(obj.Position, obj.Mass)), 1/ot.TotalMass)
+		ot.CenterOfMass = ot.CenterOfMass.Scale(ot.TotalMass - obj.Mass).Add(obj.Position.Scale(obj.Mass)).Scale(1 / ot.TotalMass)
+
+		//Vector3Scale(Vector3Add(Vector3Scale(ot.CenterOfMass, ot.TotalMass-obj.Mass), Vector3Scale(obj.Position, obj.Mass)), 1/ot.TotalMass)
 	}
 }
 
 // getIndex determina in quale sotto-Octree un oggetto appartiene.
 func (ot *Octree) getIndices(obj Unit) []int {
 	// Calcola il punto medio dell'Octree per le tre dimensioni.
-	midX := (ot.Bounds.Min.X + ot.Bounds.Max.X) / 2
-	midY := (ot.Bounds.Min.Y + ot.Bounds.Max.Y) / 2
-	midZ := (ot.Bounds.Min.Z + ot.Bounds.Max.Z) / 2
+	midX := (ot.Bounds.Min.X() + ot.Bounds.Max.X()) / 2
+	midY := (ot.Bounds.Min.Y() + ot.Bounds.Max.Y()) / 2
+	midZ := (ot.Bounds.Min.Z() + ot.Bounds.Max.Z()) / 2
 
 	// Calcola gli estremi dell'oggetto considerando il suo raggio.
-	minX := obj.Position.X + obj.Radius
-	maxX := obj.Position.X - obj.Radius
-	minY := obj.Position.Y + obj.Radius
-	maxY := obj.Position.Y - obj.Radius
-	minZ := obj.Position.Z + obj.Radius
-	maxZ := obj.Position.Z - obj.Radius
+	minX := obj.Position.X() + obj.Radius
+	maxX := obj.Position.X() - obj.Radius
+	minY := obj.Position.Y() + obj.Radius
+	maxY := obj.Position.Y() - obj.Radius
+	minZ := obj.Position.Z() + obj.Radius
+	maxZ := obj.Position.Z() - obj.Radius
 
 	// Determina la posizione dell'oggetto rispetto al punto medio per ogni dimensione,
 	// tenendo conto dei raggi delle unità.
