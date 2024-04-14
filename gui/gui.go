@@ -10,7 +10,7 @@ import (
 
 func Draw(s *physics.Simulation) {
 	rl.BeginDrawing()
-	rl.ClearBackground(rl.DarkGray)
+	rl.ClearBackground(rl.Black)
 
 	rl.BeginMode3D(s.Camera)
 
@@ -69,7 +69,7 @@ func drawFluid(s *physics.Simulation) {
 		color := unit.Color
 
 		if s.Config.ShowSpeedColor {
-			color = utils.GetColorFromVelocity(unit.GetVelocity())
+			color = utils.GetColorFromVelocity(unit.Velocity)
 		}
 
 		if s.Config.ShowVectors {
@@ -87,7 +87,7 @@ func drawOctree(octree *physics.Octree) {
 
 	// Disegna il BoundingBox dell'Octree corrente
 	rl.DrawBoundingBox(utils.ToRlBoundingBox(octree.Bounds.Min, octree.Bounds.Max), rl.Black)
-	rl.DrawSphere(utils.ToRlVector3(octree.CenterOfMass), 0.2, rl.Red)
+	rl.DrawSphere(utils.ToRlVector3(octree.CenterOfMass), 1, rl.Red)
 
 	// Disegna ricorsivamente i BoundingBox dei sotto-Octrees
 	for _, child := range octree.Children {
@@ -97,10 +97,10 @@ func drawOctree(octree *physics.Octree) {
 
 func drawVectors(u *physics.Unit) {
 
-	endVelocity := u.Position.Add(u.GetVelocity().Scale(0.1))
+	endVelocity := u.Position.Add(u.Velocity.Scale(1))
 	rl.DrawLine3D(utils.ToRlVector3(u.Position), utils.ToRlVector3(endVelocity), rl.Blue)
 
-	endAcceleration := u.Position.Add(u.Acceleration.Scale(0.1))
+	endAcceleration := u.Position.Add(u.Acceleration.Scale(1))
 
 	rl.DrawLine3D(utils.ToRlVector3(u.Position), utils.ToRlVector3(endAcceleration), rl.Orange)
 }

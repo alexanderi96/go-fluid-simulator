@@ -19,6 +19,7 @@ type Octree struct {
 	Bounds   BoundingBox
 	objects  []*Unit
 	Children [8]*Octree
+	divided  bool
 
 	CenterOfMass vector3.Vector[float64]
 	TotalMass    float64
@@ -27,8 +28,9 @@ type Octree struct {
 // Octree crea un nuovo Octree.
 func NewOctree(level int8, bounds BoundingBox) *Octree {
 	return &Octree{
-		level:  level,
-		Bounds: bounds,
+		level:   level,
+		Bounds:  bounds,
+		divided: false,
 
 		CenterOfMass: vector3.Zero[float64](),
 		TotalMass:    0,
@@ -40,7 +42,7 @@ func (ot *Octree) Clear() {
 	ot.objects = ot.objects[:0]
 	ot.TotalMass = 0
 	ot.CenterOfMass = vector3.Zero[float64]()
-	for i := 0; i < 8; i++ {
+	for i := 0; i < len(ot.Children); i++ {
 		if ot.Children[i] != nil {
 			ot.Children[i].Clear()
 			ot.Children[i] = nil
@@ -62,26 +64,38 @@ func (ot *Octree) Split() {
 
 	// Creazione dei nuovi otto sotto-octrees.
 	// children[0] = inBottom && inLeft && inBack
-	ot.Children[0] = NewOctree(level, BoundingBox{Min: vector3.New(minX, minY, minZ), Max: vector3.New(minX+subWidth, minY+subHeight, minZ+subDepth)})
+	swb := BoundingBox{Min: vector3.New(minX, minY, minZ), Max: vector3.New(minX+subWidth, minY+subHeight, minZ+subDepth)}
+	ot.Children[0] = NewOctree(level, swb)
 	// children[1] = inBottom && inRight && inBack
-	ot.Children[1] = NewOctree(level, BoundingBox{Min: vector3.New(minX+subWidth, minY, minZ), Max: vector3.New(minX+2*subWidth, minY+subHeight, minZ+subDepth)})
+	seb := BoundingBox{Min: vector3.New(minX+subWidth, minY, minZ), Max: vector3.New(minX+2*subWidth, minY+subHeight, minZ+subDepth)}
+	ot.Children[1] = NewOctree(level, seb)
 	// children[2] = inTop && inLeft && inBack
-	ot.Children[2] = NewOctree(level, BoundingBox{Min: vector3.New(minX, minY+subHeight, minZ), Max: vector3.New(minX+subWidth, minY+2*subHeight, minZ+subDepth)})
+	nwb := BoundingBox{Min: vector3.New(minX, minY+subHeight, minZ), Max: vector3.New(minX+subWidth, minY+2*subHeight, minZ+subDepth)}
+	ot.Children[2] = NewOctree(level, nwb)
 	// children[3] = inTop && inRight && inBack
-	ot.Children[3] = NewOctree(level, BoundingBox{Min: vector3.New(minX+subWidth, minY+subHeight, minZ), Max: vector3.New(minX+2*subWidth, minY+2*subHeight, minZ+subDepth)})
+	neb := BoundingBox{Min: vector3.New(minX+subWidth, minY+subHeight, minZ), Max: vector3.New(minX+2*subWidth, minY+2*subHeight, minZ+subDepth)}
+	ot.Children[3] = NewOctree(level, neb)
 	// children[4] = inBottom && inLeft && inFront
-	ot.Children[4] = NewOctree(level, BoundingBox{Min: vector3.New(minX, minY, minZ+subDepth), Max: vector3.New(minX+subWidth, minY+subHeight, minZ+2*subDepth)})
+	swf := BoundingBox{Min: vector3.New(minX, minY, minZ+subDepth), Max: vector3.New(minX+subWidth, minY+subHeight, minZ+2*subDepth)}
+	ot.Children[4] = NewOctree(level, swf)
 	// children[5] = inBottom && inRight && inFront
-	ot.Children[5] = NewOctree(level, BoundingBox{Min: vector3.New(minX+subWidth, minY, minZ+subDepth), Max: vector3.New(minX+2*subWidth, minY+subHeight, minZ+2*subDepth)})
+	sef := BoundingBox{Min: vector3.New(minX+subWidth, minY, minZ+subDepth), Max: vector3.New(minX+2*subWidth, minY+subHeight, minZ+2*subDepth)}
+	ot.Children[5] = NewOctree(level, sef)
 	// children[6] = inTop && inLeft && inFront
-	ot.Children[6] = NewOctree(level, BoundingBox{Min: vector3.New(minX, minY+subHeight, minZ+subDepth), Max: vector3.New(minX+subWidth, minY+2*subHeight, minZ+2*subDepth)})
+	nwf := BoundingBox{Min: vector3.New(minX, minY+subHeight, minZ+subDepth), Max: vector3.New(minX+subWidth, minY+2*subHeight, minZ+2*subDepth)}
+	ot.Children[6] = NewOctree(level, nwf)
 	// children[7] = inTop && inRight && inFront
-	ot.Children[7] = NewOctree(level, BoundingBox{Min: vector3.New(minX+subWidth, minY+subHeight, minZ+subDepth), Max: vector3.New(minX+2*subWidth, minY+2*subHeight, minZ+2*subDepth)})
+	nef := BoundingBox{Min: vector3.New(minX+subWidth, minY+subHeight, minZ+subDepth), Max: vector3.New(minX+2*subWidth, minY+2*subHeight, minZ+2*subDepth)}
+	ot.Children[7] = NewOctree(level, nef)
+
+	ot.divided = true
 }
 
 // Insert inserisce un oggetto nel Octree.
 func (ot *Octree) Insert(obj *Unit) {
+
 	// Calcola il nuovo centro di massa come media ponderata
+
 	newMass := ot.TotalMass + obj.Mass
 	newCenterOfMass := ot.CenterOfMass.Scale(ot.TotalMass).Add(obj.Position.Scale(obj.Mass)).Scale(1 / newMass)
 

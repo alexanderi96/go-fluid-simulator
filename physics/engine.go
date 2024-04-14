@@ -54,6 +54,20 @@ var (
 	fovy             = 60.0
 )
 
+func (bb *BoundingBox) Contains(u *Unit) bool {
+	// Controllo se l'unità si trova almeno in parte all'interno del cubo
+	return (u.Position.X()-u.Radius < bb.Max.X()) && (u.Position.X()+u.Radius > bb.Min.X()) &&
+		(u.Position.Y()-u.Radius < bb.Max.Y()) && (u.Position.Y()+u.Radius > bb.Min.Y()) &&
+		(u.Position.Z()-u.Radius < bb.Max.Z()) && (u.Position.Z()+u.Radius > bb.Min.Z())
+}
+
+func (bb *BoundingBox) IsCenterInside(u *Unit) bool {
+	// Controllo se il centro della unità si trova all'interno del cubo
+	return (u.Position.X() >= bb.Min.X() && u.Position.X() <= bb.Max.X()) &&
+		(u.Position.Y() >= bb.Min.Y() && u.Position.Y() <= bb.Max.Y()) &&
+		(u.Position.Z() >= bb.Min.Z() && u.Position.Z() <= bb.Max.Z())
+}
+
 func NewSimulation(config *config.Config) (*Simulation, error) {
 	config.UpdateWindowSettings()
 
@@ -138,7 +152,13 @@ func (s *Simulation) HandleInput() {
 		s.MouseButtonPressed = false
 
 		if s.IsSpawnInRange() {
-			s.SpawnNewUnits()
+			s.PositionNewUnitsCube(s.GetUnits())
+		}
+
+	} else if rl.IsMouseButtonReleased(rl.MouseRightButton) {
+
+		if s.IsSpawnInRange() {
+			s.PositionNewUnitsFibonacci(s.GetUnits())
 		}
 
 	} else if rl.IsKeyPressed(rl.KeyM) {
@@ -186,7 +206,12 @@ func (s *Simulation) IsSpawnInRange() bool {
 		s.SpawnPosition.Z() >= s.WorldBoundray.Min.Z() && s.SpawnPosition.Z() <= s.WorldBoundray.Max.Z()
 }
 
-func (s *Simulation) SpawnNewUnits() {
+func (s *Simulation) PositionNewUnitsCube(units []*Unit) {
+	positionUnitsCuboidally(units, s.SpawnPosition, s.Config.UnitInitialSpacing)
+	s.Fluid = append(s.Fluid, units...)
+}
+
+func (s *Simulation) GetUnits() []*Unit {
 	currentRadius := s.Config.UnitRadius * s.Config.UnitRadiusMultiplier
 	currentMassMultiplier := s.Config.UnitMassMultiplier
 	currentElasticity := s.Config.UnitElasticity
@@ -209,14 +234,15 @@ func (s *Simulation) SpawnNewUnits() {
 		if s.Config.SetRandomColor {
 			color = utils.RandomRaylibColor()
 		}
-
-		unts = append(unts, newUnitWithPropertiesAtPosition(s.SpawnPosition, vector3.New(0.0, 0.0, 0.0), currentRadius, currentMassMultiplier, currentElasticity, color))
+		static := vector3.New(0.0, 0.0, 0.0)
+		unts = append(unts, newUnitWithPropertiesAtPosition(s.SpawnPosition, static, static, currentRadius, currentMassMultiplier, currentElasticity, color))
 	}
+	return unts
+}
 
-	// positionSpheres(unts, s.SpawnPosition)
-
-	positionUnitsCuboidally(unts, s.SpawnPosition, s.Config.UnitInitialSpacing)
-	s.Fluid = append(s.Fluid, unts...)
+func (s *Simulation) PositionNewUnitsFibonacci(units []*Unit) {
+	positionUnitsInFibonacciSpiral(units, s.WorldCenter)
+	s.Fluid = append(s.Fluid, units...)
 }
 
 func (s *Simulation) ResetSimulation() {
@@ -256,7 +282,7 @@ func positionUnitsCuboidally(units []*Unit, spawnPosition vector3.Vector[float64
 				// Assegniamo la posizione alla unità corrente
 				if index < len(units) {
 					units[index].Position = vector3.New(unitX, unitY, unitZ)
-					units[index].PreviousPosition = units[index].Position
+					//units[index].PreviousPosition = units[index].Position
 					index++
 				} else {
 					break
@@ -268,26 +294,26 @@ func positionUnitsCuboidally(units []*Unit, spawnPosition vector3.Vector[float64
 	return nil
 }
 
-// func positionUnitsInFibonacciSpiral(units []*Unit, center rl.Vector3) {
-// 	phi := float32(math.Phi) // Phi è il rapporto aureo (1.618...)
-// 	angle := float32(0)
-// 	radiusStep := float32(0.3) // Passo di incremento del raggio
+func positionUnitsInFibonacciSpiral(units []*Unit, center vector3.Vector[float64]) {
+	phi := math.Phi // Phi è il rapporto aureo (1.618...)
+	angle := 0.0
+	radiusStep := 0.3 // Passo di incremento del raggio
 
-// 	for i := 0; i < len(units); i++ {
-// 		// Calcola la posizione della prossima unità sulla spirale di Fibonacci
-// 		radius := float32(math.Sqrt(float64(i))) * radiusStep
-// 		x := center.X + radius*float32(math.Cos(float64(angle)))
-// 		y := center.Y + radius*float32(math.Sin(float64(angle)))
-// 		z := center.Z
+	for i := 0; i < len(units); i++ {
+		// Calcola la posizione della prossima unità sulla spirale di Fibonacci
+		radius := math.Sqrt(float64(i)) * radiusStep
+		x := center.X() + radius*math.Cos(float64(angle))
+		y := center.Y() + radius*math.Sin(float64(angle))
+		z := center.Z() + 0.2
 
-// 		// Assegna la posizione alla unità
-// 		units[i].Position = rl.NewVector3(x, y, z)
-// 		units[i].PreviousPosition = units[i].Position
+		// Assegna la posizione alla unità
+		units[i].Position = vector3.New(x, y, z)
+		//units[i].PreviousPosition = units[i].Position
 
-// 		// Aumenta il passo di incremento del raggio
-// 		radiusStep += 0.0005 // Modifica la velocità di aumento a tuo piacimento
+		// Aumenta il passo di incremento del raggio
+		radiusStep += 0.0005 // Modifica la velocità di aumento a tuo piacimento
 
-// 		// Aggiorna l'angolo per la prossima unità sulla spirale
-// 		angle += phi * 2 * float32(math.Pi) // Incremento dell'angolo utilizzando Phi
-// 	}
-// }
+		// Aggiorna l'angolo per la prossima unità sulla spirale
+		angle += phi * 2 * math.Pi // Incremento dell'angolo utilizzando Phi
+	}
+}

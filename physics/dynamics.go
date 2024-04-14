@@ -1,10 +1,12 @@
 package physics
 
 import (
+	"log"
+
 	"github.com/EliCDavis/vector/vector3"
 )
 
-const G = 6.67430e-11 // Costante gravitazionale universale (m^3 kg^-1 s^-2)
+const G = 6.67430e1 // Costante gravitazionale universale (m^3 kg^-1 s^-2)
 
 func (s *Simulation) UpdateWithOctrees() error {
 	frameTime := s.Metrics.Frametime
@@ -18,7 +20,7 @@ func (s *Simulation) UpdateWithOctrees() error {
 
 	for _, unit := range s.Fluid {
 		if s.Config.UnitsEmitGravity {
-			unit.accelerate(s.Octree.CalculateGravity(unit, 5))
+			unit.accelerate(s.Octree.CalculateGravity(unit, 0.5))
 		}
 
 		// Calcola la forza di gravità solo se abilitato
@@ -35,10 +37,12 @@ func (s *Simulation) UpdateWithOctrees() error {
 		}
 
 		// Aggiorna la posizione utilizzando il metodo Verlet
-		updatePositionWithVerlet(unitA, frameTime)
+		unitA.UpdatePosition(frameTime)
 
 		// Gestisci le collisioni con le pareti
-		unitA.CheckAndResolveWallCollision(s.WorldBoundray, s.Config.WallElasticity)
+		if unitA.CheckAndResolveWallCollision(s.WorldBoundray, s.Config.WallElasticity) {
+			s.IsPause = true
+		}
 
 		// Trova le particelle vicine utilizzando l'Octree
 		nearUnits := []*Unit{}
@@ -117,7 +121,7 @@ func handleCollision(a, b *Unit, distance float64) {
 	b.Position.Sub(mtd.Scale(0.5))
 
 	// Calcola la velocità relativa
-	relativeVelocity := a.GetVelocity().Sub(b.GetVelocity())
+	relativeVelocity := a.Velocity.Sub(b.Velocity)
 
 	// Calcola la velocità di impatto
 	impactSpeed := relativeVelocity.Dot(collisionDir)
@@ -140,71 +144,72 @@ func handleCollision(a, b *Unit, distance float64) {
 	b.Acceleration.Add(impulse.Scale(-1.0 / b.Mass))
 }
 
-func updatePositionWithVerlet(u *Unit, dt float64) {
-	x := 2*u.Position.X() - u.PreviousPosition.X() + u.Acceleration.X()*dt*dt
-	y := 2*u.Position.Y() - u.PreviousPosition.Y() + u.Acceleration.Y()*dt*dt
-	z := 2*u.Position.Z() - u.PreviousPosition.Z() + u.Acceleration.Z()*dt*dt
-	newPosition := vector3.New(x, y, z)
-	u.PreviousPosition = u.Position
-	u.Position = newPosition
-	u.Acceleration = vector3.Zero[float64]()
-}
-
-func (unit *Unit) CheckAndResolveWallCollision(wallBounds BoundingBox, wallElasticity float64) {
-	velocity := unit.GetVelocity()
+func (unit *Unit) CheckAndResolveWallCollision(wallBounds BoundingBox, wallElasticity float64) bool {
+	nPos := unit.Position
+	nVel := unit.Velocity
+	collided := false
 
 	// Correzione asse X
 	if unit.Position.X()-unit.Radius < wallBounds.Min.X() {
 		overlapX := wallBounds.Min.X() - (unit.Position.X() - unit.Radius)
-		unit.Position.SetX(wallBounds.Min.X() + overlapX)
+		nPos.SetX(wallBounds.Min.X() + overlapX)
 		// Applica la restituzione
-		velocity.SetX(-velocity.X() * wallElasticity)
-		unit.PreviousPosition = unit.Position.Add(velocity) // Aggiorna correttamente la posizione precedente
-
+		nVel.SetX(nVel.X() * wallElasticity)
+		nVel.FlipX()
+		collided = true
 	}
 	if unit.Position.X()+unit.Radius > wallBounds.Max.X() {
 		overlapX := (unit.Position.X() + unit.Radius) - wallBounds.Max.X()
-		unit.Position.SetX(wallBounds.Max.X() - overlapX)
+		nPos.SetX(wallBounds.Max.X() - overlapX)
 		// Applica la restituzione
-		velocity.SetX(-velocity.X() * wallElasticity)
-		unit.PreviousPosition = unit.Position.Add(velocity) // Aggiorna correttamente la posizione precedente
-
+		nVel.SetX(nVel.X() * wallElasticity)
+		nVel.FlipX()
+		collided = true
 	}
 
 	// Correzione asse Y
 	if unit.Position.Y()-unit.Radius < wallBounds.Min.Y() {
 		overlapY := wallBounds.Min.Y() - (unit.Position.Y() - unit.Radius)
-		unit.Position.SetY(wallBounds.Min.Y() + overlapY)
+		nPos.SetY(wallBounds.Min.Y() + overlapY)
 		// Applica la restituzione
-		velocity.SetY(-velocity.Y() * wallElasticity)
-		unit.PreviousPosition = unit.Position.Add(velocity) // Aggiorna correttamente la posizione precedente
-
+		nVel.SetY(nVel.Y() * wallElasticity)
+		nVel.FlipY()
+		collided = true
 	}
 	if unit.Position.Y()+unit.Radius > wallBounds.Max.Y() {
 		overlapY := (unit.Position.Y() + unit.Radius) - wallBounds.Max.Y()
-		unit.Position.SetY(wallBounds.Max.Y() - overlapY)
+		nPos.SetY(wallBounds.Max.Y() - overlapY)
 		// Applica la restituzione
-		velocity.SetY(-velocity.Y() * wallElasticity)
-		unit.PreviousPosition = unit.Position.Add(velocity) // Aggiorna correttamente la posizione precedente
-
+		nVel.SetY(nVel.Y() * wallElasticity)
+		nVel.FlipY()
+		collided = true
 	}
 
 	// Correzione asse Z
 	if unit.Position.Z()-unit.Radius < wallBounds.Min.Z() {
 		overlapZ := wallBounds.Min.Z() - (unit.Position.Z() - unit.Radius)
-		unit.Position.SetZ(wallBounds.Min.Z() + overlapZ)
+		nPos.SetZ(wallBounds.Min.Z() + overlapZ)
 		// Applica la restituzione
-		velocity.SetZ(-velocity.Z() * wallElasticity)
-		unit.PreviousPosition = unit.Position.Add(velocity) // Aggiorna correttamente la posizione precedente
-
+		nVel.SetZ(nVel.Z() * wallElasticity)
+		nVel.FlipZ()
+		collided = true
 	}
 	if unit.Position.Z()+unit.Radius > wallBounds.Max.Z() {
 		overlapZ := (unit.Position.Z() + unit.Radius) - wallBounds.Max.Z()
-		unit.Position.SetZ(wallBounds.Max.Z() - overlapZ)
+		nPos.SetZ(wallBounds.Max.Z() - overlapZ)
 		// Applica la restituzione
-		velocity.SetZ(-velocity.Z() * wallElasticity)
-		unit.PreviousPosition = unit.Position.Add(velocity) // Aggiorna correttamente la posizione precedente
-
+		nVel.SetZ(nVel.Z() * wallElasticity)
+		nVel.FlipZ()
+		collided = true
 	}
+
+	if collided {
+		log.Print("\nvel:", unit.Velocity.X(), unit.Velocity.Y(), unit.Velocity.Z())
+		log.Print("\nnVel: ", nVel.X(), nVel.Y(), nVel.Z())
+		unit.Position = nPos
+		unit.Velocity = nVel
+	}
+
+	return collided
 
 }

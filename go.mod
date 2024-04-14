@@ -3,6 +3,7 @@ module github.com/alexanderi96/go-fluid-simulator
 go 1.21.1
 
 require (
+	github.com/g3n/engine v0.2.0
 	github.com/gen2brain/raylib-go/raygui v0.0.0-20231017191853-10c61020bc6c
 	github.com/gen2brain/raylib-go/raylib v0.0.0-20231010155130-e9da61431c85
 	github.com/google/uuid v1.3.1
@@ -12,6 +13,8 @@ require (
 require (
 	github.com/EliCDavis/vector v1.6.0 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
+	github.com/go-gl/glfw/v3.3/glfw v0.0.0-20210410170116-ea3d685f79fb // indirect
+	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
@@ -26,8 +29,10 @@ require (
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
 	golang.org/x/exp v0.0.0-20230905200255-921286631fa9 // indirect
+	golang.org/x/image v0.0.0-20210607152325-775e3b0c77b9 // indirect
 	golang.org/x/sys v0.12.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
