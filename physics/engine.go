@@ -2,6 +2,7 @@ package physics
 
 import (
 	"math"
+	"math/rand"
 
 	"github.com/EliCDavis/vector/vector3"
 	"github.com/alexanderi96/go-fluid-simulator/config"
@@ -241,15 +242,15 @@ func (s *Simulation) GetUnits() []*Unit {
 	unts := make([]*Unit, 0)
 
 	for i := 0; i < int(s.Config.UnitNumber); i++ {
-		// if s.Config.SetRandomRadius {
-		// 	currentRadius = (s.Config.RadiusMin + rand.Float32()*(s.Config.RadiusMax-s.Config.RadiusMin)) * s.Config.UnitRadiusMultiplier
-		// }
-		// if s.Config.SetRandomMassMultiplier {
-		// 	currentMassMultiplier = s.Config.MassMultiplierMin + rand.Float32()*(s.Config.MassMultiplierMax-s.Config.MassMultiplierMin)
-		// }
-		// if s.Config.SetRandomElasticity {
-		// 	currentElasticity = s.Config.ElasticityMin + rand.Float32()*(s.Config.ElasticityMax-s.Config.ElasticityMin)
-		// }
+		if s.Config.SetRandomRadius {
+			currentRadius = (s.Config.RadiusMin + rand.Float64()*(s.Config.RadiusMax-s.Config.RadiusMin)) * s.Config.UnitRadiusMultiplier
+		}
+		if s.Config.SetRandomMassMultiplier {
+			currentMassMultiplier = s.Config.MassMultiplierMin + rand.Float64()*(s.Config.MassMultiplierMax-s.Config.MassMultiplierMin)
+		}
+		if s.Config.SetRandomElasticity {
+			currentElasticity = s.Config.ElasticityMin + rand.Float64()*(s.Config.ElasticityMax-s.Config.ElasticityMin)
+		}
 
 		color := rl.RayWhite
 
@@ -326,7 +327,7 @@ func positionUnitsInFibonacciSpiral(units []*Unit, center vector3.Vector[float64
 		radius := math.Sqrt(float64(i)) * radiusStep
 		x := center.X() + radius*math.Cos(float64(angle))
 		y := center.Y() + radius*math.Sin(float64(angle))
-		z := center.Z() + 0.2
+		z := center.Z() + 1
 
 		// Assegna la posizione alla unità
 		units[i].Position = vector3.New(x, y, z)

@@ -1,6 +1,8 @@
 package physics
 
 import (
+	"math"
+
 	"github.com/EliCDavis/vector/vector3"
 )
 
@@ -38,23 +40,21 @@ func (s *Simulation) UpdateWithOctrees() error {
 		unitA.UpdatePosition(frameTime)
 
 		// Gestisci le collisioni con le pareti
-		if unitA.CheckAndResolveWallCollision(s.WorldBoundray, s.Config.WallElasticity) {
-			//s.IsPause = true
-		}
+		unitA.CheckAndResolveWallCollision(s.WorldBoundray, s.Config.WallElasticity)
 
 		// Trova le particelle vicine utilizzando l'Octree
 		nearUnits := []*Unit{}
 		s.Octree.Retrieve(&nearUnits, unitA)
 
 		// Gestisci le collisioni tra particelle vicine
-		// for _, unitB := range nearUnits {
-		// 	if unitB != nil && unitA.Id != unitB.Id {
-		// 		distance := unitA.Position.Distance(unitB.Position)
-		// 		if distance <= unitA.Radius+unitB.Radius {
-		// 			handleCollision(unitA, unitB)
-		// 		}
-		// 	}
-		// }
+		for _, unitB := range nearUnits {
+			if unitB != nil && unitA.Id != unitB.Id {
+				distance := unitA.Position.Distance(unitB.Position)
+				if distance <= unitA.Radius+unitB.Radius {
+					handleCollision(unitA, unitB)
+				}
+			}
+		}
 	}
 	return nil
 }
@@ -107,27 +107,28 @@ func (ot *Octree) calculateGravityRecursive(unit *Unit, theta float64, force *ve
 }
 
 func handleCollision(uA, uB *Unit) {
-	// Calculate the unit normal and unit tangent vectors
-	normal := uB.Position.Sub(uA.Position).Normalized()
-	tangent := vector3.New(-normal.Y(), normal.X(), normal.Z())
 
-	// Project the velocities onto the normal and tangent vectors
-	v1n := normal.Dot(uA.Velocity)
-	v1t := tangent.Dot(uA.Velocity)
-	v2n := normal.Dot(uB.Velocity)
-	v2t := tangent.Dot(uB.Velocity)
+	e := math.Min(uA.Elasticity, uB.Elasticity)
 
-	// Calculate new normal velocities using the one-dimensional elastic collision equations
-	v1nPrime := (v1n*(uA.Mass-uB.Mass) + 2*uB.Mass*v2n) / (uA.Mass + uB.Mass)
-	v2nPrime := (v2n*(uB.Mass-uA.Mass) + 2*uA.Mass*v1n) / (uA.Mass + uB.Mass)
+	// define the relative velocity
+	vRel := uA.Velocity.Sub(uB.Velocity)
 
-	// Convert scalar normal and tangent velocities into vectors
-	v1nPrimeVec := normal.Scale(v1nPrime)
-	v1tVec := tangent.Scale(v1t)
-	v2nPrimeVec := normal.Scale(v2nPrime)
-	v2tVec := tangent.Scale(v2t)
+	// calculate the impulseVectorAlongTheNormal
+	impulseDirection := uA.Position.Sub(uB.Position).Normalized()
+	impulseMag := -(1 + e) * vRel.Dot(impulseDirection) / (1/uA.Mass + 1/uB.Mass)
 
-	// Update the velocities of the particles by adding the normal and tangent components
-	uA.Velocity = v1nPrimeVec.Add(v1tVec)
-	uB.Velocity = v2nPrimeVec.Add(v2tVec)
+	jn := impulseDirection.Scale(impulseMag)
+
+	// Apply the impulse to both objects in opposite directions
+	uA.Velocity = uA.Velocity.Add(jn.Scale(1 / uA.Mass))
+	uB.Velocity = uB.Velocity.Sub(jn.Scale(1 / uB.Mass))
+
+	// move the units along the normals
+	totalRadius := uA.Radius + uB.Radius
+	overlap := totalRadius - uA.Position.Distance(uB.Position)
+	moveDistance := overlap / 2
+	normalMove := impulseDirection.Scale(moveDistance)
+	uA.Position = uA.Position.Add(normalMove)
+	uB.Position = uB.Position.Sub(normalMove)
+
 }

@@ -24,7 +24,7 @@ type Unit struct {
 
 func (u *Unit) GetVolume() float64 {
 	// Calcola il volume della sfera (4/3 * π * r^3)
-	return float64((4.0 / 3.0) * math.Pi * math.Pow(float64(u.Radius), 3))
+	return (4.0 / 3.0) * math.Pi * math.Pow(u.Radius, 3)
 }
 
 func (u *Unit) GetMass() float64 {

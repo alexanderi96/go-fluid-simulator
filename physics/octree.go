@@ -95,13 +95,13 @@ func (ot *Octree) Split() {
 func (ot *Octree) Insert(obj *Unit) {
 
 	// Calcola il nuovo centro di massa come media ponderata
-
-	newMass := ot.TotalMass + obj.Mass
-	newCenterOfMass := ot.CenterOfMass.Scale(ot.TotalMass).Add(obj.Position.Scale(obj.Mass)).Scale(1 / newMass)
-
-	// Aggiorna la massa totale e il centro di massa
-	ot.TotalMass = newMass
-	ot.CenterOfMass = newCenterOfMass
+	oldTotalMass := ot.TotalMass
+	ot.TotalMass += obj.Mass
+	if oldTotalMass == 0 {
+		ot.CenterOfMass = obj.Position
+	} else {
+		ot.CenterOfMass = ot.CenterOfMass.Scale(oldTotalMass).Add(obj.Position.Scale(obj.Mass)).Scale(1 / ot.TotalMass)
+	}
 
 	if ot.Children[0] == nil {
 		if len(ot.objects) < int(maxObjects) || ot.level >= maxLevels {

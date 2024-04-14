@@ -8,9 +8,11 @@ import (
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
+// TODO: https://github.com/g3n/engine
+
 func Draw(s *physics.Simulation) {
 	rl.BeginDrawing()
-	rl.ClearBackground(rl.DarkPurple)
+	rl.ClearBackground(rl.Black)
 
 	rl.BeginMode3D(s.Camera)
 
@@ -18,7 +20,7 @@ func Draw(s *physics.Simulation) {
 	// rl.DrawGrid(20, 5)
 
 	drawFluid(s)
-	rl.DrawSphere(utils.ToRlVector3(s.Octree.CenterOfMass), 0.1, rl.Red)
+	//rl.DrawSphere(utils.ToRlVector3(s.Octree.CenterOfMass), 0.1, rl.Red)
 
 	// if s.Config.ShowOverlay {
 	// 	for _, unit := range s.Fluid {
@@ -79,6 +81,7 @@ func drawFluid(s *physics.Simulation) {
 			drawVectors(unit)
 		}
 
+		// Disegna la sfera che rappresenta l'unità
 		rl.DrawSphere(utils.ToRlVector3(unit.Position), float32(unit.Radius), color)
 	}
 }
@@ -89,8 +92,8 @@ func drawOctree(octree *physics.Octree) {
 	}
 
 	// Disegna il BoundingBox dell'Octree corrente
-	rl.DrawBoundingBox(utils.ToRlBoundingBox(octree.Bounds.Min, octree.Bounds.Max), rl.Black)
-	rl.DrawSphere(utils.ToRlVector3(octree.CenterOfMass), 1, rl.Red)
+	rl.DrawBoundingBox(utils.ToRlBoundingBox(octree.Bounds.Min, octree.Bounds.Max), rl.RayWhite)
+	//rl.DrawSphere(utils.ToRlVector3(octree.CenterOfMass), float32(octree.TotalMass/(4*math.Pi)), rl.Red)
 
 	// Disegna ricorsivamente i BoundingBox dei sotto-Octrees
 	for _, child := range octree.Children {
