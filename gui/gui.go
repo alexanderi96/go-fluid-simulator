@@ -26,21 +26,24 @@ func Draw(s *physics.Simulation) {
 	// 	}
 	// }
 
-	// Calcola i punti più vicini sul cubo di gioco
-	xNear, yNear, zNear := calculateNearestCubePoints(s)
-	// Disegna le linee tratteggiate
-	drawDashedLine(xNear, s.SpawnPosition, 0.1, 0.1)
-	drawDashedLine(yNear, s.SpawnPosition, 0.1, 0.1)
-	drawDashedLine(zNear, s.SpawnPosition, 0.1, 0.1)
+	if s.ControlMode == physics.UnitSpawnMode {
 
-	cubeColor := rl.Red
-	if s.IsSpawnInRange() {
-		cubeColor = rl.Green
-	}
-	rl.DrawCube(utils.ToRlVector3(s.SpawnPosition), 1, 1, 1, cubeColor) // Modifica le dimensioni e il colore come preferisci
+		cubeColor := rl.Red
+		if s.IsSpawnInRange() {
+			cubeColor = rl.Green
+			// Calcola i punti più vicini sul cubo di gioco
+			xNear, yNear, zNear := calculateNearestCubePoints(s)
+			// Disegna le linee tratteggiate
+			drawDashedLine(xNear, s.FinalSpawnPosition, 0.1, 0.1)
+			drawDashedLine(yNear, s.FinalSpawnPosition, 0.1, 0.1)
+			drawDashedLine(zNear, s.FinalSpawnPosition, 0.1, 0.1)
 
-	if s.MouseButtonPressed && s.InitialMousePosition.X > 0 && s.InitialMousePosition.X < float32(s.Config.WindowWidth-s.Config.SidebarWidth) {
-		rl.DrawLineEx(s.InitialMousePosition, s.CurrentMousePosition, 5, rl.Black)
+		}
+		rl.DrawCube(utils.ToRlVector3(s.FinalSpawnPosition), 1, 1, 1, cubeColor) // Modifica le dimensioni e il colore come preferisci
+
+		if s.MouseButtonPressed && s.InitialMousePosition.X > 0 && s.InitialMousePosition.X < float32(s.Config.WindowWidth-s.Config.SidebarWidth) {
+			rl.DrawLine3D(utils.ToRlVector3(s.InitialSpawnPosition), utils.ToRlVector3(s.FinalSpawnPosition), rl.Black)
+		}
 	}
 
 	if s.Config.ShowOctree {
@@ -106,20 +109,20 @@ func drawVectors(u *physics.Unit) {
 }
 
 func calculateNearestCubePoints(s *physics.Simulation) (xNear, yNear, zNear vector3.Vector[float64]) {
-	if s.SpawnPosition.X() < s.WorldCenter.X() {
-		xNear = vector3.New(s.WorldBoundray.Min.X(), s.SpawnPosition.Y(), s.SpawnPosition.Z())
+	if s.FinalSpawnPosition.X() < s.WorldCenter.X() {
+		xNear = vector3.New(s.WorldBoundray.Min.X(), s.FinalSpawnPosition.Y(), s.FinalSpawnPosition.Z())
 	} else {
-		xNear = vector3.New(s.WorldBoundray.Max.X(), s.SpawnPosition.Y(), s.SpawnPosition.Z())
+		xNear = vector3.New(s.WorldBoundray.Max.X(), s.FinalSpawnPosition.Y(), s.FinalSpawnPosition.Z())
 	}
-	if s.SpawnPosition.Y() < s.WorldCenter.Y() {
-		yNear = vector3.New(s.SpawnPosition.X(), s.WorldBoundray.Min.Y(), s.SpawnPosition.Z())
+	if s.FinalSpawnPosition.Y() < s.WorldCenter.Y() {
+		yNear = vector3.New(s.FinalSpawnPosition.X(), s.WorldBoundray.Min.Y(), s.FinalSpawnPosition.Z())
 	} else {
-		yNear = vector3.New(s.SpawnPosition.X(), s.WorldBoundray.Max.Y(), s.SpawnPosition.Z())
+		yNear = vector3.New(s.FinalSpawnPosition.X(), s.WorldBoundray.Max.Y(), s.FinalSpawnPosition.Z())
 	}
-	if s.SpawnPosition.Z() < s.WorldCenter.Z() {
-		zNear = vector3.New(s.SpawnPosition.X(), s.SpawnPosition.Y(), s.WorldBoundray.Min.Z())
+	if s.FinalSpawnPosition.Z() < s.WorldCenter.Z() {
+		zNear = vector3.New(s.FinalSpawnPosition.X(), s.FinalSpawnPosition.Y(), s.WorldBoundray.Min.Z())
 	} else {
-		zNear = vector3.New(s.SpawnPosition.X(), s.SpawnPosition.Y(), s.WorldBoundray.Max.Z())
+		zNear = vector3.New(s.FinalSpawnPosition.X(), s.FinalSpawnPosition.Y(), s.WorldBoundray.Max.Z())
 	}
 	return
 }
