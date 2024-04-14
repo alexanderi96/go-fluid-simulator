@@ -69,3 +69,73 @@ func (u *Unit) UpdatePosition(dt float64) {
 	u.Velocity = nVelocity
 	u.Acceleration = vector3.Zero[float64]()
 }
+
+func (unit *Unit) CheckAndResolveWallCollision(wallBounds BoundingBox, wallElasticity float64) bool {
+	xCorrection, yCorrection, zCorrection := unit.Position.X(), unit.Position.Y(), unit.Position.Z()
+	vxCorrection, vyCorrection, vzCorrection := unit.Velocity.X(), unit.Velocity.Y(), unit.Velocity.Z()
+	collided := false
+
+	// Correzione asse X
+	if unit.Position.X()-unit.Radius < wallBounds.Min.X() {
+		overlapX := wallBounds.Min.X() - (unit.Position.X() - unit.Radius)
+		xCorrection = unit.Position.X() + overlapX
+		// Applica la restituzione
+		vxCorrection = -unit.Velocity.X() * wallElasticity
+		//nVel.FlipX()
+		collided = true
+	}
+	if unit.Position.X()+unit.Radius > wallBounds.Max.X() {
+		overlapX := (unit.Position.X() + unit.Radius) - wallBounds.Max.X()
+		xCorrection = unit.Position.X() - overlapX
+		// Applica la restituzione
+		vxCorrection = -unit.Velocity.X() * wallElasticity
+		//nVel.FlipX()
+		collided = true
+	}
+
+	// Correzione asse Y
+	if unit.Position.Y()-unit.Radius < wallBounds.Min.Y() {
+		overlapY := wallBounds.Min.Y() - (unit.Position.Y() - unit.Radius)
+		yCorrection = unit.Position.Y() + overlapY
+		// Applica la restituzione
+		vyCorrection = -unit.Velocity.Y() * wallElasticity
+		//nVel.FlipY()
+		collided = true
+	}
+	if unit.Position.Y()+unit.Radius > wallBounds.Max.Y() {
+		overlapY := (unit.Position.Y() + unit.Radius) - wallBounds.Max.Y()
+		yCorrection = unit.Position.Y() - overlapY
+		// Applica la restituzione
+		vyCorrection = -unit.Velocity.Y() * wallElasticity
+		//nVel.FlipY()
+		collided = true
+	}
+
+	// Correzione asse Z
+	if unit.Position.Z()-unit.Radius < wallBounds.Min.Z() {
+		overlapZ := wallBounds.Min.Z() - (unit.Position.Z() - unit.Radius)
+		zCorrection = unit.Position.Z() + overlapZ
+		// Applica la restituzione
+		vzCorrection = -unit.Velocity.Z() * wallElasticity
+		//nVel.FlipZ()
+		collided = true
+	}
+	if unit.Position.Z()+unit.Radius > wallBounds.Max.Z() {
+		overlapZ := (unit.Position.Z() + unit.Radius) - wallBounds.Max.Z()
+		zCorrection = unit.Position.Z() - overlapZ
+		// Applica la restituzione
+		vzCorrection = -unit.Velocity.Z() * wallElasticity
+		//nVel.FlipZ()
+		collided = true
+	}
+
+	if collided {
+		//log.Print("\nvel:", unit.Velocity.X(), unit.Velocity.Y(), unit.Velocity.Z())
+		//log.Print("\nnVel: ", nVel.X(), nVel.Y(), nVel.Z())
+		unit.Position = vector3.New(xCorrection, yCorrection, zCorrection)
+		unit.Velocity = vector3.New(vxCorrection, vyCorrection, vzCorrection)
+	}
+
+	return collided
+
+}

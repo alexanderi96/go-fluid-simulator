@@ -10,7 +10,7 @@ import (
 
 func Draw(s *physics.Simulation) {
 	rl.BeginDrawing()
-	rl.ClearBackground(rl.Black)
+	rl.ClearBackground(rl.DarkPurple)
 
 	rl.BeginMode3D(s.Camera)
 

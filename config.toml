@@ -1,5 +1,5 @@
 # simulation config
-  target_fps = 60
+  target_fps = 999
   full_screen = false
   window_width = 1600
   window_height = 1280
@@ -11,22 +11,22 @@
   scale_factor = 1 # 1 pixel = 1 cm
 
 # world config
-  game_x = 50
-  game_y = 50
-  game_z = 50
+  game_x = 100
+  game_y = 100
+  game_z = 100
   wall_elasticity = 0.9
   apply_gravity = false
   gravity = -9.81
   show_octree = false
   
 # unit config
-  unit_number = 3
-  unit_initial_spacing = 5
+  unit_number = 100
+  unit_initial_spacing = 0.1
   units_emit_gravity = true
   unit_gravitational_multiplier = 1
 
   unit_radius = 1
-  unit_radius_multiplier = 1
+  unit_radius_multiplier = 0.2
   # set_random_radius = false
   # radius_min = 1
   # radius_max = 5
