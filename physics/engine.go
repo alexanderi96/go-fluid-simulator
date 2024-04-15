@@ -23,11 +23,12 @@ type BoundingBox struct {
 }
 
 type Simulation struct {
-	Fluid   []*Unit
-	Metrics *metrics.Metrics
-	Config  *config.Config
-
-	Octree *Octree
+	Fluid     []*Unit
+	Metrics   *metrics.Metrics
+	Config    *config.Config
+	Iteration int
+	Octree    *Octree
+	//Mutex     sync.RWMutex
 
 	IsPause              bool
 	InitialMousePosition rl.Vector2
@@ -79,11 +80,11 @@ func NewSimulation(config *config.Config) (*Simulation, error) {
 	WorldCenter := vector3.New(0.0, 0.0, 0.0)
 
 	sim := &Simulation{
-		Fluid:   make([]*Unit, 0, config.UnitNumber),
-		Metrics: &metrics.Metrics{},
-		Config:  config,
-		IsPause: false,
-
+		Fluid:     make([]*Unit, 0, config.UnitNumber),
+		Metrics:   &metrics.Metrics{},
+		Config:    config,
+		IsPause:   false,
+		Iteration: 0,
 		WorldBoundray: BoundingBox{
 			Min: vector3.New(-config.GameX/2, -config.GameY/2, -config.GameZ/2),
 			Max: vector3.New(config.GameX/2, config.GameY/2, config.GameZ/2),

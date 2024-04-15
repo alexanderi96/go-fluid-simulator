@@ -2,6 +2,7 @@ package physics
 
 import (
 	"math"
+	"sync"
 
 	"github.com/EliCDavis/vector/vector3"
 )
@@ -9,27 +10,43 @@ import (
 const G = 6.67430e-11 // Costante gravitazionale universale (m^3 kg^-1 s^-2)
 
 func (s *Simulation) UpdateWithOctrees() error {
+	if len(s.Fluid) == 0 {
+		return nil
+	}
+
 	frameTime := s.Config.Frametime
+	s.Iteration++
+
+	// Blocca l'accesso alla simulazione durante l'aggiornamento
+	// s.Mutex.Lock()
+	// defer s.Mutex.Unlock()
 
 	s.Octree.Clear() // Pulisce il Octree all'inizio di ogni frame
 
-	// Costruisci l'Octree
+	// Costruisci l'Octree in modo concorrente utilizzando goroutine
+	var wg sync.WaitGroup
 	for _, unit := range s.Fluid {
-		s.Octree.Insert(unit)
+		wg.Add(1)
+		go func(unit *Unit) {
+			defer wg.Done()
+			s.Octree.Insert(unit)
+		}(unit)
 	}
+	wg.Wait()
 
+	// Calcola la forza di gravità in modo concorrente
+	var wgGravity sync.WaitGroup
 	for _, unit := range s.Fluid {
-		if s.Config.UnitsEmitGravity {
-			unit.accelerate(s.Octree.CalculateGravity(unit, 0.5))
-		}
-
-		// Calcola la forza di gravità solo se abilitato
-		// if s.Config.ApplyGravity {
-		// 	// Aggiorna l'accelerazione con la forza di gravità
-		// 	unit.accelerate(vector3.New[float64](0, s.Config.Gravity, 0).Scale(0.00001 / frameTime))
-		// }
+		wgGravity.Add(1)
+		go func(unit *Unit) {
+			defer wgGravity.Done()
+			force := s.Octree.CalculateGravity(unit, 0.5)
+			if s.Config.UnitsEmitGravity {
+				unit.accelerate(force)
+			}
+		}(unit)
 	}
-
+	wgGravity.Wait()
 	// Controlla le collisioni tra particelle e aggiorna le velocità utilizzando il Octree
 	for _, unitA := range s.Fluid {
 		if unitA == nil {

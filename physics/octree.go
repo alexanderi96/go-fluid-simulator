@@ -1,6 +1,8 @@
 package physics
 
 import (
+	"sync"
+
 	"github.com/EliCDavis/vector/vector3"
 	"github.com/alexanderi96/go-fluid-simulator/config"
 )
@@ -15,6 +17,7 @@ func InitOctree(config *config.Config) {
 }
 
 type Octree struct {
+	Mutex    sync.Mutex // Aggiungi un Mutex per l'Octree
 	level    int8
 	Bounds   BoundingBox
 	objects  []*Unit
@@ -93,6 +96,8 @@ func (ot *Octree) Split() {
 
 // Insert inserisce un oggetto nel Octree.
 func (ot *Octree) Insert(obj *Unit) {
+	ot.Mutex.Lock()         // Blocca il mutex prima di modificare l'Octree
+	defer ot.Mutex.Unlock() // Assicurati di sbloccare il mutex alla fine del metodo
 
 	// Calcola il nuovo centro di massa come media ponderata
 	oldTotalMass := ot.TotalMass

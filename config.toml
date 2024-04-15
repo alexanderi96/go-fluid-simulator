@@ -21,7 +21,7 @@
   show_octree = false
   
 # unit config
-  unit_number = 500
+  unit_number = 1000
   unit_initial_spacing = 4
   units_emit_gravity = true
   unit_gravitational_multiplier = 1
