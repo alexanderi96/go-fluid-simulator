@@ -44,7 +44,7 @@ func Draw(s *physics.Simulation) {
 		rl.DrawCube(utils.ToRlVector3(s.FinalSpawnPosition), 1, 1, 1, cubeColor) // Modifica le dimensioni e il colore come preferisci
 
 		if s.MouseButtonPressed && s.InitialMousePosition.X > 0 && s.InitialMousePosition.X < float32(s.Config.WindowWidth-s.Config.SidebarWidth) {
-			rl.DrawLine3D(utils.ToRlVector3(s.InitialSpawnPosition), utils.ToRlVector3(s.FinalSpawnPosition), rl.Black)
+			rl.DrawLine3D(utils.ToRlVector3(s.InitialSpawnPosition), utils.ToRlVector3(s.FinalSpawnPosition), rl.RayWhite)
 		}
 	}
 
@@ -103,7 +103,7 @@ func drawOctree(octree *physics.Octree) {
 
 func drawVectors(u *physics.Unit) {
 
-	endVelocity := u.Position.Add(u.Velocity.Scale(1))
+	endVelocity := u.Position.Add(u.Velocity.Scale(1000))
 	rl.DrawLine3D(utils.ToRlVector3(u.Position), utils.ToRlVector3(endVelocity), rl.Blue)
 
 	endAcceleration := u.Position.Add(u.Acceleration.Scale(1))

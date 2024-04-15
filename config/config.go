@@ -49,6 +49,7 @@ type Config struct {
 	OctreeMaxLevel          int8
 	MaxUnitNumberPerLevel   int8
 	ResolutionSteps         int8
+	Frametime               float64
 	// TestDuration          float64
 	// TestIterations        int32
 }
@@ -100,6 +101,7 @@ func ReadConfig(filepath string) (*Config, error) {
 		OctreeMaxLevel:          int8(viper.GetInt("octree_max_level")),
 		MaxUnitNumberPerLevel:   int8(viper.GetInt("max_unit_number_per_level")),
 		ResolutionSteps:         int8(viper.GetInt("resolution_steps")),
+		Frametime:               viper.GetFloat64("frametime"),
 		// TestDuration:          viper.GetFloat64("test_duration"),
 		// TestIterations:        viper.GetInt32("test_iterations"),
 	}

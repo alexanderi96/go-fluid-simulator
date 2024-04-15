@@ -32,8 +32,8 @@ func (u *Unit) GetMass() float64 {
 	return u.GetVolume() * u.MassMultiplier
 }
 
-func (u *Unit) accelerate(a vector3.Vector[float64]) {
-	u.Acceleration = u.Acceleration.Add(a)
+func (u *Unit) accelerate(f vector3.Vector[float64]) {
+	u.Acceleration = u.Acceleration.Add(f.Scale(1 / u.Mass))
 }
 
 func newUnitWithPropertiesAtPosition(position, acceleration, velocity vector3.Vector[float64], radius, massMultiplier, elasticity float64, color color.RGBA) *Unit {

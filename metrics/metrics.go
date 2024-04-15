@@ -9,7 +9,7 @@ import (
 
 type Metrics struct {
 	Mu            sync.Mutex
-	Frametime     float64
+	RealFrametime float64
 	FPS           int32
 	HeapSize      uint32
 	CPUUsage      float64
@@ -33,7 +33,7 @@ func (m *Metrics) Update() {
 	runtime.ReadMemStats(&memStats)
 	m.HeapSize = uint32(memStats.HeapAlloc / 1024)
 
-	m.Frametime = float64(rl.GetFrameTime())
+	m.RealFrametime = float64(rl.GetFrameTime())
 	m.FPS = rl.GetFPS()
 
 }

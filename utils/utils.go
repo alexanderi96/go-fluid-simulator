@@ -54,10 +54,10 @@ func GetColorFromVelocity(v vector3.Vector[float64]) color.RGBA {
 	}
 }
 
-func CheckTextFloat32(radMinText string) (float32, error) {
+func CheckTextFloat64(radMinText string) (float64, error) {
 	floatValue, err := strconv.ParseFloat(radMinText, 32)
 	if err == nil {
-		return float32(floatValue), nil
+		return floatValue, nil
 	} else {
 		return 0, fmt.Errorf("error parsing float value: %v", err)
 	}

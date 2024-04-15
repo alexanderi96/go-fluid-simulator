@@ -6,10 +6,10 @@ import (
 	"github.com/EliCDavis/vector/vector3"
 )
 
-const G = 6.67430e1 // Costante gravitazionale universale (m^3 kg^-1 s^-2)
+const G = 6.67430e-11 // Costante gravitazionale universale (m^3 kg^-1 s^-2)
 
 func (s *Simulation) UpdateWithOctrees() error {
-	frameTime := s.Metrics.Frametime
+	frameTime := s.Config.Frametime
 
 	s.Octree.Clear() // Pulisce il Octree all'inizio di ogni frame
 
@@ -24,10 +24,10 @@ func (s *Simulation) UpdateWithOctrees() error {
 		}
 
 		// Calcola la forza di gravità solo se abilitato
-		if s.Config.ApplyGravity {
-			// Aggiorna l'accelerazione con la forza di gravità
-			unit.accelerate(vector3.New[float64](0, s.Config.Gravity, 0))
-		}
+		// if s.Config.ApplyGravity {
+		// 	// Aggiorna l'accelerazione con la forza di gravità
+		// 	unit.accelerate(vector3.New[float64](0, s.Config.Gravity, 0).Scale(0.00001 / frameTime))
+		// }
 	}
 
 	// Controlla le collisioni tra particelle e aggiorna le velocità utilizzando il Octree

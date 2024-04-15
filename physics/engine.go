@@ -46,7 +46,7 @@ type Simulation struct {
 	WorldCenter   vector3.Vector[float64]
 
 	ControlMode   ControlMode
-	SpawnDistance float32
+	SpawnDistance float64
 
 	InitialSpawnPosition vector3.Vector[float64]
 	FinalSpawnPosition   vector3.Vector[float64]
@@ -119,7 +119,7 @@ func (s *Simulation) ResetCameraPosition(position vector3.Vector[float64], fovy 
 		Projection: rl.CameraPerspective,
 	}
 
-	s.SpawnDistance = rl.Vector3Distance(rlWc, s.Camera.Position)
+	s.SpawnDistance = float64(rl.Vector3Distance(rlWc, s.Camera.Position))
 }
 
 func (s *Simulation) Update() error {
@@ -157,13 +157,16 @@ func (s *Simulation) HandleInput() {
 
 	} else if rl.IsMouseButtonPressed(rl.MouseLeftButton) {
 		s.InitialMousePosition = rl.GetMousePosition()
-		s.UpdateInitialSpawnPosition()
+		//s.UpdateInitialSpawnPosition()
+		updateSpawnPosition(&s.InitialSpawnPosition, &s.SpawnDistance, &s.Camera)
+
 		for rl.IsMouseButtonDown(rl.MouseLeftButton) && s.InitialMousePosition.X > 0 && s.InitialMousePosition.X < float32(s.Config.ViewportX) &&
 			s.InitialMousePosition.Y > 0 && s.InitialMousePosition.Y < float32(s.Config.ViewportY) {
 			s.MouseButtonPressed = true
 
 			s.FinalMousePosition = rl.GetMousePosition()
-			s.UpdateFinalSpawnPosition()
+			updateSpawnPosition(&s.FinalSpawnPosition, &s.SpawnDistance, &s.Camera)
+			//s.UpdateFinalSpawnPosition()
 		}
 
 	} else if rl.IsMouseButtonReleased(rl.MouseRightButton) {
@@ -186,7 +189,9 @@ func (s *Simulation) HandleInput() {
 		s.UpdateCameraPosition()
 
 	case UnitSpawnMode:
-		s.UpdateFinalSpawnPosition()
+		updateSpawnPosition(&s.FinalSpawnPosition, &s.SpawnDistance, &s.Camera)
+
+		//		s.UpdateFinalSpawnPosition()
 
 	default:
 	}
@@ -201,28 +206,15 @@ func (s *Simulation) UpdateCameraPosition() error {
 	return nil
 }
 
-func (s *Simulation) UpdateInitialSpawnPosition() {
-	mouseRay := rl.GetMouseRay(rl.GetMousePosition(), s.Camera)
+func updateSpawnPosition(position *vector3.Vector[float64], spawnDistance *float64, camera *rl.Camera3D) {
+	mouseRay := rl.GetMouseRay(rl.GetMousePosition(), *camera)
 
 	// Calcola la distanza basata sulla rotazione della rotella del mouse
-	s.SpawnDistance += rl.GetMouseWheelMove() // Adatta questa formula secondo le tue necessità
+	*spawnDistance += float64(rl.GetMouseWheelMove()) // Adatta questa formula secondo le tue necessità
 
 	// Calcola la posizione del segnalino di anteprima lungo il raggio
-	s.InitialSpawnPosition = utils.ToVector3FromRlVector3(rl.Vector3Add(mouseRay.Position, rl.Vector3Scale(mouseRay.Direction, s.SpawnDistance)))
-
+	*position = utils.ToVector3FromRlVector3(rl.Vector3Add(mouseRay.Position, rl.Vector3Scale(mouseRay.Direction, float32(*spawnDistance))))
 }
-
-func (s *Simulation) UpdateFinalSpawnPosition() {
-	mouseRay := rl.GetMouseRay(rl.GetMousePosition(), s.Camera)
-
-	// Calcola la distanza basata sulla rotazione della rotella del mouse
-	s.SpawnDistance += rl.GetMouseWheelMove() // Adatta questa formula secondo le tue necessità
-
-	// Calcola la posizione del segnalino di anteprima lungo il raggio
-	s.FinalSpawnPosition = utils.ToVector3FromRlVector3(rl.Vector3Add(mouseRay.Position, rl.Vector3Scale(mouseRay.Direction, s.SpawnDistance)))
-
-}
-
 func (s *Simulation) IsSpawnInRange() bool {
 
 	return s.FinalSpawnPosition.X() >= s.WorldBoundray.Min.X() && s.FinalSpawnPosition.X() <= s.WorldBoundray.Max.X() &&
@@ -305,7 +297,6 @@ func positionUnitsCuboidally(units []*Unit, FinalspawnPosition vector3.Vector[fl
 				// Assegniamo la posizione alla unità corrente
 				if index < len(units) {
 					units[index].Position = vector3.New(unitX, unitY, unitZ)
-					//units[index].PreviousPosition = units[index].Position
 					index++
 				} else {
 					break
@@ -327,11 +318,11 @@ func positionUnitsInFibonacciSpiral(units []*Unit, center vector3.Vector[float64
 		radius := math.Sqrt(float64(i)) * radiusStep
 		x := center.X() + radius*math.Cos(float64(angle))
 		y := center.Y() + radius*math.Sin(float64(angle))
-		z := center.Z() + 1
+		zMin, zMax := -0.1, 0.1
+		z := center.Z() + zMin + rand.Float64()*(zMax-zMin)
 
 		// Assegna la posizione alla unità
 		units[i].Position = vector3.New(x, y, z)
-		//units[i].PreviousPosition = units[i].Position
 
 		// Aumenta il passo di incremento del raggio
 		radiusStep += 0.0005 // Modifica la velocità di aumento a tuo piacimento
@@ -343,16 +334,16 @@ func positionUnitsInFibonacciSpiral(units []*Unit, center vector3.Vector[float64
 
 func (s *Simulation) GiveVelocity(units []*Unit) {
 	for _, u := range units {
-		u.Velocity = CalcolaVettoreVelocita(s.InitialSpawnPosition, s.FinalSpawnPosition)
+		u.Velocity = CalcolaVettoreVelocita(s.InitialSpawnPosition, s.FinalSpawnPosition, s.Config.Frametime)
 	}
 }
 
-func CalcolaVettoreVelocita(p1, p2 vector3.Vector[float64]) vector3.Vector[float64] {
+func CalcolaVettoreVelocita(p1, p2 vector3.Vector[float64], dt float64) vector3.Vector[float64] {
 	// Calcola la differenza tra la posizione finale e quella iniziale
 	differenzaPosizione := p2.Sub(p1)
 
 	// Dividi la differenza di posizione per l'intervallo di tempo per ottenere il vettore velocità
-	// vettoreVelocita := differenzaPosizione.Scale(1 / deltaTime)
+	vettoreVelocita := differenzaPosizione.Scale(0.01 / dt)
 
-	return differenzaPosizione
+	return vettoreVelocita
 }
