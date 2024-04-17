@@ -20,6 +20,8 @@ type Unit struct {
 	MassMultiplier float64
 	Mass           float64
 	Color          color.RGBA
+
+	Heat float64
 }
 
 func (u *Unit) GetVolume() float64 {
@@ -47,6 +49,7 @@ func newUnitWithPropertiesAtPosition(position, acceleration, velocity vector3.Ve
 		MassMultiplier: massMultiplier,
 		Elasticity:     elasticity,
 		Color:          color,
+		Heat:           0.0,
 	}
 
 	unit.Mass = unit.GetMass()
@@ -68,6 +71,11 @@ func (u *Unit) UpdatePosition(dt float64) {
 	u.Position = nPos
 	u.Velocity = nVelocity
 	u.Acceleration = vector3.Zero[float64]()
+	if u.Heat > 0.0 {
+		u.Heat -= 1
+	} else {
+		u.Heat = 0.0
+	}
 }
 
 func (unit *Unit) CheckAndResolveWallCollision(wallBounds BoundingBox, wallElasticity float64) bool {
@@ -134,6 +142,8 @@ func (unit *Unit) CheckAndResolveWallCollision(wallBounds BoundingBox, wallElast
 		//log.Print("\nnVel: ", nVel.X(), nVel.Y(), nVel.Z())
 		unit.Position = vector3.New(xCorrection, yCorrection, zCorrection)
 		unit.Velocity = vector3.New(vxCorrection, vyCorrection, vzCorrection)
+
+		unit.Heat += 2
 	}
 
 	return collided

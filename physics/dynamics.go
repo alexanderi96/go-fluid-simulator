@@ -15,24 +15,12 @@ func (s *Simulation) UpdateWithOctrees() error {
 	}
 
 	frameTime := s.Config.Frametime
-	s.Iteration++
-
-	// Blocca l'accesso alla simulazione durante l'aggiornamento
-	// s.Mutex.Lock()
-	// defer s.Mutex.Unlock()
 
 	s.Octree.Clear() // Pulisce il Octree all'inizio di ogni frame
 
-	// Costruisci l'Octree in modo concorrente utilizzando goroutine
-	var wg sync.WaitGroup
 	for _, unit := range s.Fluid {
-		wg.Add(1)
-		go func(unit *Unit) {
-			defer wg.Done()
-			s.Octree.Insert(unit)
-		}(unit)
+		s.Octree.Insert(unit)
 	}
-	wg.Wait()
 
 	// Calcola la forza di gravità in modo concorrente
 	var wgGravity sync.WaitGroup
@@ -148,4 +136,7 @@ func handleCollision(uA, uB *Unit) {
 	uA.Position = uA.Position.Add(normalMove)
 	uB.Position = uB.Position.Sub(normalMove)
 
+	// Convert the magnitude of the impulse to heat for each unit
+	uA.Heat += 2
+	uB.Heat += 2
 }

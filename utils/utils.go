@@ -5,11 +5,27 @@ import (
 	"image/color"
 	"math"
 	"math/rand"
+	"sort"
 	"strconv"
 
 	"github.com/EliCDavis/vector/vector3"
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
+
+// Mappatura dei valori Kelvin a colori RGBA.
+// Questi valori sono esempi e possono essere adattati o dettagliati meglio.
+var kelvinToRGB = map[float64]color.RGBA{
+	1000:  {255, 56, 0, 255},
+	2000:  {255, 137, 18, 255},
+	3000:  {255, 180, 107, 255},
+	4000:  {255, 209, 163, 255},
+	5000:  {255, 228, 206, 255},
+	6000:  {255, 242, 239, 255},
+	7000:  {245, 243, 255, 255},
+	8000:  {235, 238, 255, 255},
+	9000:  {227, 233, 255, 255},
+	10000: {220, 229, 255, 255},
+}
 
 func RandomColor() (r, g, b, a uint8) {
 	r = uint8(rand.Intn(256))
@@ -79,5 +95,47 @@ func ToRlBoundingBox(min, max vector3.Vector[float64]) rl.BoundingBox {
 	return rl.BoundingBox{
 		Min: ToRlVector3(min),
 		Max: ToRlVector3(max),
+	}
+}
+
+// KelvinToRGBA converte un valore di temperatura Kelvin in un colore RGBA.
+func KelvinToRGBA(kelvin float64) color.RGBA {
+
+	// Trova i due valori Kelvin più vicini.
+	keys := make([]float64, 0, len(kelvinToRGB))
+	for k := range kelvinToRGB {
+		keys = append(keys, k)
+	}
+	sort.Float64s(keys)
+
+	var lower, upper float64
+	for i, k := range keys {
+		if kelvin < k {
+			if i == 0 {
+				return kelvinToRGB[keys[0]] // Se è minore del valore più basso, restituisci il valore più basso.
+			}
+			lower = keys[i-1]
+			upper = k
+			break
+		}
+	}
+	if kelvin >= keys[len(keys)-1] {
+		return kelvinToRGB[keys[len(keys)-1]] // Se è maggiore del valore più alto, restituisci il valore più alto.
+	}
+
+	// Calcola il fattore di interpolazione tra i due valori Kelvin.
+	factor := (kelvin - lower) / (upper - lower)
+
+	// Interpola linearmente i valori RGBA.
+	lowerColor := kelvinToRGB[lower]
+	upperColor := kelvinToRGB[upper]
+	blend := func(a, b uint8) uint8 {
+		return a + uint8(float64(b-a)*factor)
+	}
+	return color.RGBA{
+		R: blend(lowerColor.R, upperColor.R),
+		G: blend(lowerColor.G, upperColor.G),
+		B: blend(lowerColor.B, upperColor.B),
+		A: 255, // Alpha è sempre 255 (opaco).
 	}
 }

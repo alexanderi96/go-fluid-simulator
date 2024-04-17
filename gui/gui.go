@@ -12,7 +12,11 @@ import (
 
 func Draw(s *physics.Simulation) {
 	rl.BeginDrawing()
-	rl.ClearBackground(rl.Black)
+	rl.ClearBackground(rl.NewColor(10, 10, 10, 255))
+
+	cubeColor := rl.Red
+	// Calcola i punti più vicini sul cubo di gioco
+	xNear, yNear, zNear := calculateNearestCubePoints(s)
 
 	rl.BeginMode3D(s.Camera)
 
@@ -20,21 +24,12 @@ func Draw(s *physics.Simulation) {
 	// rl.DrawGrid(20, 5)
 
 	drawFluid(s)
-	//rl.DrawSphere(utils.ToRlVector3(s.Octree.CenterOfMass), 0.1, rl.Red)
-
-	// if s.Config.ShowOverlay {
-	// 	for _, unit := range s.Fluid {
-	// 		drawOverlay(unit)
-	// 	}
-	// }
 
 	if s.ControlMode == physics.UnitSpawnMode {
 
-		cubeColor := rl.Red
 		if s.IsSpawnInRange() {
 			cubeColor = rl.Green
-			// Calcola i punti più vicini sul cubo di gioco
-			xNear, yNear, zNear := calculateNearestCubePoints(s)
+
 			// Disegna le linee tratteggiate
 			drawDashedLine(xNear, s.FinalSpawnPosition, 0.1, 0.1)
 			drawDashedLine(yNear, s.FinalSpawnPosition, 0.1, 0.1)
@@ -54,8 +49,6 @@ func Draw(s *physics.Simulation) {
 		rl.DrawBoundingBox(utils.ToRlBoundingBox(s.WorldBoundray.Min, s.WorldBoundray.Max), rl.RayWhite)
 	}
 
-	rl.DrawCube(utils.ToRlVector3(s.WorldBoundray.Min), 1, 1, 1, rl.Blue)
-	rl.DrawCube(utils.ToRlVector3(s.WorldBoundray.Max), 1, 1, 1, rl.Red)
 	rl.DrawLine3D(utils.ToRlVector3(s.WorldBoundray.Min), utils.ToRlVector3(vector3.New(s.WorldBoundray.Max.X(), s.WorldBoundray.Min.Y(), s.WorldBoundray.Min.Z())), rl.Red)
 	rl.DrawLine3D(utils.ToRlVector3(s.WorldBoundray.Min), utils.ToRlVector3(vector3.New(s.WorldBoundray.Min.X(), s.WorldBoundray.Max.Y(), s.WorldBoundray.Min.Z())), rl.Green)
 	rl.DrawLine3D(utils.ToRlVector3(s.WorldBoundray.Min), utils.ToRlVector3(vector3.New(s.WorldBoundray.Min.X(), s.WorldBoundray.Min.Y(), s.WorldBoundray.Max.Z())), rl.Blue)
@@ -71,7 +64,7 @@ func Draw(s *physics.Simulation) {
 func drawFluid(s *physics.Simulation) {
 	for _, unit := range s.Fluid {
 
-		color := unit.Color
+		color := utils.KelvinToRGBA(unit.Heat)
 
 		if s.Config.ShowSpeedColor {
 			color = utils.GetColorFromVelocity(unit.Velocity)
