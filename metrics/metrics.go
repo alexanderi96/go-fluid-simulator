@@ -3,8 +3,7 @@ package metrics
 import (
 	"runtime"
 	"sync"
-
-	rl "github.com/gen2brain/raylib-go/raylib"
+	// rl "github.com/gen2brain/raylib-go/raylib"
 )
 
 type Metrics struct {
@@ -33,7 +32,7 @@ func (m *Metrics) Update() {
 	runtime.ReadMemStats(&memStats)
 	m.HeapSize = uint32(memStats.HeapAlloc / 1024)
 
-	m.RealFrametime = float64(rl.GetFrameTime())
-	m.FPS = rl.GetFPS()
+	// m.RealFrametime = float64(rl.GetFrameTime())
+	// m.FPS = rl.GetFPS()
 
 }

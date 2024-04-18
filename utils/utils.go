@@ -9,7 +9,7 @@ import (
 	"strconv"
 
 	"github.com/EliCDavis/vector/vector3"
-	rl "github.com/gen2brain/raylib-go/raylib"
+	// rl "github.com/gen2brain/raylib-go/raylib"
 )
 
 // Mappatura dei valori Kelvin a colori RGBA.
@@ -35,10 +35,10 @@ func RandomColor() (r, g, b, a uint8) {
 	return
 }
 
-func RandomRaylibColor() rl.Color {
-	r, g, b, a := RandomColor()
-	return rl.NewColor(r, g, b, a)
-}
+// func RandomRaylibColor() rl.Color {
+// 	r, g, b, a := RandomColor()
+// 	return rl.NewColor(r, g, b, a)
+// }
 
 // write a function that return a rl.Color from a ginev mass. the hevier the mass, the darker the color
 func GetColorFromMass(mass float32) color.RGBA {
@@ -79,24 +79,24 @@ func CheckTextFloat64(radMinText string) (float64, error) {
 	}
 }
 
-func ToRlVector3(v vector3.Vector[float64]) rl.Vector3 {
-	return rl.Vector3{
-		X: float32(v.X()),
-		Y: float32(v.Y()),
-		Z: float32(v.Z()),
-	}
-}
+// func ToRlVector3(v vector3.Vector[float64]) rl.Vector3 {
+// 	return rl.Vector3{
+// 		X: float32(v.X()),
+// 		Y: float32(v.Y()),
+// 		Z: float32(v.Z()),
+// 	}
+// }
 
-func ToVector3FromRlVector3(v rl.Vector3) vector3.Vector[float64] {
-	return vector3.New(float64(v.X), float64(v.Y), float64(v.Z))
-}
+// func ToVector3FromRlVector3(v rl.Vector3) vector3.Vector[float64] {
+// 	return vector3.New(float64(v.X), float64(v.Y), float64(v.Z))
+// }
 
-func ToRlBoundingBox(min, max vector3.Vector[float64]) rl.BoundingBox {
-	return rl.BoundingBox{
-		Min: ToRlVector3(min),
-		Max: ToRlVector3(max),
-	}
-}
+// func ToRlBoundingBox(min, max vector3.Vector[float64]) rl.BoundingBox {
+// 	return rl.BoundingBox{
+// 		Min: ToRlVector3(min),
+// 		Max: ToRlVector3(max),
+// 	}
+// }
 
 // KelvinToRGBA converte un valore di temperatura Kelvin in un colore RGBA.
 func KelvinToRGBA(kelvin float64) color.RGBA {

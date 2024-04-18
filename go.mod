@@ -3,15 +3,13 @@ module github.com/alexanderi96/go-fluid-simulator
 go 1.21.1
 
 require (
+	github.com/EliCDavis/vector v1.6.0
 	github.com/g3n/engine v0.2.0
-	github.com/gen2brain/raylib-go/raygui v0.0.0-20231017191853-10c61020bc6c
-	github.com/gen2brain/raylib-go/raylib v0.0.0-20231010155130-e9da61431c85
 	github.com/google/uuid v1.3.1
 	github.com/spf13/viper v1.17.0
 )
 
 require (
-	github.com/EliCDavis/vector v1.6.0 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/go-gl/glfw/v3.3/glfw v0.0.0-20210410170116-ea3d685f79fb // indirect
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
