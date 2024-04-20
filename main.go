@@ -71,18 +71,19 @@ func main() {
 	}
 
 	// Set background color to gray
-	s.App.Gls().ClearColor(0.5, 0.5, 0.5, 1.0)
+	s.App.Gls().ClearColor(0, 0, 0, 1.0)
 
 	// Create and add lights to the scene
-	s.Scene.Add(light.NewAmbient(&math32.Color{1.0, 1.0, 1.0}, 0.8))
-	pointLight := light.NewPoint(&math32.Color{1, 1, 1}, 5.0)
+	s.Scene.Add(light.NewAmbient(&math32.Color{R: 1.0, G: 1.0, B: 1.0}, 0.3))
+	pointLight := light.NewPoint(&math32.Color{R: 1, G: 1, B: 1}, 1000.0)
 	pointLight.SetPosition(0, 0, 0)
 	s.Scene.Add(pointLight)
 
 	// Handle right mouse button press to create a new ball
 	s.App.Subscribe(window.OnMouseDown, func(evname string, ev interface{}) {
 		mev := ev.(*window.MouseEvent)
-		if mev.Button == window.MouseButtonRight { // Check if the right mouse button was pressed
+		if mev.Button == window.MouseButtonRight && mev.Mods == window.ModControl {
+			// Controlla se sia il pulsante destro del mouse sia il pulsante Ctrl sinistro sono premuti
 			units := s.GetUnits()
 			s.PositionNewUnitsCube(units)
 
@@ -97,7 +98,7 @@ func main() {
 
 	// Create FPS label
 	unitLabel := gui.NewLabel("unit: 0")
-	unitLabel.SetPosition(10, 20)
+	unitLabel.SetPosition(10, 25)
 	s.Scene.Add(unitLabel)
 
 	s.App.Run(func(renderer *renderer.Renderer, deltaTime time.Duration) {

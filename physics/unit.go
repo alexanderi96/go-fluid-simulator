@@ -4,6 +4,7 @@ import (
 	"image/color"
 	"math"
 
+	"github.com/EliCDavis/vector/vector3"
 	"github.com/g3n/engine/graphic"
 	"github.com/g3n/engine/material"
 	"github.com/g3n/engine/math32"
@@ -22,48 +23,67 @@ type Unit struct {
 	Id   uuid.UUID
 	Mesh *graphic.Mesh
 
-	//Position vector3.Vector[float32]
-	//PreviousPosition vector3.Vector[float32]
-	Velocity     *math32.Vector3
-	Acceleration *math32.Vector3
+	Position     vector3.Vector[float64]
+	Velocity     vector3.Vector[float64]
+	Acceleration vector3.Vector[float64]
 
-	Elasticity     float32
-	Radius         float32
-	MassMultiplier float32
-	Mass           float32
+	Elasticity     float64
+	Radius         float64
+	MassMultiplier float64
+	Mass           float64
 	Color          color.RGBA
 
-	Heat float32
+	Heat float64
 }
 
-func (u *Unit) GetVolume() float32 {
+func (u *Unit) GetVolume() float64 {
 	// Calcola il volume della sfera (4/3 * π * r^3)
-	return float32((4.0 / 3.0) * math.Pi * math.Pow(float64(u.Radius), 3))
+	return (4.0 / 3.0) * math.Pi * math.Pow(u.Radius, 3)
 }
 
-func (u *Unit) GetMass() float32 {
+func (u *Unit) GetMass() float64 {
 	// Calcola la massa utilizzando il volume e il MassMultiplier
 	return u.GetVolume() * u.MassMultiplier
 }
 
-func (u *Unit) accelerate(f *math32.Vector3) {
-	// log.Print("Before Acceleration: ", u.Acceleration)
-	u.Acceleration = u.Acceleration.Add(f.MultiplyScalar(1 / u.Mass))
-	// log.Print("After Acceleration: ", u.Acceleration)
+func (u *Unit) accelerate(f vector3.Vector[float64]) {
+	u.Acceleration = u.Acceleration.Add(f.Scale(1 / u.Mass))
 }
 
-func (u *Unit) UpdatePosition(dt float32) {
+func newUnitWithPropertiesAtPosition(position, acceleration, velocity vector3.Vector[float64], radius, massMultiplier, elasticity float64, color color.RGBA) *Unit {
+	unit := &Unit{
+		Id:       uuid.New(),
+		Position: position,
+		//PreviousPosition: position,
+		Velocity:       velocity,
+		Acceleration:   acceleration,
+		Radius:         radius,
+		MassMultiplier: massMultiplier,
+		Elasticity:     elasticity,
+		Color:          color,
+		Heat:           0.0,
+	}
 
-	u.Velocity.Add(u.Acceleration.MultiplyScalar(dt))
+	unit.Mass = unit.GetMass()
 
-	nPos := u.Mesh.Position()
+	return unit
+}
 
-	nPos.Add(u.Velocity.MultiplyScalar(dt)).Add(u.Acceleration.MultiplyScalar(0.5 * dt * dt))
+func (u *Unit) UpdatePosition(dt float64) {
+	// x := 2*u.Position.X() - u.PreviousPosition.X() + u.Acceleration.X()*dt*dt
+	// y := 2*u.Position.Y() - u.PreviousPosition.Y() + u.Acceleration.Y()*dt*dt
+	// z := 2*u.Position.Z() - u.PreviousPosition.Z() + u.Acceleration.Z()*dt*dt
+	// newPosition := vector3.New(x, y, z)
+	// u.PreviousPosition = u.Position
+	// u.Position = newPosition
 
-	// u.Mesh.SetPositionVec(&nPos)
-	u.Mesh.SetPositionVec(math32.NewVector3(nPos.X, nPos.Y, nPos.Z))
+	nPos := u.Position.Add(u.Velocity.Scale(dt)).Add(u.Acceleration.Scale(0.5 * dt * dt))
+	nVelocity := u.Velocity.Add(u.Acceleration.Scale(dt))
 
-	u.Acceleration = math32.NewVec3()
+	u.Position = nPos
+	u.Velocity = nVelocity
+	u.Acceleration = vector3.Zero[float64]()
+	u.Mesh.SetPosition(float32(nPos.X()), float32(nPos.Y()), float32(nPos.Z()))
 	if u.Heat > 0.0 {
 		u.Heat -= 1
 	} else {
@@ -71,61 +91,61 @@ func (u *Unit) UpdatePosition(dt float32) {
 	}
 }
 
-func (unit *Unit) CheckAndResolveWallCollision(wallBounds *math32.Box3, wallElasticity float32) bool {
-	xCorrection, yCorrection, zCorrection := unit.Mesh.Position().X, unit.Mesh.Position().Y, unit.Mesh.Position().Z
-	vxCorrection, vyCorrection, vzCorrection := unit.Velocity.X, unit.Velocity.Y, unit.Velocity.Z
+func (unit *Unit) CheckAndResolveWallCollision(wallBounds BoundingBox, wallElasticity float64) bool {
+	xCorrection, yCorrection, zCorrection := unit.Position.X(), unit.Position.Y(), unit.Position.Z()
+	vxCorrection, vyCorrection, vzCorrection := unit.Velocity.X(), unit.Velocity.Y(), unit.Velocity.Z()
 	collided := false
 
 	// Correzione asse X
-	if unit.Mesh.Position().X-unit.Radius < wallBounds.Min.X {
-		overlapX := wallBounds.Min.X - (unit.Mesh.Position().X - unit.Radius)
-		xCorrection = unit.Mesh.Position().X + overlapX
+	if unit.Position.X()-unit.Radius < wallBounds.Min.X() {
+		overlapX := wallBounds.Min.X() - (unit.Position.X() - unit.Radius)
+		xCorrection = unit.Position.X() + overlapX
 		// Applica la restituzione
-		vxCorrection = -unit.Velocity.X * wallElasticity
+		vxCorrection = -unit.Velocity.X() * wallElasticity
 		//nVel.FlipX()
 		collided = true
 	}
-	if unit.Mesh.Position().X+unit.Radius > wallBounds.Max.X {
-		overlapX := (unit.Mesh.Position().X + unit.Radius) - wallBounds.Max.X
-		xCorrection = unit.Mesh.Position().X - overlapX
+	if unit.Position.X()+unit.Radius > wallBounds.Max.X() {
+		overlapX := (unit.Position.X() + unit.Radius) - wallBounds.Max.X()
+		xCorrection = unit.Position.X() - overlapX
 		// Applica la restituzione
-		vxCorrection = -unit.Velocity.X * wallElasticity
+		vxCorrection = -unit.Velocity.X() * wallElasticity
 		//nVel.FlipX()
 		collided = true
 	}
 
 	// Correzione asse Y
-	if unit.Mesh.Position().Y-unit.Radius < wallBounds.Min.Y {
-		overlapY := wallBounds.Min.Y - (unit.Mesh.Position().Y - unit.Radius)
-		yCorrection = unit.Mesh.Position().Y + overlapY
+	if unit.Position.Y()-unit.Radius < wallBounds.Min.Y() {
+		overlapY := wallBounds.Min.Y() - (unit.Position.Y() - unit.Radius)
+		yCorrection = unit.Position.Y() + overlapY
 		// Applica la restituzione
-		vyCorrection = -unit.Velocity.Y * wallElasticity
+		vyCorrection = -unit.Velocity.Y() * wallElasticity
 		//nVel.FlipY()
 		collided = true
 	}
-	if unit.Mesh.Position().Y+unit.Radius > wallBounds.Max.Y {
-		overlapY := (unit.Mesh.Position().Y + unit.Radius) - wallBounds.Max.Y
-		yCorrection = unit.Mesh.Position().Y - overlapY
+	if unit.Position.Y()+unit.Radius > wallBounds.Max.Y() {
+		overlapY := (unit.Position.Y() + unit.Radius) - wallBounds.Max.Y()
+		yCorrection = unit.Position.Y() - overlapY
 		// Applica la restituzione
-		vyCorrection = -unit.Velocity.Y * wallElasticity
+		vyCorrection = -unit.Velocity.Y() * wallElasticity
 		//nVel.FlipY()
 		collided = true
 	}
 
 	// Correzione asse Z
-	if unit.Mesh.Position().Z-unit.Radius < wallBounds.Min.Z {
-		overlapZ := wallBounds.Min.Z - (unit.Mesh.Position().Z - unit.Radius)
-		zCorrection = unit.Mesh.Position().Z + overlapZ
+	if unit.Position.Z()-unit.Radius < wallBounds.Min.Z() {
+		overlapZ := wallBounds.Min.Z() - (unit.Position.Z() - unit.Radius)
+		zCorrection = unit.Position.Z() + overlapZ
 		// Applica la restituzione
-		vzCorrection = -unit.Velocity.Z * wallElasticity
+		vzCorrection = -unit.Velocity.Z() * wallElasticity
 		//nVel.FlipZ()
 		collided = true
 	}
-	if unit.Mesh.Position().Z+unit.Radius > wallBounds.Max.Z {
-		overlapZ := (unit.Mesh.Position().Z + unit.Radius) - wallBounds.Max.Z
-		zCorrection = unit.Mesh.Position().Z - overlapZ
+	if unit.Position.Z()+unit.Radius > wallBounds.Max.Z() {
+		overlapZ := (unit.Position.Z() + unit.Radius) - wallBounds.Max.Z()
+		zCorrection = unit.Position.Z() - overlapZ
 		// Applica la restituzione
-		vzCorrection = -unit.Velocity.Z * wallElasticity
+		vzCorrection = -unit.Velocity.Z() * wallElasticity
 		//nVel.FlipZ()
 		collided = true
 	}
@@ -133,8 +153,8 @@ func (unit *Unit) CheckAndResolveWallCollision(wallBounds *math32.Box3, wallElas
 	if collided {
 		//log.Print("\nvel:", unit.Velocity.X(), unit.Velocity.Y(), unit.Velocity.Z())
 		//log.Print("\nnVel: ", nVel.X(), nVel.Y(), nVel.Z())
-		unit.Mesh.SetPosition(xCorrection, yCorrection, zCorrection)
-		unit.Velocity = math32.NewVector3(vxCorrection, vyCorrection, vzCorrection)
+		unit.Position = vector3.New(xCorrection, yCorrection, zCorrection)
+		unit.Velocity = vector3.New(vxCorrection, vyCorrection, vzCorrection)
 
 		unit.Heat += 2
 	}

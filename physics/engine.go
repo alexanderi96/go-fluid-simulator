@@ -5,6 +5,8 @@ import (
 	"math"
 	"math/rand"
 
+	"github.com/EliCDavis/vector/vector2"
+	"github.com/EliCDavis/vector/vector3"
 	"github.com/alexanderi96/go-fluid-simulator/config"
 	"github.com/alexanderi96/go-fluid-simulator/metrics"
 	"github.com/google/uuid"
@@ -14,15 +16,11 @@ import (
 	"github.com/g3n/engine/core"
 	"github.com/g3n/engine/geometry"
 	"github.com/g3n/engine/graphic"
-	"github.com/g3n/engine/math32"
 )
 
-const (
-	CameraMovementMode ControlMode = iota
-	UnitSpawnMode
-)
-
-type ControlMode int
+type BoundingBox struct {
+	Min, Max vector3.Vector[float64]
+}
 
 type Simulation struct {
 	Fluid   []*Unit
@@ -31,8 +29,8 @@ type Simulation struct {
 	Octree  *Octree
 
 	IsPause              bool
-	InitialMousePosition math32.Vector2
-	FinalMousePosition   math32.Vector2
+	InitialMousePosition vector2.Float64
+	FinalMousePosition   vector2.Float64
 	MouseButtonPressed   bool
 	IsInputBeingHandled  bool
 
@@ -42,19 +40,19 @@ type Simulation struct {
 	Cam   *camera.Camera
 
 	// Velocità di rotazione
-	MovementSpeed float32
+	MovementSpeed float64
 
-	WorldBoundray *math32.Box3
-	WorldCenter   *math32.Vector3
+	WorldBoundray BoundingBox
+	WorldCenter   vector3.Vector[float64]
 
-	SpawnDistance        float32
-	InitialSpawnPosition *math32.Vector3
-	FinalSpawnPosition   *math32.Vector3
+	SpawnDistance        float64
+	InitialSpawnPosition vector3.Vector[float64]
+	FinalSpawnPosition   vector3.Vector[float64]
 }
 
 var (
-	front, top, side math32.Vector3
-	fovy             = float32(60)
+	front, top, side vector3.Vector[float64]
+	fovy             = 60.0
 )
 
 func NewSimulation(config *config.Config) (*Simulation, error) {
@@ -62,15 +60,15 @@ func NewSimulation(config *config.Config) (*Simulation, error) {
 
 	InitOctree(config)
 
-	WorldCenter := math32.NewVector3(0.0, 0.0, 0.0)
+	WorldCenter := vector3.New(0.0, 0.0, 0.0)
 	sim := &Simulation{
 		Fluid:   make([]*Unit, 0, config.UnitNumber),
 		Metrics: &metrics.Metrics{},
 		Config:  config,
 		IsPause: false,
-		WorldBoundray: &math32.Box3{
-			Min: *math32.NewVector3(-config.GameX/2, -config.GameY/2, -config.GameZ/2),
-			Max: *math32.NewVector3(config.GameX/2, config.GameY/2, config.GameZ/2),
+		WorldBoundray: BoundingBox{
+			Min: vector3.New(-config.GameX/2, -config.GameY/2, -config.GameZ/2),
+			Max: vector3.New(config.GameX/2, config.GameY/2, config.GameZ/2),
 		},
 		WorldCenter: WorldCenter,
 
@@ -84,19 +82,19 @@ func NewSimulation(config *config.Config) (*Simulation, error) {
 
 	sim.Octree = NewOctree(0, sim.WorldBoundray, sim.Scene)
 
-	fovyRadians := fovy * (math32.Pi / 180)
-	d := float32((math32.Sqrt(3) * math32.Max(config.GameX, math32.Max(config.GameY, config.GameZ))) / (2 * math32.Tan(fovyRadians/2)))
+	fovyRadians := fovy * (math.Pi / 180)
+	d := (math.Sqrt(3) * math.Max(config.GameX, math.Max(config.GameY, config.GameZ))) / (2 * math.Tan(fovyRadians/2))
 
-	front = *math32.NewVector3(0, 0, d)
-	top = *math32.NewVector3(0, config.GameY, 0)
-	side = *math32.NewVector3(d, 0, 0)
+	front = vector3.New(0, 0, d)
+	top = vector3.New(0, config.GameY, 0)
+	side = vector3.New(d, 0, 0)
 
 	sim.ResetCameraPosition(front, fovy)
 
 	return sim, nil
 }
 
-func (s *Simulation) ResetCameraPosition(position math32.Vector3, fovy float32) {
+func (s *Simulation) ResetCameraPosition(position vector3.Vector[float64], fovy float64) {
 	// rlWc := utils.ToRlVector3(s.WorldCenter)
 	// s.Camera = rl.Camera{
 	// 	Position:   utils.ToRlVector3(position),
@@ -204,19 +202,19 @@ func (s *Simulation) UpdateCameraPosition() error {
 //	}
 func (s *Simulation) IsSpawnInRange() bool {
 
-	return s.FinalSpawnPosition.X >= s.WorldBoundray.Min.X && s.FinalSpawnPosition.X <= s.WorldBoundray.Max.X &&
-		s.FinalSpawnPosition.Y >= s.WorldBoundray.Min.Y && s.FinalSpawnPosition.Y <= s.WorldBoundray.Max.Y &&
-		s.FinalSpawnPosition.Z >= s.WorldBoundray.Min.Z && s.FinalSpawnPosition.Z <= s.WorldBoundray.Max.Z
+	return s.FinalSpawnPosition.X() >= s.WorldBoundray.Min.X() && s.FinalSpawnPosition.X() <= s.WorldBoundray.Max.X() &&
+		s.FinalSpawnPosition.Y() >= s.WorldBoundray.Min.Y() && s.FinalSpawnPosition.Y() <= s.WorldBoundray.Max.Y() &&
+		s.FinalSpawnPosition.Z() >= s.WorldBoundray.Min.Z() && s.FinalSpawnPosition.Z() <= s.WorldBoundray.Max.Z()
 }
 
-func (s *Simulation) newUnitWithPropertiesAtPosition(position, acceleration, velocity *math32.Vector3, radius, massMultiplier, elasticity float32, color color.RGBA) *Unit {
+func (s *Simulation) newUnitWithPropertiesAtPosition(position, acceleration, velocity vector3.Vector[float64], radius, massMultiplier, elasticity float64, color color.RGBA) *Unit {
 	unitGeom := geometry.NewSphere(float64(radius), seg, seg)
 
 	unit := &Unit{
-		Id:   uuid.New(),
-		Mesh: graphic.NewMesh(unitGeom, mat),
-		//Position: position,
-		//PreviousPosition: position,
+		Id:       uuid.New(),
+		Mesh:     graphic.NewMesh(unitGeom, mat),
+		Position: position,
+
 		Velocity:       velocity,
 		Acceleration:   acceleration,
 		Radius:         radius,
@@ -225,8 +223,6 @@ func (s *Simulation) newUnitWithPropertiesAtPosition(position, acceleration, vel
 		Color:          color,
 		Heat:           0.0,
 	}
-
-	unit.Mesh.SetPositionVec(position)
 
 	s.Scene.Add(unit.Mesh)
 
@@ -248,13 +244,13 @@ func (s *Simulation) GetUnits() []*Unit {
 
 	for i := 0; i < int(s.Config.UnitNumber); i++ {
 		if s.Config.SetRandomRadius {
-			currentRadius = (s.Config.RadiusMin + rand.Float32()*(s.Config.RadiusMax-s.Config.RadiusMin)) * s.Config.UnitRadiusMultiplier
+			currentRadius = (s.Config.RadiusMin + rand.Float64()*(s.Config.RadiusMax-s.Config.RadiusMin)) * s.Config.UnitRadiusMultiplier
 		}
 		if s.Config.SetRandomMassMultiplier {
-			currentMassMultiplier = s.Config.MassMultiplierMin + rand.Float32()*(s.Config.MassMultiplierMax-s.Config.MassMultiplierMin)
+			currentMassMultiplier = s.Config.MassMultiplierMin + rand.Float64()*(s.Config.MassMultiplierMax-s.Config.MassMultiplierMin)
 		}
 		if s.Config.SetRandomElasticity {
-			currentElasticity = s.Config.ElasticityMin + rand.Float32()*(s.Config.ElasticityMax-s.Config.ElasticityMin)
+			currentElasticity = s.Config.ElasticityMin + rand.Float64()*(s.Config.ElasticityMax-s.Config.ElasticityMin)
 		}
 
 		color := color.RGBA{uint8(255), uint8(255), uint8(255), 255}
@@ -262,14 +258,14 @@ func (s *Simulation) GetUnits() []*Unit {
 		// if s.Config.SetRandomColor {
 		// 	color = utils.RandomRaylibColor()
 		// }
-		static := *math32.NewVector3(0.0, 0.0, 0.0)
-		unts = append(unts, s.newUnitWithPropertiesAtPosition(s.FinalSpawnPosition, &static, &static, currentRadius, currentMassMultiplier, currentElasticity, color))
+		static := vector3.Zero[float64]()
+		unts = append(unts, s.newUnitWithPropertiesAtPosition(s.FinalSpawnPosition, static, static, currentRadius, currentMassMultiplier, currentElasticity, color))
 	}
 	return unts
 }
 
 func (s *Simulation) PositionNewUnitsFibonacci(units []*Unit) {
-	positionUnitsInFibonacciSpiral(units, s.WorldCenter)
+	positionUnitsInFibonacciSpiral(units, &s.WorldCenter)
 	s.Fluid = append(s.Fluid, units...)
 }
 
@@ -278,7 +274,7 @@ func (s *Simulation) ResetSimulation() {
 	s.Fluid = []*Unit{}
 }
 
-func positionUnitsCuboidally(units []*Unit, FinalspawnPosition *math32.Vector3, spacing float32) error {
+func positionUnitsCuboidally(units []*Unit, FinalspawnPosition vector3.Vector[float64], spacing float64) error {
 	if len(units) == 0 {
 		return nil
 	}
@@ -288,14 +284,14 @@ func positionUnitsCuboidally(units []*Unit, FinalspawnPosition *math32.Vector3, 
 	unitRadius := units[0].Radius
 
 	// Calcoliamo lo spazio totale richiesto per le unità
-	totalWidth := float32(sideLength)*(2*unitRadius+spacing) - spacing
-	totalHeight := float32(sideLength)*(2*unitRadius+spacing) - spacing
-	totalDepth := float32(sideLength)*(2*unitRadius+spacing) - spacing
+	totalWidth := float64(sideLength)*(2*unitRadius+spacing) - spacing
+	totalHeight := float64(sideLength)*(2*unitRadius+spacing) - spacing
+	totalDepth := float64(sideLength)*(2*unitRadius+spacing) - spacing
 
 	// Calcoliamo la posizione iniziale del cubo
-	startX := FinalspawnPosition.X - totalWidth/2
-	startY := FinalspawnPosition.Y - totalHeight/2
-	startZ := FinalspawnPosition.Z - totalDepth/2
+	startX := FinalspawnPosition.X() - totalWidth/2
+	startY := FinalspawnPosition.Y() - totalHeight/2
+	startZ := FinalspawnPosition.Z() - totalDepth/2
 
 	// Posizioniamo le unità nel cubo
 	index := 0
@@ -303,13 +299,13 @@ func positionUnitsCuboidally(units []*Unit, FinalspawnPosition *math32.Vector3, 
 		for y := 0; y < sideLength; y++ {
 			for z := 0; z < sideLength; z++ {
 				// Calcoliamo la posizione per questa unità
-				unitX := startX + float32(x)*(2*unitRadius+spacing)
-				unitY := startY + float32(y)*(2*unitRadius+spacing)
-				unitZ := startZ + float32(z)*(2*unitRadius+spacing)
+				unitX := startX + float64(x)*(2*unitRadius+spacing)
+				unitY := startY + float64(y)*(2*unitRadius+spacing)
+				unitZ := startZ + float64(z)*(2*unitRadius+spacing)
 
 				// Assegniamo la posizione alla unità corrente
 				if index < len(units) {
-					units[index].Mesh.SetPosition(unitX, unitY, unitZ)
+					units[index].Position = vector3.New(unitX, unitY, unitZ)
 					index++
 				} else {
 					break
@@ -321,7 +317,7 @@ func positionUnitsCuboidally(units []*Unit, FinalspawnPosition *math32.Vector3, 
 	return nil
 }
 
-func positionUnitsInFibonacciSpiral(units []*Unit, center *math32.Vector3) {
+func positionUnitsInFibonacciSpiral(units []*Unit, center *vector3.Vector[float64]) {
 	phi := math.Phi // Phi è il rapporto aureo (1.618...)
 	angle := 0.0
 	radiusStep := 0.3 // Passo di incremento del raggio
@@ -329,13 +325,13 @@ func positionUnitsInFibonacciSpiral(units []*Unit, center *math32.Vector3) {
 	for i := 0; i < len(units); i++ {
 		// Calcola la posizione della prossima unità sulla spirale di Fibonacci
 		radius := math.Sqrt(float64(i)) * radiusStep
-		x := center.X + float32(radius*math.Cos(float64(angle)))
-		y := center.Y + float32(radius*math.Sin(float64(angle)))
-		zMin, zMax := float32(-0.1), float32(0.1)
-		z := center.Z + zMin + rand.Float32()*(zMax-zMin)
+		x := center.X() + radius*math.Cos(angle)
+		y := center.Y() + radius*math.Sin(angle)
+		zMin, zMax := -0.1, 0.1
+		z := center.Z() + zMin + rand.Float64()*(zMax-zMin)
 
 		// Assegna la posizione alla unità
-		units[i].Mesh.SetPosition(x, y, z)
+		units[i].Position = vector3.New(x, y, z)
 
 		// Aumenta il passo di incremento del raggio
 		radiusStep += 0.0005 // Modifica la velocità di aumento a tuo piacimento
@@ -347,16 +343,16 @@ func positionUnitsInFibonacciSpiral(units []*Unit, center *math32.Vector3) {
 
 func (s *Simulation) GiveVelocity(units []*Unit) {
 	for _, u := range units {
-		u.Velocity = CalcolaVettoreVelocita(s.InitialSpawnPosition, s.FinalSpawnPosition, s.Config.Frametime)
+		u.Velocity = *CalcolaVettoreVelocita(&s.InitialSpawnPosition, &s.FinalSpawnPosition, s.Config.Frametime)
 	}
 }
 
-func CalcolaVettoreVelocita(p1, p2 *math32.Vector3, dt float32) *math32.Vector3 {
+func CalcolaVettoreVelocita(p1, p2 *vector3.Vector[float64], dt float64) *vector3.Vector[float64] {
 	// Calcola la differenza tra la posizione finale e quella iniziale
-	differenzaPosizione := p2.Sub(p1)
+	differenzaPosizione := p2.Sub(*p1)
 
 	// Dividi la differenza di posizione per l'intervallo di tempo per ottenere il vettore velocità
-	vettoreVelocita := differenzaPosizione.AddScalar(0.01 / dt)
+	vettoreVelocita := differenzaPosizione.Scale(0.01 / dt)
 
-	return vettoreVelocita
+	return &vettoreVelocita
 }

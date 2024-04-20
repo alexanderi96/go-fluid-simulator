@@ -11,43 +11,43 @@ type Config struct {
 	SidebarWidth            int32
 	ViewportX               int32
 	ViewportY               int32
-	GameX                   float32
-	GameY                   float32
-	GameZ                   float32
+	GameX                   float64
+	GameY                   float64
+	GameZ                   float64
 	TargetFPS               int32
 	IsResizable             bool
 	UnitNumber              int32
-	UnitRadius              float32
-	UnitMassMultiplier      float32
-	UnitInitialSpacing      float32
+	UnitRadius              float64
+	UnitMassMultiplier      float64
+	UnitInitialSpacing      float64
 	ShowVectors             bool
-	ScaleFactor             float32
-	UnitElasticity          float32
-	WallElasticity          float32
+	ScaleFactor             float64
+	UnitElasticity          float64
+	WallElasticity          float64
 	ApplyGravity            bool
-	Gravity                 float32
+	Gravity                 float64
 	ShowOctree              bool
 	ShowTrail               bool
 	ShouldBeProfiled        bool
 	SetRandomRadius         bool
-	RadiusMin               float32
-	RadiusMax               float32
+	RadiusMin               float64
+	RadiusMax               float64
 	SetRandomMassMultiplier bool
-	MassMultiplierMin       float32
-	MassMultiplierMax       float32
+	MassMultiplierMin       float64
+	MassMultiplierMax       float64
 	SetRandomElasticity     bool
-	ElasticityMin           float32
-	ElasticityMax           float32
+	ElasticityMin           float64
+	ElasticityMax           float64
 	ShowOverlay             bool
 	SetRandomColor          bool
 	ShowSpeedColor          bool
 	UnitsEmitGravity        bool
-	UnitRadiusMultiplier    float32
+	UnitRadiusMultiplier    float64
 	ShowClusterColor        bool
 	OctreeMaxLevel          int8
 	MaxUnitNumberPerLevel   int8
 	ResolutionSteps         int8
-	Frametime               float32
+	Frametime               float64
 	// TestDuration          float32
 	// TestIterations        int32
 }
@@ -64,43 +64,43 @@ func ReadConfig(filepath string) (*Config, error) {
 		FullScreen:              viper.GetBool("full_screen"),
 		WindowWidth:             viper.GetInt32("window_width"),
 		WindowHeight:            viper.GetInt32("window_height"),
-		GameX:                   float32(viper.GetInt32("game_x")),
-		GameY:                   float32(viper.GetInt32("game_y")),
-		GameZ:                   float32(viper.GetInt32("game_z")),
+		GameX:                   float64(viper.GetInt32("game_x")),
+		GameY:                   float64(viper.GetInt32("game_y")),
+		GameZ:                   float64(viper.GetInt32("game_z")),
 		TargetFPS:               viper.GetInt32("target_fps"),
 		IsResizable:             viper.GetBool("is_resizable"),
 		UnitNumber:              viper.GetInt32("unit_number"),
-		UnitRadius:              float32(viper.GetFloat64("unit_radius")),
-		UnitMassMultiplier:      float32(viper.GetFloat64("unit_mass_multiplier")),
-		UnitInitialSpacing:      float32(viper.GetFloat64("unit_initial_spacing")),
+		UnitRadius:              viper.GetFloat64("unit_radius"),
+		UnitMassMultiplier:      viper.GetFloat64("unit_mass_multiplier"),
+		UnitInitialSpacing:      viper.GetFloat64("unit_initial_spacing"),
 		ShowVectors:             viper.GetBool("show_vectors"),
-		ScaleFactor:             float32(viper.GetFloat64("scale_factor")),
-		UnitElasticity:          float32(viper.GetFloat64("unit_elasticity")),
-		WallElasticity:          float32(viper.GetFloat64("wall_elasticity")),
+		ScaleFactor:             viper.GetFloat64("scale_factor"),
+		UnitElasticity:          viper.GetFloat64("unit_elasticity"),
+		WallElasticity:          viper.GetFloat64("wall_elasticity"),
 		ApplyGravity:            viper.GetBool("apply_gravity"),
-		Gravity:                 float32(viper.GetFloat64("gravity")),
+		Gravity:                 viper.GetFloat64("gravity"),
 		ShowOctree:              viper.GetBool("show_octree"),
 		ShowTrail:               viper.GetBool("show_trail"),
 		ShouldBeProfiled:        viper.GetBool("should_be_profiled"),
 		SetRandomRadius:         viper.GetBool("set_random_radius"),
-		RadiusMin:               float32(viper.GetFloat64("radius_min")),
-		RadiusMax:               float32(viper.GetFloat64("radius_max")),
+		RadiusMin:               viper.GetFloat64("radius_min"),
+		RadiusMax:               viper.GetFloat64("radius_max"),
 		SetRandomMassMultiplier: viper.GetBool("set_random_mass_multiplier"),
-		MassMultiplierMin:       float32(viper.GetFloat64("mass_multiplier_min")),
-		MassMultiplierMax:       float32(viper.GetFloat64("mass_multiplier_max")),
+		MassMultiplierMin:       viper.GetFloat64("mass_multiplier_min"),
+		MassMultiplierMax:       viper.GetFloat64("mass_multiplier_max"),
 		SetRandomElasticity:     viper.GetBool("set_random_elasticity"),
-		ElasticityMin:           float32(viper.GetFloat64("elasticity_min")),
-		ElasticityMax:           float32(viper.GetFloat64("elasticity_max")),
+		ElasticityMin:           viper.GetFloat64("elasticity_min"),
+		ElasticityMax:           viper.GetFloat64("elasticity_max"),
 		ShowOverlay:             viper.GetBool("show_overlay"),
 		SetRandomColor:          viper.GetBool("set_random_color"),
 		ShowSpeedColor:          viper.GetBool("show_speed_color"),
 		UnitsEmitGravity:        viper.GetBool("units_emit_gravity"),
-		UnitRadiusMultiplier:    float32(viper.GetFloat64("unit_radius_multiplier")),
+		UnitRadiusMultiplier:    viper.GetFloat64("unit_radius_multiplier"),
 		OctreeMaxLevel:          int8(viper.GetInt("octree_max_level")),
 		MaxUnitNumberPerLevel:   int8(viper.GetInt("max_unit_number_per_level")),
 		ResolutionSteps:         int8(viper.GetInt("resolution_steps")),
-		Frametime:               float32(viper.GetFloat64("frametime")),
-		// TestDuration:          float32(viper.GetFloat64("test_duration")),
+		Frametime:               viper.GetFloat64("frametime"),
+		// TestDuration:          viper.GetFloat64("test_duration"),
 		// TestIterations:        viper.GetInt32("test_iterations"),
 	}
 
