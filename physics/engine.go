@@ -234,7 +234,7 @@ func (s *Simulation) newUnitWithPropertiesAtPosition(position, acceleration, vel
 }
 
 func (s *Simulation) PositionNewUnitsCube(units []*Unit) {
-	positionUnitsCuboidally(units, s.InitialSpawnPosition, s.Config.UnitInitialSpacing)
+	positionUnitsCuboidally(units, s.InitialSpawnPosition, s.Config.UnitInitialSpacing*s.Config.UnitRadiusMultiplier)
 }
 
 func (s *Simulation) GetUnits() []*Unit {

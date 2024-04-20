@@ -75,7 +75,7 @@ func main() {
 
 	// Create and add lights to the scene
 	s.Scene.Add(light.NewAmbient(&math32.Color{R: 1.0, G: 1.0, B: 1.0}, 0.3))
-	pointLight := light.NewPoint(&math32.Color{R: 1, G: 1, B: 1}, 1000.0)
+	pointLight := light.NewPoint(&math32.Color{R: 1, G: 1, B: 1}, 50.0)
 	pointLight.SetPosition(0, 0, 0)
 	s.Scene.Add(pointLight)
 
