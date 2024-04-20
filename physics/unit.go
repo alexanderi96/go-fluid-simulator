@@ -6,17 +6,11 @@ import (
 
 	"github.com/EliCDavis/vector/vector3"
 	"github.com/g3n/engine/graphic"
-	"github.com/g3n/engine/material"
-	"github.com/g3n/engine/math32"
 	"github.com/google/uuid"
 )
 
 const (
 	seg = 10
-)
-
-var (
-	mat = material.NewStandard(math32.NewColor("Green"))
 )
 
 type Unit struct {
@@ -50,25 +44,6 @@ func (u *Unit) accelerate(f vector3.Vector[float64]) {
 	u.Acceleration = u.Acceleration.Add(f.Scale(1 / u.Mass))
 }
 
-func newUnitWithPropertiesAtPosition(position, acceleration, velocity vector3.Vector[float64], radius, massMultiplier, elasticity float64, color color.RGBA) *Unit {
-	unit := &Unit{
-		Id:       uuid.New(),
-		Position: position,
-		//PreviousPosition: position,
-		Velocity:       velocity,
-		Acceleration:   acceleration,
-		Radius:         radius,
-		MassMultiplier: massMultiplier,
-		Elasticity:     elasticity,
-		Color:          color,
-		Heat:           0.0,
-	}
-
-	unit.Mass = unit.GetMass()
-
-	return unit
-}
-
 func (u *Unit) UpdatePosition(dt float64) {
 	// x := 2*u.Position.X() - u.PreviousPosition.X() + u.Acceleration.X()*dt*dt
 	// y := 2*u.Position.Y() - u.PreviousPosition.Y() + u.Acceleration.Y()*dt*dt
@@ -83,7 +58,10 @@ func (u *Unit) UpdatePosition(dt float64) {
 	u.Position = nPos
 	u.Velocity = nVelocity
 	u.Acceleration = vector3.Zero[float64]()
-	u.Mesh.SetPosition(float32(nPos.X()), float32(nPos.Y()), float32(nPos.Z()))
+	u.Mesh.SetPosition(nPos.ToFloat32().X(), nPos.ToFloat32().Y(), nPos.ToFloat32().Z())
+
+	// color := utils.KelvinToRGBA(u.Heat)
+	// u.Mesh.SetMaterial(material.NewStandard(&math32.Color{float32(color.R), float32(color.G), float32(color.B)}))
 	if u.Heat > 0.0 {
 		u.Heat -= 1
 	} else {

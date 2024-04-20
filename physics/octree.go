@@ -38,18 +38,18 @@ func getOctreeWireframe(min, max vector3.Vector[float64]) *graphic.Lines {
 	// Crea il wireframe per il nodo corrente
 	vertices := math32.NewArrayF32(0, 16)
 	vertices.Append(
-		float32(min.X()), float32(min.Y()), float32(min.Z()), float32(max.X()), float32(min.Y()), float32(min.Z()),
-		float32(max.X()), float32(min.Y()), float32(min.Z()), float32(max.X()), float32(max.Y()), float32(min.Z()),
-		float32(max.X()), float32(max.Y()), float32(min.Z()), float32(min.X()), float32(max.Y()), float32(min.Z()),
-		float32(min.X()), float32(max.Y()), float32(min.Z()), float32(min.X()), float32(min.Y()), float32(min.Z()),
-		float32(min.X()), float32(min.Y()), float32(max.Z()), float32(max.X()), float32(min.Y()), float32(max.Z()),
-		float32(max.X()), float32(min.Y()), float32(max.Z()), float32(max.X()), float32(max.Y()), float32(max.Z()),
-		float32(max.X()), float32(max.Y()), float32(max.Z()), float32(min.X()), float32(max.Y()), float32(max.Z()),
-		float32(min.X()), float32(max.Y()), float32(max.Z()), float32(min.X()), float32(min.Y()), float32(max.Z()),
-		float32(min.X()), float32(min.Y()), float32(min.Z()), float32(min.X()), float32(min.Y()), float32(max.Z()),
-		float32(max.X()), float32(min.Y()), float32(min.Z()), float32(max.X()), float32(min.Y()), float32(max.Z()),
-		float32(max.X()), float32(max.Y()), float32(min.Z()), float32(max.X()), float32(max.Y()), float32(max.Z()),
-		float32(min.X()), float32(max.Y()), float32(min.Z()), float32(min.X()), float32(max.Y()), float32(max.Z()),
+		min.ToFloat32().X(), min.ToFloat32().Y(), min.ToFloat32().Z(), max.ToFloat32().X(), min.ToFloat32().Y(), min.ToFloat32().Z(),
+		max.ToFloat32().X(), min.ToFloat32().Y(), min.ToFloat32().Z(), max.ToFloat32().X(), max.ToFloat32().Y(), min.ToFloat32().Z(),
+		max.ToFloat32().X(), max.ToFloat32().Y(), min.ToFloat32().Z(), min.ToFloat32().X(), max.ToFloat32().Y(), min.ToFloat32().Z(),
+		min.ToFloat32().X(), max.ToFloat32().Y(), min.ToFloat32().Z(), min.ToFloat32().X(), min.ToFloat32().Y(), min.ToFloat32().Z(),
+		min.ToFloat32().X(), min.ToFloat32().Y(), max.ToFloat32().Z(), max.ToFloat32().X(), min.ToFloat32().Y(), max.ToFloat32().Z(),
+		max.ToFloat32().X(), min.ToFloat32().Y(), max.ToFloat32().Z(), max.ToFloat32().X(), max.ToFloat32().Y(), max.ToFloat32().Z(),
+		max.ToFloat32().X(), max.ToFloat32().Y(), max.ToFloat32().Z(), min.ToFloat32().X(), max.ToFloat32().Y(), max.ToFloat32().Z(),
+		min.ToFloat32().X(), max.ToFloat32().Y(), max.ToFloat32().Z(), min.ToFloat32().X(), min.ToFloat32().Y(), max.ToFloat32().Z(),
+		min.ToFloat32().X(), min.ToFloat32().Y(), min.ToFloat32().Z(), min.ToFloat32().X(), min.ToFloat32().Y(), max.ToFloat32().Z(),
+		max.ToFloat32().X(), min.ToFloat32().Y(), min.ToFloat32().Z(), max.ToFloat32().X(), min.ToFloat32().Y(), max.ToFloat32().Z(),
+		max.ToFloat32().X(), max.ToFloat32().Y(), min.ToFloat32().Z(), max.ToFloat32().X(), max.ToFloat32().Y(), max.ToFloat32().Z(),
+		min.ToFloat32().X(), max.ToFloat32().Y(), min.ToFloat32().Z(), min.ToFloat32().X(), max.ToFloat32().Y(), max.ToFloat32().Z(),
 	)
 	vbo := gls.NewVBO(vertices).AddAttrib(gls.VertexPosition)
 
@@ -63,10 +63,13 @@ func getOctreeWireframe(min, max vector3.Vector[float64]) *graphic.Lines {
 
 // Octree crea un nuovo Octree.
 func NewOctree(level int8, bounds BoundingBox, scene *core.Node) *Octree {
+	wireframe := &graphic.Lines{}
+	if false {
+		wireframe = getOctreeWireframe(bounds.Min, bounds.Max)
+		wireframe.SetVisible(false)
+		scene.Add(wireframe)
+	}
 
-	wireframe := getOctreeWireframe(bounds.Min, bounds.Max)
-	wireframe.SetVisible(false)
-	scene.Add(wireframe)
 	return &Octree{
 		level:   level,
 		Bounds:  bounds,
@@ -84,6 +87,7 @@ func (ot *Octree) Clear(scene *core.Node) {
 	ot.TotalMass = 0
 	ot.CenterOfMass = vector3.Zero[float64]()
 	scene.Remove(ot.wf)
+
 	ot.wf = nil
 
 	for i := 0; i < len(ot.Children); i++ {
@@ -166,6 +170,7 @@ func (ot *Octree) Insert(obj *Unit, scene *core.Node) {
 		// Prova ad inserire l'oggetto nei figli.
 		ot.insertUnitIntoChildren(obj, scene)
 	}
+
 }
 
 // insertUnitIntoChildren inserisce un'unità nei figli dell'octree.

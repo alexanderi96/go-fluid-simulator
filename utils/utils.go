@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"github.com/EliCDavis/vector/vector3"
+	"github.com/g3n/engine/math32"
 	// rl "github.com/gen2brain/raylib-go/raylib"
 )
 
@@ -137,5 +138,13 @@ func KelvinToRGBA(kelvin float64) color.RGBA {
 		G: blend(lowerColor.G, upperColor.G),
 		B: blend(lowerColor.B, upperColor.B),
 		A: 255, // Alpha è sempre 255 (opaco).
+	}
+}
+
+func RgbaToMath32(rgba color.RGBA) *math32.Color {
+	return &math32.Color{
+		R: float32(rgba.R) / 255.0,
+		G: float32(rgba.G) / 255.0,
+		B: float32(rgba.B) / 255.0,
 	}
 }
