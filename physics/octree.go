@@ -175,7 +175,7 @@ func (ot *Octree) Insert(obj *Unit, scene *core.Node) {
 
 // insertUnitIntoChildren inserisce un'unità nei figli dell'octree.
 func (ot *Octree) insertUnitIntoChildren(obj *Unit, scene *core.Node) {
-	indices := ot.getIndices(*obj)
+	indices := ot.getIndices(*obj, obj.Radius)
 	inserted := false
 	for _, index := range indices {
 		if index != -1 {
@@ -195,19 +195,19 @@ func (ot *Octree) insertUnitIntoChildren(obj *Unit, scene *core.Node) {
 }
 
 // getIndex determina in quale sotto-Octree un oggetto appartiene.
-func (ot *Octree) getIndices(obj Unit) []int {
+func (ot *Octree) getIndices(obj Unit, treshold float64) []int {
 	// Calcola il punto medio dell'Octree per le tre dimensioni.
 	midX := (ot.Bounds.Min.X() + ot.Bounds.Max.X()) / 2
 	midY := (ot.Bounds.Min.Y() + ot.Bounds.Max.Y()) / 2
 	midZ := (ot.Bounds.Min.Z() + ot.Bounds.Max.Z()) / 2
 
 	// Calcola gli estremi dell'oggetto considerando il suo raggio.
-	minX := obj.Position.X() + obj.Radius
-	maxX := obj.Position.X() - obj.Radius
-	minY := obj.Position.Y() + obj.Radius
-	maxY := obj.Position.Y() - obj.Radius
-	minZ := obj.Position.Z() + obj.Radius
-	maxZ := obj.Position.Z() - obj.Radius
+	minX := obj.Position.X() + treshold
+	maxX := obj.Position.X() - treshold
+	minY := obj.Position.Y() + treshold
+	maxY := obj.Position.Y() - treshold
+	minZ := obj.Position.Z() + treshold
+	maxZ := obj.Position.Z() - treshold
 
 	// Determina la posizione dell'oggetto rispetto al punto medio per ogni dimensione,
 	// tenendo conto dei raggi delle unità.
@@ -270,7 +270,7 @@ func (ot *Octree) getIndices(obj Unit) []int {
 
 // Retrieve restituisce tutti gli oggetti che potrebbero collidere con l'oggetto dato.
 func (ot *Octree) Retrieve(returnObjects *[]*Unit, obj *Unit) {
-	indices := ot.getIndices(*obj)
+	indices := ot.getIndices(*obj, obj.Radius*2)
 	for _, index := range indices {
 		if index != -1 && ot.Children[index] != nil {
 			ot.Children[index].Retrieve(returnObjects, obj)

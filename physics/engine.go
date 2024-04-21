@@ -9,7 +9,6 @@ import (
 	"github.com/EliCDavis/vector/vector3"
 	"github.com/alexanderi96/go-fluid-simulator/config"
 	"github.com/alexanderi96/go-fluid-simulator/metrics"
-	"github.com/alexanderi96/go-fluid-simulator/utils"
 	"github.com/google/uuid"
 
 	"github.com/g3n/engine/app"
@@ -17,7 +16,6 @@ import (
 	"github.com/g3n/engine/core"
 	"github.com/g3n/engine/geometry"
 	"github.com/g3n/engine/graphic"
-	"github.com/g3n/engine/material"
 )
 
 type BoundingBox struct {
@@ -211,7 +209,6 @@ func (s *Simulation) IsSpawnInRange() bool {
 
 func (s *Simulation) newUnitWithPropertiesAtPosition(position, acceleration, velocity vector3.Vector[float64], radius, massMultiplier, elasticity float64, color color.RGBA) *Unit {
 	unitGeom := geometry.NewSphere(float64(radius), seg, seg)
-	mat := material.NewStandard(utils.RgbaToMath32(color))
 	unit := &Unit{
 		Id:       uuid.New(),
 		Mesh:     graphic.NewMesh(unitGeom, mat),

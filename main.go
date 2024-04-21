@@ -74,9 +74,9 @@ func main() {
 	s.App.Gls().ClearColor(0, 0, 0, 1.0)
 
 	// Create and add lights to the scene
-	s.Scene.Add(light.NewAmbient(&math32.Color{R: 1.0, G: 1.0, B: 1.0}, 0.3))
-	pointLight := light.NewPoint(&math32.Color{R: 1, G: 1, B: 1}, 50.0)
-	pointLight.SetPosition(0, 0, 0)
+	s.Scene.Add(light.NewAmbient(&math32.Color{R: 1.0, G: 1.0, B: 1.0}, 0.1))
+	pointLight := light.NewPoint(&math32.Color{R: 1, G: 1, B: 1}, 800.0)
+	pointLight.SetPosition(float32(s.Config.GameX), float32(s.Config.GameY), float32(s.Config.GameZ))
 	s.Scene.Add(pointLight)
 
 	// Handle right mouse button press to create a new ball

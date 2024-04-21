@@ -1,7 +1,6 @@
 package physics
 
 import (
-	"log"
 	"math"
 	"sync"
 
@@ -50,7 +49,7 @@ func (s *Simulation) UpdateWithOctrees() error {
 		wgGravity.Add(1)
 		go func(unit *Unit) {
 			defer wgGravity.Done()
-			force := s.Octree.CalculateGravity(unit, 2)
+			force := s.Octree.CalculateGravity(unit, 0.5)
 			if s.Config.UnitsEmitGravity {
 				unit.accelerate(force)
 			}
@@ -78,10 +77,9 @@ func (s *Simulation) UpdateWithOctrees() error {
 			if unitB != nil && unitA.Id != unitB.Id {
 				collData := s.gatherCollisionData(unitA, unitB)
 
-				// if collData.collided {
-				// 	handleCollision(collData)
-				// 	} else
-				if collData.distance <= collData.dampingDistance {
+				if collData.collided {
+					handleCollision(collData)
+				} else if collData.distance <= collData.dampingDistance {
 					handleDamping(collData)
 				}
 			}
@@ -170,32 +168,22 @@ func (s *Simulation) gatherCollisionData(uA, uB *Unit) (collData *CollData) {
 		surfaceDistance:  0,
 		dampingDistance:  0,
 	}
-	log.Printf("Gathering collision data between %v and %v\n", uA.Id.ID(), uB.Id.ID())
 	collData.distance = uA.Position.Distance(uB.Position)
-	log.Printf("  Distance between the objects: %v\n", collData.distance)
 	collData.surfaceDistance = collData.distance - uA.Radius + uB.Radius
-	log.Printf("  Surface distance: %v\n", collData.surfaceDistance)
 
 	collData.collided = collData.distance <= collData.uA.Radius+collData.uB.Radius
-	log.Printf("  Collided: %v\n", collData.collided)
 
-	if collData.distance > collData.dampingDistance {
-		log.Printf("  Collision not close enough for damping, skipping\n")
+	if collData.distance > collData.surfaceDistance*2 {
 		return
 	}
 
 	collData.vRel = uA.Velocity.Sub(uB.Velocity)
-	log.Printf("  Velocity of %v relative to %v: %v\n", uA.Id.ID(), uB.Id.ID(), collData.vRel)
 	collData.impulseDirection = uA.Position.Sub(uB.Position).Normalized()
-	log.Printf("  Impulse direction: %v\n", collData.impulseDirection)
 	collData.rVelNormal = collData.vRel.Dot(collData.impulseDirection)
-	log.Printf("  Relative velocity in the normal direction: %v\n", collData.rVelNormal)
-	collData.dampingDistance = (collData.uA.Radius + collData.uB.Radius) * 2
-	log.Printf("  Damping distance: %v\n", collData.dampingDistance)
+	collData.dampingDistance = (collData.uA.Radius + collData.uB.Radius) * s.Config.UnitRadiusMultiplier * 2
 
 	if collData.collided {
 		collData.e = math.Min(uA.Elasticity, uB.Elasticity)
-		log.Printf("  Elasticity of collision: %v\n", collData.e)
 	}
 
 	return
@@ -214,10 +202,16 @@ func handleCollision(collData *CollData) {
 	// move the units along the normals
 	totalRadius := collData.uA.Radius + collData.uB.Radius
 	overlap := totalRadius - collData.distance
-	moveDistance := overlap / 2
-	normalMove := collData.impulseDirection.Scale(moveDistance)
-	collData.uA.Position = collData.uA.Position.Add(normalMove)
-	collData.uB.Position = collData.uB.Position.Sub(normalMove)
+	if overlap > 0 {
+		collData.uA.Mesh.SetMaterial(overlapMat)
+		collData.uB.Mesh.SetMaterial(overlapMat)
+
+		moveDistance := overlap / 2
+		normalMove := collData.impulseDirection.Scale(moveDistance)
+		collData.uA.Position = collData.uA.Position.Add(normalMove)
+		collData.uB.Position = collData.uB.Position.Sub(normalMove)
+
+	}
 
 	// Gestisci il calore generato dalla collisione (opzionale)
 	heatTransfer := collData.rVelNormal * collData.distance * 0.5

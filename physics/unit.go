@@ -6,11 +6,18 @@ import (
 
 	"github.com/EliCDavis/vector/vector3"
 	"github.com/g3n/engine/graphic"
+	"github.com/g3n/engine/material"
+	"github.com/g3n/engine/math32"
 	"github.com/google/uuid"
 )
 
 const (
 	seg = 10
+)
+
+var (
+	mat        = material.NewStandard(math32.NewColor("white"))
+	overlapMat = material.NewStandard(math32.NewColor("red"))
 )
 
 type Unit struct {
@@ -60,6 +67,9 @@ func (u *Unit) UpdatePosition(dt float64) {
 	u.Acceleration = vector3.Zero[float64]()
 	u.Mesh.SetPosition(nPos.ToFloat32().X(), nPos.ToFloat32().Y(), nPos.ToFloat32().Z())
 
+	if u.Mesh.GetMaterial(0) != mat {
+		u.Mesh.SetMaterial(mat)
+	}
 	// color := utils.KelvinToRGBA(u.Heat)
 	// u.Mesh.SetMaterial(material.NewStandard(&math32.Color{float32(color.R), float32(color.G), float32(color.B)}))
 	if u.Heat > 0.0 {
