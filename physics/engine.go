@@ -207,7 +207,7 @@ func (s *Simulation) IsSpawnInRange() bool {
 		s.FinalSpawnPosition.Z() >= s.WorldBoundray.Min.Z() && s.FinalSpawnPosition.Z() <= s.WorldBoundray.Max.Z()
 }
 
-func (s *Simulation) newUnitWithPropertiesAtPosition(position, acceleration, velocity vector3.Vector[float64], radius, massMultiplier, elasticity float64, color color.RGBA) *Unit {
+func (s *Simulation) newUnitWithPropertiesAtPosition(position, force, velocity vector3.Vector[float64], radius, massMultiplier, elasticity float64, color color.RGBA) *Unit {
 	unitGeom := geometry.NewSphere(float64(radius), seg, seg)
 	unit := &Unit{
 		Id:       uuid.New(),
@@ -215,7 +215,7 @@ func (s *Simulation) newUnitWithPropertiesAtPosition(position, acceleration, vel
 		Position: position,
 
 		Velocity:       velocity,
-		Acceleration:   acceleration,
+		Force:          force,
 		Radius:         radius,
 		MassMultiplier: massMultiplier,
 		Elasticity:     elasticity,

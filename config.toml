@@ -10,7 +10,7 @@
   show_octree = true
   resolution_steps = 1
   scale_factor = 1 # 1 pixel = 1 cm
-  frametime = 1 # 0.01 s = 100 hz
+  frametime = 0.001 # 0.01 s = 100 hz
 
 # world config
   game_x = 20
@@ -21,7 +21,7 @@
   gravity = -9.81
   
 # unit config
-  unit_number = 100
+  unit_number = 30
   unit_initial_spacing = 5
   units_emit_gravity = true
   unit_gravitational_multiplier = 1
@@ -32,7 +32,7 @@
   radius_min = 1
   radius_max = 10
   
-  unit_mass_multiplier = 10000000
+  unit_mass_multiplier = 10000000000000
   set_random_mass_multiplier = false
   mass_multiplier_min = 1
   mass_multiplier_max = 10

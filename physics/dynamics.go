@@ -2,7 +2,6 @@ package physics
 
 import (
 	"math"
-	"sync"
 
 	"github.com/EliCDavis/vector/vector3"
 )
@@ -10,16 +9,17 @@ import (
 const G = 6.67430e-11 // Costante gravitazionale universale (m^3 kg^-1 s^-2)
 
 // Definisci il coefficiente di damping
-const dampingCoefficient = 1.1 // Sostituisci con il valore desiderato
+const dampingCoefficient = 0.9 // Sostituisci con il valore desiderato
 
 type CollData struct {
 	uA, uB *Unit
 
 	distance        float64
-	surfaceDistance float64
+	totalRadius     float64
 	collided        bool
 	dampingDistance float64
 
+	rAB vector3.Vector[float64]
 	// the normal of the collision
 	impulseDirection vector3.Vector[float64]
 
@@ -44,18 +44,12 @@ func (s *Simulation) UpdateWithOctrees() error {
 	}
 
 	// Calcola la forza di gravità in modo concorrente
-	var wgGravity sync.WaitGroup
 	for _, unit := range s.Fluid {
-		wgGravity.Add(1)
-		go func(unit *Unit) {
-			defer wgGravity.Done()
-			force := s.Octree.CalculateGravity(unit, 0.5)
-			if s.Config.UnitsEmitGravity {
-				unit.accelerate(force)
-			}
-		}(unit)
+		if s.Config.UnitsEmitGravity {
+			unit.accelerate(s.Octree.CalculateGravity(unit, 0.5))
+		}
 	}
-	wgGravity.Wait()
+
 	// Controlla le collisioni tra particelle e aggiorna le velocità utilizzando il Octree
 	for _, unitA := range s.Fluid {
 		if unitA == nil {
@@ -79,8 +73,6 @@ func (s *Simulation) UpdateWithOctrees() error {
 
 				if collData.collided {
 					handleCollision(collData)
-				} else if collData.distance <= collData.dampingDistance {
-					handleDamping(collData)
 				}
 			}
 		}
@@ -135,56 +127,28 @@ func (ot *Octree) calculateGravityRecursive(unit *Unit, theta float64, force *ve
 	}
 }
 
-func handleDamping(collData *CollData) {
-	targetDistance := collData.dampingDistance / 2
-
-	// Calcola la forza di damping basata sulla velocità relativa
-	dampingForceMag := -dampingCoefficient * collData.rVelNormal
-
-	// Calcola l'accelerazione di damping e applicala alle accelerazioni delle unità
-	dampingAcceleration := collData.impulseDirection.Scale(dampingForceMag)
-	collData.uA.Acceleration = collData.uA.Acceleration.Add(dampingAcceleration.Scale(1 / collData.uA.Mass))
-	collData.uB.Acceleration = collData.uB.Acceleration.Sub(dampingAcceleration.Scale(1 / collData.uB.Mass))
-
-	correctionForceMag := (targetDistance - collData.distance) * dampingCoefficient
-
-	// Calcola l'accelerazione di correzione e applicala alle accelerazioni delle unità
-	correctionAcceleration := collData.impulseDirection.Scale(correctionForceMag)
-	collData.uA.Acceleration = collData.uA.Acceleration.Add(correctionAcceleration.Scale(1 / collData.uA.Mass))
-	collData.uB.Acceleration = collData.uB.Acceleration.Sub(correctionAcceleration.Scale(1 / collData.uB.Mass))
-}
-
 func (s *Simulation) gatherCollisionData(uA, uB *Unit) (collData *CollData) {
 	collData = &CollData{
 		uA:               uA,
 		uB:               uB,
-		e:                0,
-		impulseDirection: vector3.Zero[float64](),
-		vRel:             vector3.Zero[float64](),
+		e:                math.Min(uA.Elasticity, uB.Elasticity),
+		impulseDirection: uA.Position.Sub(uB.Position).Normalized(),
+		vRel:             uA.Velocity.Sub(uB.Velocity),
 		rVelNormal:       0,
 		collided:         false,
 		relativeVel:      0,
-		distance:         0,
-		surfaceDistance:  0,
-		dampingDistance:  0,
-	}
-	collData.distance = uA.Position.Distance(uB.Position)
-	collData.surfaceDistance = collData.distance - uA.Radius + uB.Radius
-
-	collData.collided = collData.distance <= collData.uA.Radius+collData.uB.Radius
-
-	if collData.distance > collData.surfaceDistance*2 {
-		return
+		distance:         uA.Position.Distance(uB.Position),
+		totalRadius:      uA.Radius + uB.Radius,
 	}
 
-	collData.vRel = uA.Velocity.Sub(uB.Velocity)
-	collData.impulseDirection = uA.Position.Sub(uB.Position).Normalized()
+	collData.collided = collData.distance < collData.totalRadius
+
+	// todo: continua
+	// if collData.distance > collData.surfaceDistance*2 {
+	// 	return
+	// }
+
 	collData.rVelNormal = collData.vRel.Dot(collData.impulseDirection)
-	collData.dampingDistance = (collData.uA.Radius + collData.uB.Radius) * s.Config.UnitRadiusMultiplier * 2
-
-	if collData.collided {
-		collData.e = math.Min(uA.Elasticity, uB.Elasticity)
-	}
 
 	return
 }
@@ -200,11 +164,10 @@ func handleCollision(collData *CollData) {
 	collData.uB.Velocity = collData.uB.Velocity.Sub(jn.Scale(1 / collData.uB.Mass))
 
 	// move the units along the normals
-	totalRadius := collData.uA.Radius + collData.uB.Radius
-	overlap := totalRadius - collData.distance
+	overlap := collData.totalRadius - collData.distance
 	if overlap > 0 {
-		collData.uA.Mesh.SetMaterial(overlapMat)
-		collData.uB.Mesh.SetMaterial(overlapMat)
+		// collData.uA.Mesh.SetMaterial(overlapMat)
+		// collData.uB.Mesh.SetMaterial(overlapMat)
 
 		moveDistance := overlap / 2
 		normalMove := collData.impulseDirection.Scale(moveDistance)

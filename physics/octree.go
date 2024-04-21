@@ -270,7 +270,7 @@ func (ot *Octree) getIndices(obj Unit, treshold float64) []int {
 
 // Retrieve restituisce tutti gli oggetti che potrebbero collidere con l'oggetto dato.
 func (ot *Octree) Retrieve(returnObjects *[]*Unit, obj *Unit) {
-	indices := ot.getIndices(*obj, obj.Radius*2)
+	indices := ot.getIndices(*obj, obj.Radius*3)
 	for _, index := range indices {
 		if index != -1 && ot.Children[index] != nil {
 			ot.Children[index].Retrieve(returnObjects, obj)

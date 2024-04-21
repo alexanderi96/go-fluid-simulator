@@ -103,10 +103,6 @@ func main() {
 
 	s.App.Run(func(renderer *renderer.Renderer, deltaTime time.Duration) {
 
-		if !s.IsInputBeingHandled {
-			go s.HandleInput()
-		}
-
 		if !s.IsPause {
 			if err := s.Update(); err != nil {
 				log.Fatal("Errore durante l'update della simulazione %w", err)
