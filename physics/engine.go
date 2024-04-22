@@ -16,6 +16,7 @@ import (
 	"github.com/g3n/engine/core"
 	"github.com/g3n/engine/geometry"
 	"github.com/g3n/engine/graphic"
+	"github.com/g3n/engine/window"
 )
 
 type BoundingBox struct {
@@ -79,6 +80,8 @@ func NewSimulation(config *config.Config) (*Simulation, error) {
 		InitialSpawnPosition: WorldCenter,
 		FinalSpawnPosition:   WorldCenter,
 	}
+
+	sim.App.IWindow.(*window.GlfwWindow).SetSize(int(config.WindowWidth), int(config.WindowHeight))
 
 	sim.Octree = NewOctree(0, sim.WorldBoundray, sim.Scene)
 
@@ -207,15 +210,18 @@ func (s *Simulation) IsSpawnInRange() bool {
 		s.FinalSpawnPosition.Z() >= s.WorldBoundray.Min.Z() && s.FinalSpawnPosition.Z() <= s.WorldBoundray.Max.Z()
 }
 
-func (s *Simulation) newUnitWithPropertiesAtPosition(position, force, velocity vector3.Vector[float64], radius, massMultiplier, elasticity float64, color color.RGBA) *Unit {
+func (s *Simulation) newUnitWithPropertiesAtPosition(position, acceleration, velocity vector3.Vector[float64], radius, massMultiplier, elasticity float64, color color.RGBA) *Unit {
 	unitGeom := geometry.NewSphere(float64(radius), seg, seg)
+
+	// mat.SetEmissiveColor(math32.NewColor("white"))
+	// mat.Se
 	unit := &Unit{
 		Id:       uuid.New(),
 		Mesh:     graphic.NewMesh(unitGeom, mat),
 		Position: position,
 
 		Velocity:       velocity,
-		Force:          force,
+		Acceleration:   acceleration,
 		Radius:         radius,
 		MassMultiplier: massMultiplier,
 		Elasticity:     elasticity,
@@ -326,8 +332,7 @@ func positionUnitsInFibonacciSpiral(units []*Unit, center *vector3.Vector[float6
 		radius := math.Sqrt(float64(i)) * radiusStep
 		x := center.X() + radius*math.Cos(angle)
 		y := center.Y() + radius*math.Sin(angle)
-		zMin, zMax := -0.1, 0.1
-		z := center.Z() + zMin + rand.Float64()*(zMax-zMin)
+		z := center.Z()
 
 		// Assegna la posizione alla unità
 		units[i].Position = vector3.New(x, y, z)

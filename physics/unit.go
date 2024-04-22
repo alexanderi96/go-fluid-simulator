@@ -24,9 +24,9 @@ type Unit struct {
 	Id   uuid.UUID
 	Mesh *graphic.Mesh
 
-	Position vector3.Vector[float64]
-	Velocity vector3.Vector[float64]
-	Force    vector3.Vector[float64]
+	Position     vector3.Vector[float64]
+	Velocity     vector3.Vector[float64]
+	Acceleration vector3.Vector[float64]
 
 	Elasticity     float64
 	Radius         float64
@@ -48,31 +48,18 @@ func (u *Unit) GetMass() float64 {
 }
 
 func (u *Unit) accelerate(f vector3.Vector[float64]) {
-	u.Force = u.Force.Add(f.Scale(1 / u.Mass))
+	u.Acceleration = u.Acceleration.Add(f.Scale(1 / u.Mass))
 }
 
 func (u *Unit) UpdatePosition(dt float64) {
-	// x := 2*u.Position.X() - u.PreviousPosition.X() + u.Force.X()*dt*dt
-	// y := 2*u.Position.Y() - u.PreviousPosition.Y() + u.Force.Y()*dt*dt
-	// z := 2*u.Position.Z() - u.PreviousPosition.Z() + u.Force.Z()*dt*dt
-	// newPosition := vector3.New(x, y, z)
-	// u.PreviousPosition = u.Position
-	// u.Position = newPosition
+	u.Velocity = u.Velocity.Add(u.Acceleration.Scale(dt))
 
-	nPos := u.Position.Add(u.Velocity.Scale(dt)).Add(u.Force.Scale(0.5 * dt * dt))
-	nVelocity := u.Velocity.Add(u.Force.Scale(dt))
+	u.Position = u.Position.Add(u.Velocity.Scale(dt)).Add(u.Acceleration.Scale(0.5 * dt * dt))
 
-	u.Position = nPos
-	u.Velocity = nVelocity
-	u.Force = vector3.Zero[float64]()
+	u.Acceleration = vector3.Zero[float64]()
 
-	u.Mesh.SetPosition(nPos.ToFloat32().X(), nPos.ToFloat32().Y(), nPos.ToFloat32().Z())
+	u.Mesh.SetPosition(u.Position.ToFloat32().X(), u.Position.ToFloat32().Y(), u.Position.ToFloat32().Z())
 
-	// if u.Mesh.GetMaterial(0) != mat {
-	// 	u.Mesh.SetMaterial(mat)
-	// }
-	// color := utils.KelvinToRGBA(u.Heat)
-	// u.Mesh.SetMaterial(material.NewStandard(&math32.Color{float32(color.R), float32(color.G), float32(color.B)}))
 	if u.Heat > 0.0 {
 		u.Heat -= 1
 	} else {

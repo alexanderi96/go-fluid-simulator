@@ -141,8 +141,27 @@ func (ot *Octree) Split(scene *core.Node) {
 
 // Insert inserisce un oggetto nel Octree.
 func (ot *Octree) Insert(obj *Unit, scene *core.Node) {
+	if ot.Children[0] == nil {
+		if len(ot.objects) < int(maxObjects) || ot.level >= maxLevels {
+			// Aggiungi l'oggetto qui se c'è spazio o siamo al livello massimo.
+			ot.objects = append(ot.objects, obj)
+			ot.updateMassAndCenterOfMass(obj)
+			return
+		}
 
-	// Calcola il nuovo centro di massa come media ponderata
+		// Suddividi se il nodo è pieno e non siamo al livello massimo.
+		ot.Split(scene)
+		for _, item := range ot.objects {
+			ot.insertUnitIntoChildren(item, scene)
+		}
+		ot.objects = []*Unit{} // Svuota gli oggetti nel nodo corrente
+	}
+
+	// Inserisci l'oggetto nei nodi figli.
+	ot.insertUnitIntoChildren(obj, scene)
+}
+
+func (ot *Octree) updateMassAndCenterOfMass(obj *Unit) {
 	oldTotalMass := ot.TotalMass
 	ot.TotalMass += obj.Mass
 	if oldTotalMass == 0 {
@@ -150,32 +169,11 @@ func (ot *Octree) Insert(obj *Unit, scene *core.Node) {
 	} else {
 		ot.CenterOfMass = ot.CenterOfMass.Scale(oldTotalMass).Add(obj.Position.Scale(obj.Mass)).Scale(1 / ot.TotalMass)
 	}
-
-	if ot.Children[0] == nil {
-		if len(ot.objects) < int(maxObjects) || ot.level >= maxLevels {
-			// Se il nodo corrente ha spazio o abbiamo raggiunto il livello massimo, aggiungi qui.
-			ot.objects = append(ot.objects, obj)
-			return
-		}
-
-		// Se il nodo corrente è pieno e non al livello massimo, dividi.
-		ot.Split(scene)
-
-		// Reinserisci gli oggetti negli octree figli.
-		for _, item := range ot.objects {
-			ot.insertUnitIntoChildren(item, scene)
-		}
-		ot.objects = ot.objects[:0] // Svuota l'elenco degli oggetti nel nodo corrente dopo la suddivisione
-	} else {
-		// Prova ad inserire l'oggetto nei figli.
-		ot.insertUnitIntoChildren(obj, scene)
-	}
-
 }
 
 // insertUnitIntoChildren inserisce un'unità nei figli dell'octree.
 func (ot *Octree) insertUnitIntoChildren(obj *Unit, scene *core.Node) {
-	indices := ot.getIndices(*obj, obj.Radius)
+	indices := ot.getIndices(*obj)
 	inserted := false
 	for _, index := range indices {
 		if index != -1 {
@@ -195,72 +193,60 @@ func (ot *Octree) insertUnitIntoChildren(obj *Unit, scene *core.Node) {
 }
 
 // getIndex determina in quale sotto-Octree un oggetto appartiene.
-func (ot *Octree) getIndices(obj Unit, treshold float64) []int {
-	// Calcola il punto medio dell'Octree per le tre dimensioni.
+func (ot *Octree) getIndices(obj Unit) []int {
+	// Calcola una volta e riutilizza
 	midX := (ot.Bounds.Min.X() + ot.Bounds.Max.X()) / 2
 	midY := (ot.Bounds.Min.Y() + ot.Bounds.Max.Y()) / 2
 	midZ := (ot.Bounds.Min.Z() + ot.Bounds.Max.Z()) / 2
 
-	// Calcola gli estremi dell'oggetto considerando il suo raggio.
-	minX := obj.Position.X() + treshold
-	maxX := obj.Position.X() - treshold
-	minY := obj.Position.Y() + treshold
-	maxY := obj.Position.Y() - treshold
-	minZ := obj.Position.Z() + treshold
-	maxZ := obj.Position.Z() - treshold
+	treshold := obj.Radius
+	minX := obj.Position.X() - treshold
+	maxX := obj.Position.X() + treshold
+	minY := obj.Position.Y() - treshold
+	maxY := obj.Position.Y() + treshold
+	minZ := obj.Position.Z() - treshold
+	maxZ := obj.Position.Z() + treshold
 
-	// Determina la posizione dell'oggetto rispetto al punto medio per ogni dimensione,
-	// tenendo conto dei raggi delle unità.
-	inLeft := minX <= midX
-	inRight := maxX >= midX
-	inBottom := minY <= midY
-	inTop := maxY >= midY
-	inBack := minZ <= midZ
-	inFront := maxZ >= midZ
+	indices := make([]int, 0, 8) // Preallocazione con la dimensione massima possibile
 
-	// Inizializza un array vuoto per gli indici.
-	var indices []int
-
-	// Assegna un indice basato sulla posizione dell'oggetto.
-	// Utilizza una struttura condizionale compatta per verificare tutte le possibili combinazioni.
-	if inTop {
-		if inRight {
-			if inFront {
+	// Condizioni ottimizzate e raggruppate
+	if maxX >= midX {
+		if maxY >= midY {
+			if maxZ >= midZ {
 				indices = append(indices, 7)
 			}
-			if inBack {
+			if minZ <= midZ {
 				indices = append(indices, 3)
 			}
 		}
-		if inLeft {
-			if inFront {
-				indices = append(indices, 6)
-			}
-			if inBack {
-				indices = append(indices, 2)
-			}
-		}
-	}
-	if inBottom {
-		if inRight {
-			if inFront {
+		if minY <= midY {
+			if maxZ >= midZ {
 				indices = append(indices, 5)
 			}
-			if inBack {
+			if minZ <= midZ {
 				indices = append(indices, 1)
 			}
 		}
-		if inLeft {
-			if inFront {
+	}
+	if minX <= midX {
+		if maxY >= midY {
+			if maxZ >= midZ {
+				indices = append(indices, 6)
+			}
+			if minZ <= midZ {
+				indices = append(indices, 2)
+			}
+		}
+		if minY <= midY {
+			if maxZ >= midZ {
 				indices = append(indices, 4)
 			}
-			if inBack {
+			if minZ <= midZ {
 				indices = append(indices, 0)
 			}
 		}
 	}
 
-	// Se l'array degli indici è vuoto, significa che l'oggetto non appartiene a nessun ottante.
 	if len(indices) == 0 {
 		return []int{-1}
 	}
@@ -270,7 +256,7 @@ func (ot *Octree) getIndices(obj Unit, treshold float64) []int {
 
 // Retrieve restituisce tutti gli oggetti che potrebbero collidere con l'oggetto dato.
 func (ot *Octree) Retrieve(returnObjects *[]*Unit, obj *Unit) {
-	indices := ot.getIndices(*obj, obj.Radius*3)
+	indices := ot.getIndices(*obj)
 	for _, index := range indices {
 		if index != -1 && ot.Children[index] != nil {
 			ot.Children[index].Retrieve(returnObjects, obj)

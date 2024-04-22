@@ -17,6 +17,7 @@ import (
 	"github.com/g3n/engine/light"
 	"github.com/g3n/engine/math32"
 	"github.com/g3n/engine/renderer"
+	"github.com/g3n/engine/util/helper"
 	"github.com/g3n/engine/window"
 )
 
@@ -47,6 +48,9 @@ func init() {
 	// Set up orbit control for the camera
 	camera.NewOrbitControl(s.Cam)
 
+	// Create and add an axis helper to the scene
+	s.Scene.Add(helper.NewAxes(10 * float32(s.Config.UnitRadiusMultiplier)))
+
 	// Set up callback to update viewport and camera aspect ratio when the window is resized
 	onResize := func(evname string, ev interface{}) {
 		// Get framebuffer size and update viewport accordingly
@@ -75,7 +79,7 @@ func main() {
 
 	// Create and add lights to the scene
 	s.Scene.Add(light.NewAmbient(&math32.Color{R: 1.0, G: 1.0, B: 1.0}, 0.1))
-	pointLight := light.NewPoint(&math32.Color{R: 1, G: 1, B: 1}, 800.0)
+	pointLight := light.NewPoint(&math32.Color{R: 1, G: 1, B: 1}, 1000.0)
 	pointLight.SetPosition(float32(s.Config.GameX), float32(s.Config.GameY), float32(s.Config.GameZ))
 	s.Scene.Add(pointLight)
 
