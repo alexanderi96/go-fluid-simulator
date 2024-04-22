@@ -6,7 +6,7 @@ import (
 	"github.com/EliCDavis/vector/vector3"
 )
 
-const G = 6.67430e-11 // Costante gravitazionale universale (m^3 kg^-1 s^-2)
+const G = 100 //6.67430e-11 // Costante gravitazionale universale (m^3 kg^-1 s^-2)
 
 type CollData struct {
 	uA, uB *Unit
@@ -41,7 +41,7 @@ func (s *Simulation) UpdateWithOctrees() error {
 	// Calcola la forza di gravità in modo concorrente
 	for _, unit := range s.Fluid {
 		if s.Config.UnitsEmitGravity {
-			unit.accelerate(s.Octree.CalculateGravity(unit, unit.Radius))
+			unit.accelerate(s.Octree.CalculateGravity(unit, unit.Radius/2))
 		}
 	}
 
@@ -50,9 +50,6 @@ func (s *Simulation) UpdateWithOctrees() error {
 		if unitA == nil {
 			continue
 		}
-
-		// Aggiorna la posizione utilizzando il metodo Verlet
-		unitA.UpdatePosition(frameTime)
 
 		// Gestisci le collisioni con le pareti
 		unitA.CheckAndResolveWallCollision(s.WorldBoundray, s.Config.WallElasticity)
@@ -71,6 +68,9 @@ func (s *Simulation) UpdateWithOctrees() error {
 				}
 			}
 		}
+
+		// Aggiorna la posizione utilizzando il metodo Verlet
+		unitA.UpdatePosition(frameTime)
 	}
 	return nil
 }

@@ -83,15 +83,56 @@ func main() {
 	pointLight.SetPosition(float32(s.Config.GameX), float32(s.Config.GameY), float32(s.Config.GameZ))
 	s.Scene.Add(pointLight)
 
-	// Handle right mouse button press to create a new ball
+	// Handle mouse input
 	s.App.Subscribe(window.OnMouseDown, func(evname string, ev interface{}) {
+
 		mev := ev.(*window.MouseEvent)
-		if mev.Button == window.MouseButtonRight && mev.Mods == window.ModControl {
+		if mev.Button == window.MouseButtonLeft && mev.Mods == window.ModControl {
 			// Controlla se sia il pulsante destro del mouse sia il pulsante Ctrl sinistro sono premuti
 			units := s.GetUnits()
 			s.PositionNewUnitsCube(units)
 
 			s.Fluid = append(s.Fluid, units...)
+		} else if mev.Button == window.MouseButtonRight && mev.Mods == window.ModControl {
+			// Controlla se sia il pulsante destro del mouse sia il pulsante Ctrl sinistro sono premuti
+			units := s.GetUnits()
+			s.PositionNewUnitsFibonacci(units)
+
+			s.Fluid = append(s.Fluid, units...)
+		}
+	})
+
+	// Handle keyboard input
+	s.App.Subscribe(window.OnKeyDown, func(evname string, ev interface{}) {
+
+		kev := ev.(*window.KeyEvent)
+		if kev.Key == window.KeyR {
+			s.ResetSimulation()
+		}
+		if kev.Key == window.KeySpace {
+			s.IsPause = !s.IsPause
+		}
+		if kev.Key == window.KeyS {
+			s.SaveSimulation("simulation.json")
+		}
+		if kev.Key == window.KeyL {
+
+			sim, err := physics.LoadSimulation("simulation.json")
+			if err != nil {
+				log.Fatal(err)
+			}
+			s.ResetSimulation()
+
+			s.Fluid = sim.Fluid
+
+			for _, unit := range s.Fluid {
+				unit.GenerateMesh()
+				s.Scene.Add(unit.Mesh)
+			}
+			s.Config = sim.Config
+			s.IsPause = sim.IsPause
+			s.WorldBoundray = sim.WorldBoundray
+			s.WorldCenter = sim.WorldCenter
 		}
 	})
 

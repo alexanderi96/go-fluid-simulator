@@ -1,9 +1,11 @@
 package physics
 
 import (
+	"encoding/json"
 	"image/color"
 	"math"
 	"math/rand"
+	"os"
 
 	"github.com/EliCDavis/vector/vector2"
 	"github.com/EliCDavis/vector/vector3"
@@ -14,8 +16,6 @@ import (
 	"github.com/g3n/engine/app"
 	"github.com/g3n/engine/camera"
 	"github.com/g3n/engine/core"
-	"github.com/g3n/engine/geometry"
-	"github.com/g3n/engine/graphic"
 	"github.com/g3n/engine/window"
 )
 
@@ -25,30 +25,30 @@ type BoundingBox struct {
 
 type Simulation struct {
 	Fluid   []*Unit
-	Metrics *metrics.Metrics
+	Metrics *metrics.Metrics `json:"-"`
 	Config  *config.Config
-	Octree  *Octree
+	Octree  *Octree `json:"-"`
 
 	IsPause              bool
-	InitialMousePosition vector2.Float64
-	FinalMousePosition   vector2.Float64
-	MouseButtonPressed   bool
-	IsInputBeingHandled  bool
+	InitialMousePosition vector2.Float64 `json:"-"`
+	FinalMousePosition   vector2.Float64 `json:"-"`
+	MouseButtonPressed   bool            `json:"-"`
+	IsInputBeingHandled  bool            `json:"-"`
 
 	// variables added for the g3n branch
-	App   *app.Application
-	Scene *core.Node
-	Cam   *camera.Camera
+	App   *app.Application `json:"-"`
+	Scene *core.Node       `json:"-"`
+	Cam   *camera.Camera   `json:"-"`
 
 	// Velocità di rotazione
-	MovementSpeed float64
+	MovementSpeed float64 `json:"-"`
 
 	WorldBoundray BoundingBox
 	WorldCenter   vector3.Vector[float64]
 
-	SpawnDistance        float64
-	InitialSpawnPosition vector3.Vector[float64]
-	FinalSpawnPosition   vector3.Vector[float64]
+	SpawnDistance        float64                 `json:"-"`
+	InitialSpawnPosition vector3.Vector[float64] `json:"-"`
+	FinalSpawnPosition   vector3.Vector[float64] `json:"-"`
 }
 
 var (
@@ -81,6 +81,7 @@ func NewSimulation(config *config.Config) (*Simulation, error) {
 		FinalSpawnPosition:   WorldCenter,
 	}
 
+	sim.App.IWindow.(*window.GlfwWindow).SetTitle("Go Fluid Simulator")
 	sim.App.IWindow.(*window.GlfwWindow).SetSize(int(config.WindowWidth), int(config.WindowHeight))
 
 	sim.Octree = NewOctree(0, sim.WorldBoundray, sim.Scene)
@@ -95,6 +96,35 @@ func NewSimulation(config *config.Config) (*Simulation, error) {
 	sim.ResetCameraPosition(front, fovy)
 
 	return sim, nil
+}
+
+func (sim *Simulation) SaveSimulation(filePath string) error {
+	file, err := os.Create(filePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "    ") // Per un output formattato
+	return encoder.Encode(sim)
+}
+
+func LoadSimulation(filePath string) (*Simulation, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var sim Simulation
+	decoder := json.NewDecoder(file)
+	err = decoder.Decode(&sim)
+	if err != nil {
+		return nil, err
+	}
+
+	return &sim, nil
 }
 
 func (s *Simulation) ResetCameraPosition(position vector3.Vector[float64], fovy float64) {
@@ -211,13 +241,9 @@ func (s *Simulation) IsSpawnInRange() bool {
 }
 
 func (s *Simulation) newUnitWithPropertiesAtPosition(position, acceleration, velocity vector3.Vector[float64], radius, massMultiplier, elasticity float64, color color.RGBA) *Unit {
-	unitGeom := geometry.NewSphere(float64(radius), seg, seg)
 
-	// mat.SetEmissiveColor(math32.NewColor("white"))
-	// mat.Se
 	unit := &Unit{
 		Id:       uuid.New(),
-		Mesh:     graphic.NewMesh(unitGeom, mat),
 		Position: position,
 
 		Velocity:       velocity,
@@ -228,6 +254,8 @@ func (s *Simulation) newUnitWithPropertiesAtPosition(position, acceleration, vel
 		Color:          color,
 		Heat:           0.0,
 	}
+
+	unit.GenerateMesh()
 
 	s.Scene.Add(unit.Mesh)
 
@@ -271,55 +299,71 @@ func (s *Simulation) GetUnits() []*Unit {
 
 func (s *Simulation) PositionNewUnitsFibonacci(units []*Unit) {
 	positionUnitsInFibonacciSpiral(units, &s.WorldCenter)
-	s.Fluid = append(s.Fluid, units...)
 }
 
 func (s *Simulation) ResetSimulation() {
 	s.Octree.Clear(s.Scene)
+
+	for _, unit := range s.Fluid {
+		s.Scene.Remove(unit.Mesh)
+	}
 	s.Fluid = []*Unit{}
+
 }
 
-func positionUnitsCuboidally(units []*Unit, FinalspawnPosition vector3.Vector[float64], spacing float64) error {
+func positionUnitsCuboidally(units []*Unit, finalSpawnPosition vector3.Vector[float64], spacing float64) error {
 	if len(units) == 0 {
 		return nil
 	}
 
-	// Calcoliamo il lato del cubo arrotondando per eccesso
-	sideLength := int(math.Ceil(math.Pow(float64(len(units)), 1.0/3.0)))
+	// Calcoliamo le dimensioni ottimali del cubo
+	n := len(units)
+	sideLengthX, sideLengthY, sideLengthZ := optimalCuboidDimensions(n)
+
 	unitRadius := units[0].Radius
 
 	// Calcoliamo lo spazio totale richiesto per le unità
-	totalWidth := float64(sideLength)*(2*unitRadius+spacing) - spacing
-	totalHeight := float64(sideLength)*(2*unitRadius+spacing) - spacing
-	totalDepth := float64(sideLength)*(2*unitRadius+spacing) - spacing
+	totalWidth := float64(sideLengthX)*(2*unitRadius+spacing) - spacing
+	totalHeight := float64(sideLengthY)*(2*unitRadius+spacing) - spacing
+	totalDepth := float64(sideLengthZ)*(2*unitRadius+spacing) - spacing
 
 	// Calcoliamo la posizione iniziale del cubo
-	startX := FinalspawnPosition.X() - totalWidth/2
-	startY := FinalspawnPosition.Y() - totalHeight/2
-	startZ := FinalspawnPosition.Z() - totalDepth/2
+	startX := finalSpawnPosition.X() - totalWidth/2
+	startY := finalSpawnPosition.Y() - totalHeight/2
+	startZ := finalSpawnPosition.Z() - totalDepth/2
 
 	// Posizioniamo le unità nel cubo
 	index := 0
-	for x := 0; x < sideLength; x++ {
-		for y := 0; y < sideLength; y++ {
-			for z := 0; z < sideLength; z++ {
+	for x := 0; x < sideLengthX && index < n; x++ {
+		for y := 0; y < sideLengthY && index < n; y++ {
+			for z := 0; z < sideLengthZ && index < n; z++ {
 				// Calcoliamo la posizione per questa unità
 				unitX := startX + float64(x)*(2*unitRadius+spacing)
 				unitY := startY + float64(y)*(2*unitRadius+spacing)
 				unitZ := startZ + float64(z)*(2*unitRadius+spacing)
 
 				// Assegniamo la posizione alla unità corrente
-				if index < len(units) {
-					units[index].Position = vector3.New(unitX, unitY, unitZ)
-					index++
-				} else {
-					break
-				}
+				units[index].Position = vector3.New(unitX, unitY, unitZ)
+				index++
 			}
 		}
 	}
 
 	return nil
+}
+
+// Funzione per calcolare le dimensioni ottimali del cubo
+func optimalCuboidDimensions(n int) (int, int, int) {
+	sideLength := int(math.Ceil(math.Pow(float64(n), 1.0/3.0)))
+	for x := sideLength; x > 0; x-- {
+		for y := x; y > 0; y-- {
+			z := int(math.Ceil(float64(n) / float64(x*y)))
+			if x*y*z >= n {
+				return x, y, z
+			}
+		}
+	}
+	return sideLength, sideLength, sideLength
 }
 
 func positionUnitsInFibonacciSpiral(units []*Unit, center *vector3.Vector[float64]) {

@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"github.com/EliCDavis/vector/vector3"
+	"github.com/g3n/engine/geometry"
 	"github.com/g3n/engine/graphic"
 	"github.com/g3n/engine/material"
 	"github.com/g3n/engine/math32"
@@ -21,8 +22,9 @@ var (
 )
 
 type Unit struct {
-	Id   uuid.UUID
-	Mesh *graphic.Mesh
+	Id    uuid.UUID
+	Mesh  *graphic.Mesh  `json:"-"`
+	Trail *graphic.Lines `json:"-"`
 
 	Position     vector3.Vector[float64]
 	Velocity     vector3.Vector[float64]
@@ -35,6 +37,10 @@ type Unit struct {
 	Color          color.RGBA
 
 	Heat float64
+}
+
+func (u *Unit) GenerateMesh() {
+	u.Mesh = graphic.NewMesh(geometry.NewSphere(float64(u.Radius), seg, seg), mat)
 }
 
 func (u *Unit) GetVolume() float64 {
@@ -52,9 +58,8 @@ func (u *Unit) accelerate(f vector3.Vector[float64]) {
 }
 
 func (u *Unit) UpdatePosition(dt float64) {
+	u.Position = u.Position.Add(u.Velocity.Scale(dt))
 	u.Velocity = u.Velocity.Add(u.Acceleration.Scale(dt))
-
-	u.Position = u.Position.Add(u.Velocity.Scale(dt)).Add(u.Acceleration.Scale(0.5 * dt * dt))
 
 	u.Acceleration = vector3.Zero[float64]()
 

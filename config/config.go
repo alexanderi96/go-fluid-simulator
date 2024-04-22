@@ -21,7 +21,6 @@ type Config struct {
 	UnitMassMultiplier      float64
 	UnitInitialSpacing      float64
 	ShowVectors             bool
-	ScaleFactor             float64
 	UnitElasticity          float64
 	WallElasticity          float64
 	ApplyGravity            bool
@@ -46,7 +45,6 @@ type Config struct {
 	ShowClusterColor        bool
 	OctreeMaxLevel          int8
 	MaxUnitNumberPerLevel   int8
-	ResolutionSteps         int8
 	Frametime               float64
 	// TestDuration          float32
 	// TestIterations        int32
@@ -74,7 +72,6 @@ func ReadConfig(filepath string) (*Config, error) {
 		UnitMassMultiplier:      viper.GetFloat64("unit_mass_multiplier"),
 		UnitInitialSpacing:      viper.GetFloat64("unit_initial_spacing"),
 		ShowVectors:             viper.GetBool("show_vectors"),
-		ScaleFactor:             viper.GetFloat64("scale_factor"),
 		UnitElasticity:          viper.GetFloat64("unit_elasticity"),
 		WallElasticity:          viper.GetFloat64("wall_elasticity"),
 		ApplyGravity:            viper.GetBool("apply_gravity"),
@@ -98,7 +95,6 @@ func ReadConfig(filepath string) (*Config, error) {
 		UnitRadiusMultiplier:    viper.GetFloat64("unit_radius_multiplier"),
 		OctreeMaxLevel:          int8(viper.GetInt("octree_max_level")),
 		MaxUnitNumberPerLevel:   int8(viper.GetInt("max_unit_number_per_level")),
-		ResolutionSteps:         int8(viper.GetInt("resolution_steps")),
 		Frametime:               viper.GetFloat64("frametime"),
 		// TestDuration:          viper.GetFloat64("test_duration"),
 		// TestIterations:        viper.GetInt32("test_iterations"),
