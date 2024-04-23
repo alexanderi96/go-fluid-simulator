@@ -52,8 +52,7 @@ type Simulation struct {
 }
 
 var (
-	front, top, side vector3.Vector[float64]
-	fovy             = 60.0
+	fovy = 60.0
 )
 
 func NewSimulation(config *config.Config) (*Simulation, error) {
@@ -85,15 +84,6 @@ func NewSimulation(config *config.Config) (*Simulation, error) {
 	sim.App.IWindow.(*window.GlfwWindow).SetSize(int(config.WindowWidth), int(config.WindowHeight))
 
 	sim.Octree = NewOctree(0, sim.WorldBoundray, sim.Scene)
-
-	fovyRadians := fovy * (math.Pi / 180)
-	d := (math.Sqrt(3) * math.Max(config.GameX, math.Max(config.GameY, config.GameZ))) / (2 * math.Tan(fovyRadians/2))
-
-	front = vector3.New(0, 0, d)
-	top = vector3.New(0, config.GameY, 0)
-	side = vector3.New(d, 0, 0)
-
-	sim.ResetCameraPosition(front, fovy)
 
 	return sim, nil
 }
@@ -127,94 +117,10 @@ func LoadSimulation(filePath string) (*Simulation, error) {
 	return &sim, nil
 }
 
-func (s *Simulation) ResetCameraPosition(position vector3.Vector[float64], fovy float64) {
-	// rlWc := utils.ToRlVector3(s.WorldCenter)
-	// s.Camera = rl.Camera{
-	// 	Position:   utils.ToRlVector3(position),
-	// 	Target:     rlWc,
-	// 	Up:         rl.NewVector3(0, 1, 0),
-	// 	Fovy:       float32(fovy),
-	// 	Projection: rl.CameraPerspective,
-	// }
-
-	s.SpawnDistance = 100
-}
-
 func (s *Simulation) Update() error {
 	s.Metrics.Update(s.Config.Frametime)
 
 	return s.UpdateWithOctrees()
-}
-
-func (s *Simulation) HandleInput() {
-	s.IsInputBeingHandled = true
-
-	// if rl.IsKeyPressed(rl.KeyR) {
-	// 	s.ResetSimulation()
-	// } else if rl.IsKeyPressed(rl.KeyOne) {
-	// 	s.ResetCameraPosition(front, fovy)
-	// } else if rl.IsKeyPressed(rl.KeyTwo) {
-	// 	s.ResetCameraPosition(top, fovy)
-	// } else if rl.IsKeyPressed(rl.KeyThree) {
-	// 	s.ResetCameraPosition(side, fovy)
-	// } else if rl.IsKeyPressed(rl.KeySpace) {
-	// 	s.IsPause = !s.IsPause
-	// } else if s.MouseButtonPressed && rl.IsMouseButtonReleased(rl.MouseLeftButton) {
-	// 	s.MouseButtonPressed = false
-
-	// 	if s.IsSpawnInRange() {
-	// 		units := s.GetUnits()
-	// 		s.PositionNewUnitsCube(units)
-
-	// 		if s.InitialMousePosition != s.FinalMousePosition {
-	// 			s.GiveVelocity(units)
-	// 		}
-
-	// 		s.Fluid = append(s.Fluid, units...)
-	// 	}
-
-	// } else if rl.IsMouseButtonPressed(rl.MouseLeftButton) {
-	// 	s.InitialMousePosition = rl.GetMousePosition()
-	// 	//s.UpdateInitialSpawnPosition()
-	// 	// updateSpawnPosition(&s.InitialSpawnPosition, &s.SpawnDistance, &s.Camera)
-
-	// 	for rl.IsMouseButtonDown(rl.MouseLeftButton) && s.InitialMousePosition.X > 0 && s.InitialMousePosition.X < float32(s.Config.ViewportX) &&
-	// 		s.InitialMousePosition.Y > 0 && s.InitialMousePosition.Y < float32(s.Config.ViewportY) {
-	// 		s.MouseButtonPressed = true
-
-	// 		s.FinalMousePosition = rl.GetMousePosition()
-	// 		// updateSpawnPosition(&s.FinalSpawnPosition, &s.SpawnDistance, &s.Camera)
-	// 		//s.UpdateFinalSpawnPosition()
-	// 	}
-
-	// } else if rl.IsMouseButtonReleased(rl.MouseRightButton) {
-
-	// 	if s.IsSpawnInRange() {
-	// 		s.PositionNewUnitsFibonacci(s.GetUnits())
-	// 	}
-
-	// } else if rl.IsKeyPressed(rl.KeyM) {
-	// 	// Cambio modalità con il tasto M (esempio)
-	// 	if s.ControlMode == CameraMovementMode {
-	// 		s.ControlMode = UnitSpawnMode
-	// 	} else {
-	// 		s.ControlMode = CameraMovementMode
-	// 	}
-	// }
-
-	// switch s.ControlMode {
-	// case CameraMovementMode:
-	// 	s.UpdateCameraPosition()
-
-	// case UnitSpawnMode:
-	// 	// updateSpawnPosition(&s.FinalSpawnPosition, &s.SpawnDistance, &s.Camera)
-
-	// 	//		s.UpdateFinalSpawnPosition()
-
-	// default:
-	// }
-
-	s.IsInputBeingHandled = false
 }
 
 func (s *Simulation) UpdateCameraPosition() error {

@@ -2,6 +2,7 @@ package physics
 
 import (
 	"math"
+	"sync"
 
 	"github.com/EliCDavis/vector/vector3"
 )
@@ -13,16 +14,16 @@ type CollData struct {
 
 	distance    float64
 	totalRadius float64
+	totalMass   float64
 	collided    bool
 
 	// the normal of the collision
 	impulseDirection vector3.Vector[float64]
 
 	// define the relative velocity (velocityVector)
-	vRel        vector3.Vector[float64]
-	rVelNormal  float64
-	relativeVel float64
-	e           float64
+	vRel       vector3.Vector[float64]
+	rVelNormal float64
+	e          float64
 }
 
 func (s *Simulation) UpdateWithOctrees() error {
@@ -38,23 +39,22 @@ func (s *Simulation) UpdateWithOctrees() error {
 		s.Octree.Insert(unit, s.Scene)
 	}
 
-	if s.Config.UnitsEmitGravity {
+	var wg sync.WaitGroup
+	wg.Add(len(s.Fluid)) // Aggiungi il conteggio delle unità
 
-		for _, unit := range s.Fluid {
-			// Avviare una goroutine per ogni unità
-			go func(unit *Unit) {
-				unit.accelerate(s.Octree.CalculateGravity(unit, 0.5))
-			}(unit)
-		}
-
+	for _, unit := range s.Fluid {
+		go func(u *Unit) {
+			defer wg.Done()
+			u.accelerate(s.Octree.CalculateGravity(u, 0.5))
+		}(unit)
 	}
 
-	// Controlla le collisioni tra particelle e aggiorna le velocità utilizzando il Octree
+	wg.Wait()
+
 	for _, unitA := range s.Fluid {
 		if unitA == nil {
 			continue
 		}
-
 		// Gestisci le collisioni con le pareti
 		unitA.CheckAndResolveWallCollision(s.WorldBoundray, s.Config.WallElasticity)
 
@@ -75,6 +75,7 @@ func (s *Simulation) UpdateWithOctrees() error {
 
 		unitA.UpdatePosition(frameTime)
 	}
+
 	return nil
 }
 
@@ -85,7 +86,7 @@ func (ot *Octree) CalculateGravity(unit *Unit, theta float64) vector3.Vector[flo
 }
 
 func (ot *Octree) calculateGravityRecursive(unit *Unit, theta float64, force *vector3.Vector[float64]) {
-	if ot.Children[0] == nil {
+	if !ot.divided {
 		// Se siamo in un nodo foglia, calcoliamo la forza tra tutti gli oggetti e la unit.
 		for _, obj := range ot.objects {
 			if obj != unit {
@@ -125,30 +126,26 @@ func (ot *Octree) calculateGravityRecursive(unit *Unit, theta float64, force *ve
 	}
 }
 
-func (s *Simulation) gatherCollisionData(uA, uB *Unit) (collData *CollData) {
-	collData = &CollData{
-		uA:               uA,
-		uB:               uB,
-		e:                math.Min(uA.Elasticity, uB.Elasticity),
-		impulseDirection: uA.Position.Sub(uB.Position).Normalized(),
-		vRel:             uA.Velocity.Sub(uB.Velocity),
-		rVelNormal:       0,
-		collided:         false,
-		relativeVel:      0,
-		distance:         uA.Position.Distance(uB.Position),
-		totalRadius:      uA.Radius + uB.Radius,
+func (s *Simulation) gatherCollisionData(uA, uB *Unit) *CollData {
+	collData := &CollData{
+		uA:          uA,
+		uB:          uB,
+		distance:    uA.Position.Distance(uB.Position),
+		totalRadius: uA.Radius + uB.Radius,
 	}
 
 	collData.collided = collData.distance < collData.totalRadius
 
 	// todo: continua
-	// if collData.distance > collData.surfaceDistance*2 {
-	// 	return
-	// }
+	if collData.collided {
+		collData.e = math.Min(uA.Elasticity, uB.Elasticity)
+		collData.impulseDirection = uA.Position.Sub(uB.Position).Normalized()
+		collData.vRel = uA.Velocity.Sub(uB.Velocity)
+		collData.rVelNormal = collData.vRel.Dot(collData.impulseDirection)
+		collData.totalMass = uA.Mass + uB.Mass
+	}
 
-	collData.rVelNormal = collData.vRel.Dot(collData.impulseDirection)
-
-	return
+	return collData
 }
 
 func handleCollision(collData *CollData) {
@@ -165,7 +162,7 @@ func handleCollision(collData *CollData) {
 	// collData.uA.Mesh.SetMaterial(overlapMat)
 	// collData.uB.Mesh.SetMaterial(overlapMat)
 	overlap := collData.totalRadius - collData.distance
-	massTotal := collData.uA.Mass + collData.uB.Mass
+	massTotal := collData.totalMass
 	moveDistanceA := (collData.uB.Mass / massTotal) * overlap
 	moveDistanceB := (collData.uA.Mass / massTotal) * overlap
 
