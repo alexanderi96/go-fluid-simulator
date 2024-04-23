@@ -20,7 +20,7 @@
             "Elasticity": 0.6,
             "Radius": 0.15,
             "MassMultiplier": 100,
-            "Mass": 0.025,
+            "Mass": 0.1,
             "Color": {
                 "R": 255,
                 "G": 255,
@@ -38,7 +38,7 @@
             },
             "Velocity": {
                 "x": 0,
-                "y": 3,
+                "y": 4,
                 "z": 0
             },
             "Acceleration": {
@@ -67,7 +67,7 @@
             },
             "Velocity": {
                 "x": 0,
-                "y": -3,
+                "y": -4,
                 "z": 0
             },
             "Acceleration": {
@@ -98,7 +98,7 @@
         "GameX": 20,
         "GameY": 20,
         "GameZ": 20,
-        "TargetFPS": 999,
+        "TargetFPS": 60,
         "IsResizable": true,
         "UnitNumber": 3,
         "UnitRadius": 1,

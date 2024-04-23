@@ -301,6 +301,12 @@ func (s *Simulation) GiveVelocity(units []*Unit) {
 	}
 }
 
+func (s *Simulation) GiveRotationalVelocity(units []*Unit) {
+	for _, u := range units {
+		u.CalcolaVettoreVelocitaRotazione(&s.WorldCenter)
+	}
+}
+
 func CalcolaVettoreVelocita(p1, p2 *vector3.Vector[float64], dt float64) *vector3.Vector[float64] {
 	// Calcola la differenza tra la posizione finale e quella iniziale
 	differenzaPosizione := p2.Sub(*p1)
@@ -309,4 +315,20 @@ func CalcolaVettoreVelocita(p1, p2 *vector3.Vector[float64], dt float64) *vector
 	vettoreVelocita := differenzaPosizione.Scale(0.01 / dt)
 
 	return &vettoreVelocita
+}
+
+func (u *Unit) CalcolaVettoreVelocitaRotazione(p *vector3.Vector[float64]) {
+	// Calcola la distanza dall'origine
+	d := math.Sqrt(u.Position.X()*u.Position.X() + u.Position.Y()*u.Position.Y())
+
+	// Calcola la velocità di rotazione proporzionale alla distanza
+	k := 0.1 // Costante di proporzionalità (personalizzabile)
+	v := k * d
+
+	// Calcola le componenti di velocità lungo gli assi x e y
+	v_x := v * u.Position.Y() / d
+	v_y := -v * u.Position.X() / d
+
+	// Crea un nuovo vettore velocità con le componenti calcolate
+	u.Velocity = vector3.New(v_x, v_y, 0)
 }

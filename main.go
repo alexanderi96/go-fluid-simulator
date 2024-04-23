@@ -99,6 +99,12 @@ func main() {
 			s.PositionNewUnitsFibonacci(units)
 
 			s.Fluid = append(s.Fluid, units...)
+		} else if mev.Button == window.MouseButtonRight && mev.Mods == window.ModShift {
+			// Controlla se sia il pulsante destro del mouse sia il pulsante Ctrl sinistro sono premuti
+			units := s.GetUnits()
+			s.PositionNewUnitsFibonacci(units)
+			s.GiveRotationalVelocity(units)
+			s.Fluid = append(s.Fluid, units...)
 		}
 	})
 

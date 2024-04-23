@@ -152,7 +152,7 @@ func (ot *Octree) Insert(obj *Unit, scene *core.Node) {
 		for _, item := range ot.objects {
 			ot.insertUnitIntoChildren(item, scene)
 		}
-		ot.objects = []*Unit{}
+		ot.objects = ot.objects[:0]
 	} else {
 		ot.insertUnitIntoChildren(obj, scene)
 	}
@@ -170,8 +170,8 @@ func (ot *Octree) insertUnitIntoChildren(obj *Unit, scene *core.Node) {
 
 	if !inserted {
 		ot.objects = append(ot.objects, obj)
-		ot.updateMassAndCenterOfMass(obj)
 	}
+	// ot.updateMassAndCenterOfMass(obj)
 }
 
 func (ot *Octree) updateMassAndCenterOfMass(obj *Unit) {

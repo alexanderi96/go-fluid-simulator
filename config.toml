@@ -5,8 +5,8 @@
   window_height = 1280
   is_resizable = true
   should_be_profiled = true
-  octree_max_level = 6
-  max_unit_number_per_level = 1
+  octree_max_level = 7
+  max_unit_number_per_level = 5
   show_octree = true
   frametime = 0.001 # 0.01 s = 100 hz
 
