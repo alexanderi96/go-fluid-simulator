@@ -142,25 +142,44 @@ func main() {
 	s.Scene.Add(fpsLabel)
 
 	// Create FPS label
+	ftLabel := gui.NewLabel("FrameTime: 0")
+	ftLabel.SetPosition(100, 10)
+	s.Scene.Add(ftLabel)
+
+	// Create FPS label
 	unitLabel := gui.NewLabel("unit: 0")
 	unitLabel.SetPosition(10, 25)
 	s.Scene.Add(unitLabel)
 
-	s.App.Run(func(renderer *renderer.Renderer, deltaTime time.Duration) {
+	// Create FPS label
+	simDurationLabel := gui.NewLabel("Simulation duration: 0")
+	simDurationLabel.SetPosition(10, 40)
+	s.Scene.Add(simDurationLabel)
 
+	// Create FPS label
+	realDurationLabel := gui.NewLabel("Real duration: 0")
+	realDurationLabel.SetPosition(10, 55)
+	s.Scene.Add(realDurationLabel)
+
+	appStartTime := time.Now()
+	s.App.Run(func(renderer *renderer.Renderer, deltaTime time.Duration) {
 		if !s.IsPause {
 			if err := s.Update(); err != nil {
 				log.Fatal("Errore durante l'update della simulazione %w", err)
 			}
 
 		}
-		// Update FPS label
-		deltaTimeSec := float32(deltaTime.Seconds())
 
-		fps := 1.0 / deltaTimeSec
+		fps := 1.0 / float64(deltaTime.Seconds())
 		fpsLabel.SetText("FPS: " + fmt.Sprintf("%.2f", fps))
 
+		ftLabel.SetText("FrameTime: " + fmt.Sprintf("%.2f", s.Config.Frametime))
+
 		unitLabel.SetText("unit: " + fmt.Sprintf("%d", len(s.Fluid)))
+
+		simDurationLabel.SetText("Simulation duration: " + fmt.Sprintf("%.2f", s.Metrics.SimDuration))
+
+		realDurationLabel.SetText("Real duration: " + fmt.Sprintf("%.2f", -time.Until(appStartTime).Seconds()))
 
 		// gui.Draw(s)
 		s.App.Gls().Clear(gls.DEPTH_BUFFER_BIT | gls.STENCIL_BUFFER_BIT | gls.COLOR_BUFFER_BIT)

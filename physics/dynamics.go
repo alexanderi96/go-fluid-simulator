@@ -6,7 +6,7 @@ import (
 	"github.com/EliCDavis/vector/vector3"
 )
 
-const G = 100 //6.67430e-11 // Costante gravitazionale universale (m^3 kg^-1 s^-2)
+const G = 10 //6.67430e-11 // Costante gravitazionale universale (m^3 kg^-1 s^-2)
 
 type CollData struct {
 	uA, uB *Unit
@@ -38,11 +38,15 @@ func (s *Simulation) UpdateWithOctrees() error {
 		s.Octree.Insert(unit, s.Scene)
 	}
 
-	// Calcola la forza di gravità in modo concorrente
-	for _, unit := range s.Fluid {
-		if s.Config.UnitsEmitGravity {
-			unit.accelerate(s.Octree.CalculateGravity(unit, unit.Radius/2))
+	if s.Config.UnitsEmitGravity {
+
+		for _, unit := range s.Fluid {
+			// Avviare una goroutine per ogni unità
+			go func(unit *Unit) {
+				unit.accelerate(s.Octree.CalculateGravity(unit, 0.5))
+			}(unit)
 		}
+
 	}
 
 	// Controlla le collisioni tra particelle e aggiorna le velocità utilizzando il Octree
@@ -69,56 +73,56 @@ func (s *Simulation) UpdateWithOctrees() error {
 			}
 		}
 
-		// Aggiorna la posizione utilizzando il metodo Verlet
 		unitA.UpdatePosition(frameTime)
 	}
 	return nil
 }
 
 func (ot *Octree) CalculateGravity(unit *Unit, theta float64) vector3.Vector[float64] {
-	var force vector3.Vector[float64]
-	// Utilizzare una coda per gestire i nodi da visitare
-	queue := []*Octree{ot}
-	for len(queue) > 0 {
-		current := queue[0]
-		queue = queue[1:]
+	var force = vector3.Zero[float64]()
+	ot.calculateGravityRecursive(unit, theta, &force)
+	return force
+}
 
-		if !current.divided {
-			// Nodo foglia, calcola la forza tra tutti gli oggetti e la unit
-			for _, obj := range current.objects {
-				if obj != unit {
-					deltaPos := obj.Position.Sub(unit.Position)
-					distance := deltaPos.Length()
-					if distance > 0 {
-						magnitude := G * unit.Mass * obj.Mass / (distance * distance)
-						direction := deltaPos.Normalized()
-						force = force.Add(direction.Scale(magnitude))
-					}
-				}
-			}
-		} else {
-			// Nodo interno, decide se usare il centro di massa o visitare i figli
-			width := current.Bounds.Max.X() - current.Bounds.Min.X()
-			distance := unit.Position.Distance(current.CenterOfMass)
-			if (width / distance) < theta {
-				deltaPos := current.CenterOfMass.Sub(unit.Position)
+func (ot *Octree) calculateGravityRecursive(unit *Unit, theta float64, force *vector3.Vector[float64]) {
+	if ot.Children[0] == nil {
+		// Se siamo in un nodo foglia, calcoliamo la forza tra tutti gli oggetti e la unit.
+		for _, obj := range ot.objects {
+			if obj != unit {
+				deltaPos := obj.Position.Sub(unit.Position)
 				distance := deltaPos.Length()
 				if distance > 0 {
-					magnitude := G * unit.Mass * current.TotalMass / (distance * distance)
+					// Calcolo della forza gravitazionale.
+					magnitude := G * unit.Mass * obj.Mass / (distance * distance)
 					direction := deltaPos.Normalized()
-					force = force.Add(direction.Scale(magnitude))
+					forceToAdd := direction.Scale(magnitude)
+					*force = force.Add(forceToAdd)
 				}
-			} else {
-				// Aggiungi i figli alla coda
-				for _, child := range current.Children {
-					if child != nil {
-						queue = append(queue, child)
-					}
+			}
+		}
+	} else {
+		// Se non siamo in un nodo foglia, decidiamo se calcolare la forza con il centro di massa o scendere nell'Octree.
+		width := ot.Bounds.Max.X() - ot.Bounds.Min.X()
+		distance := unit.Position.Distance(ot.CenterOfMass)
+		if (width / distance) < theta {
+			// Usiamo il centro di massa per approssimare la forza.
+			deltaPos := ot.CenterOfMass.Sub(unit.Position)
+			distance := deltaPos.Length()
+			if distance > 0 {
+				magnitude := G * unit.Mass * ot.TotalMass / (distance * distance)
+				direction := deltaPos.Normalized()
+				forceToAdd := direction.Scale(magnitude)
+				*force = force.Add(forceToAdd)
+			}
+		} else {
+			// Altrimenti, calcoliamo la forza ricorsivamente sui figli dell'Octree.
+			for _, child := range ot.Children {
+				if child != nil {
+					child.calculateGravityRecursive(unit, theta, force)
 				}
 			}
 		}
 	}
-	return force
 }
 
 func (s *Simulation) gatherCollisionData(uA, uB *Unit) (collData *CollData) {
@@ -161,13 +165,19 @@ func handleCollision(collData *CollData) {
 	// collData.uA.Mesh.SetMaterial(overlapMat)
 	// collData.uB.Mesh.SetMaterial(overlapMat)
 	overlap := collData.totalRadius - collData.distance
-	moveDistance := overlap / 2
-	normalMove := collData.impulseDirection.Scale(moveDistance)
-	collData.uA.Position = collData.uA.Position.Add(normalMove)
-	collData.uB.Position = collData.uB.Position.Sub(normalMove)
+	massTotal := collData.uA.Mass + collData.uB.Mass
+	moveDistanceA := (collData.uB.Mass / massTotal) * overlap
+	moveDistanceB := (collData.uA.Mass / massTotal) * overlap
+
+	normalMoveA := collData.impulseDirection.Scale(moveDistanceA)
+	normalMoveB := collData.impulseDirection.Scale(moveDistanceB)
+
+	collData.uA.Position = collData.uA.Position.Add(normalMoveA)
+	collData.uB.Position = collData.uB.Position.Sub(normalMoveB)
 
 	// Gestisci il calore generato dalla collisione (opzionale)
 	heatTransfer := collData.rVelNormal * collData.distance * 0.5
 	collData.uA.Heat += heatTransfer * (1.0 - collData.uA.Elasticity)
 	collData.uB.Heat += heatTransfer * (1.0 - collData.uB.Elasticity)
+
 }

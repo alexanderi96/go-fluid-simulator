@@ -141,7 +141,7 @@ func (s *Simulation) ResetCameraPosition(position vector3.Vector[float64], fovy 
 }
 
 func (s *Simulation) Update() error {
-	s.Metrics.Update()
+	s.Metrics.Update(s.Config.Frametime)
 
 	return s.UpdateWithOctrees()
 }

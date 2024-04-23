@@ -22,9 +22,8 @@ var (
 )
 
 type Unit struct {
-	Id    uuid.UUID
-	Mesh  *graphic.Mesh  `json:"-"`
-	Trail *graphic.Lines `json:"-"`
+	Id   uuid.UUID
+	Mesh *graphic.Mesh `json:"-"`
 
 	Position     vector3.Vector[float64]
 	Velocity     vector3.Vector[float64]

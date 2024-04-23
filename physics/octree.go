@@ -143,35 +143,21 @@ func (ot *Octree) Split(scene *core.Node) {
 func (ot *Octree) Insert(obj *Unit, scene *core.Node) {
 	if ot.Children[0] == nil {
 		if len(ot.objects) < int(maxObjects) || ot.level >= maxLevels {
-			// Aggiungi l'oggetto qui se c'è spazio o siamo al livello massimo.
 			ot.objects = append(ot.objects, obj)
 			ot.updateMassAndCenterOfMass(obj)
 			return
 		}
 
-		// Suddividi se il nodo è pieno e non siamo al livello massimo.
 		ot.Split(scene)
 		for _, item := range ot.objects {
 			ot.insertUnitIntoChildren(item, scene)
 		}
-		ot.objects = []*Unit{} // Svuota gli oggetti nel nodo corrente
-	}
-
-	// Inserisci l'oggetto nei nodi figli.
-	ot.insertUnitIntoChildren(obj, scene)
-}
-
-func (ot *Octree) updateMassAndCenterOfMass(obj *Unit) {
-	oldTotalMass := ot.TotalMass
-	ot.TotalMass += obj.Mass
-	if oldTotalMass == 0 {
-		ot.CenterOfMass = obj.Position
+		ot.objects = []*Unit{}
 	} else {
-		ot.CenterOfMass = ot.CenterOfMass.Scale(oldTotalMass).Add(obj.Position.Scale(obj.Mass)).Scale(1 / ot.TotalMass)
+		ot.insertUnitIntoChildren(obj, scene)
 	}
 }
 
-// insertUnitIntoChildren inserisce un'unità nei figli dell'octree.
 func (ot *Octree) insertUnitIntoChildren(obj *Unit, scene *core.Node) {
 	indices := ot.getIndices(*obj)
 	inserted := false
@@ -182,13 +168,19 @@ func (ot *Octree) insertUnitIntoChildren(obj *Unit, scene *core.Node) {
 		}
 	}
 
-	// Se l'oggetto non è stato inserito in nessun figlio, aggiungilo a questo nodo.
 	if !inserted {
 		ot.objects = append(ot.objects, obj)
+		ot.updateMassAndCenterOfMass(obj)
+	}
+}
+
+func (ot *Octree) updateMassAndCenterOfMass(obj *Unit) {
+	oldTotalMass := ot.TotalMass
+	ot.TotalMass += obj.Mass
+	if oldTotalMass == 0 {
+		ot.CenterOfMass = obj.Position
 	} else {
-		// Aggiorna la massa totale e il centro di massa dell'Octree padre.
-		ot.TotalMass += obj.Mass
-		ot.CenterOfMass = ot.CenterOfMass.Scale(ot.TotalMass - obj.Mass).Add(obj.Position.Scale(obj.Mass)).Scale(1 / ot.TotalMass)
+		ot.CenterOfMass = ot.CenterOfMass.Scale(oldTotalMass).Add(obj.Position.Scale(obj.Mass)).Scale(1 / ot.TotalMass)
 	}
 }
 

@@ -100,6 +100,8 @@ func ReadConfig(filepath string) (*Config, error) {
 		// TestIterations:        viper.GetInt32("test_iterations"),
 	}
 
+	config.Frametime = 1.0 / float64(config.TargetFPS)
+
 	return config, nil
 }
 
