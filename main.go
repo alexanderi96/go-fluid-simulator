@@ -75,7 +75,7 @@ func main() {
 	}
 
 	// Set background color to gray
-	s.App.Gls().ClearColor(0, 0, 0, 1.0)
+	s.App.Gls().ClearColor(10, 10, 10, 1.0)
 
 	// Create and add lights to the scene
 	s.Scene.Add(light.NewAmbient(&math32.Color{R: 1.0, G: 1.0, B: 1.0}, 0.1))

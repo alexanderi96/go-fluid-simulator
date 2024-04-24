@@ -55,7 +55,7 @@ func getOctreeWireframe(min, max vector3.Vector[float64]) *graphic.Lines {
 
 	geom := geometry.NewGeometry()
 	geom.AddVBO(vbo)
-	mat := material.NewBasic()
+	mat := material.NewStandard(math32.NewColor("Red"))
 	mat.SetLineWidth(1)
 	mat.SetSide(material.SideDouble)
 	return graphic.NewLines(geom, mat)
@@ -64,9 +64,9 @@ func getOctreeWireframe(min, max vector3.Vector[float64]) *graphic.Lines {
 // Octree crea un nuovo Octree.
 func NewOctree(level int8, bounds BoundingBox, scene *core.Node) *Octree {
 	wireframe := &graphic.Lines{}
-	if false {
+	if true {
 		wireframe = getOctreeWireframe(bounds.Min, bounds.Max)
-		wireframe.SetVisible(false)
+		wireframe.SetVisible(true)
 		scene.Add(wireframe)
 	}
 
@@ -111,30 +111,30 @@ func (ot *Octree) Split(scene *core.Node) {
 	level := ot.level + 1
 
 	// Creazione dei nuovi otto sotto-octrees.
-	// children[0] = inBottom && inLeft && inBack
+	// children[0] = inBottom && inLeft && inBack (0)
 	swb := BoundingBox{Min: vector3.New(minX, minY, minZ), Max: vector3.New(minX+subWidth, minY+subHeight, minZ+subDepth)}
 	ot.Children[0] = NewOctree(level, swb, scene)
-	// children[1] = inBottom && inRight && inBack
+	// children[1] = inBottom && inRight && inBack (1)
 	seb := BoundingBox{Min: vector3.New(minX+subWidth, minY, minZ), Max: vector3.New(minX+2*subWidth, minY+subHeight, minZ+subDepth)}
 	ot.Children[1] = NewOctree(level, seb, scene)
-	// children[2] = inTop && inLeft && inBack
-	nwb := BoundingBox{Min: vector3.New(minX, minY+subHeight, minZ), Max: vector3.New(minX+subWidth, minY+2*subHeight, minZ+subDepth)}
-	ot.Children[2] = NewOctree(level, nwb, scene)
-	// children[3] = inTop && inRight && inBack
-	neb := BoundingBox{Min: vector3.New(minX+subWidth, minY+subHeight, minZ), Max: vector3.New(minX+2*subWidth, minY+2*subHeight, minZ+subDepth)}
-	ot.Children[3] = NewOctree(level, neb, scene)
-	// children[4] = inBottom && inLeft && inFront
-	swf := BoundingBox{Min: vector3.New(minX, minY, minZ+subDepth), Max: vector3.New(minX+subWidth, minY+subHeight, minZ+2*subDepth)}
-	ot.Children[4] = NewOctree(level, swf, scene)
-	// children[5] = inBottom && inRight && inFront
+	// children[5] = inBottom && inRight && inFront (2)
 	sef := BoundingBox{Min: vector3.New(minX+subWidth, minY, minZ+subDepth), Max: vector3.New(minX+2*subWidth, minY+subHeight, minZ+2*subDepth)}
-	ot.Children[5] = NewOctree(level, sef, scene)
-	// children[6] = inTop && inLeft && inFront
-	nwf := BoundingBox{Min: vector3.New(minX, minY+subHeight, minZ+subDepth), Max: vector3.New(minX+subWidth, minY+2*subHeight, minZ+2*subDepth)}
-	ot.Children[6] = NewOctree(level, nwf, scene)
-	// children[7] = inTop && inRight && inFront
+	ot.Children[2] = NewOctree(level, sef, scene)
+	// children[4] = inBottom && inLeft && inFront (3)
+	swf := BoundingBox{Min: vector3.New(minX, minY, minZ+subDepth), Max: vector3.New(minX+subWidth, minY+subHeight, minZ+2*subDepth)}
+	ot.Children[3] = NewOctree(level, swf, scene)
+	// children[2] = inTop && inLeft && inBack (4)
+	nwb := BoundingBox{Min: vector3.New(minX, minY+subHeight, minZ), Max: vector3.New(minX+subWidth, minY+2*subHeight, minZ+subDepth)}
+	ot.Children[4] = NewOctree(level, nwb, scene)
+	// children[3] = inTop && inRight && inBack (5)
+	neb := BoundingBox{Min: vector3.New(minX+subWidth, minY+subHeight, minZ), Max: vector3.New(minX+2*subWidth, minY+2*subHeight, minZ+subDepth)}
+	ot.Children[5] = NewOctree(level, neb, scene)
+	// children[7] = inTop && inRight && inFront (6)
 	nef := BoundingBox{Min: vector3.New(minX+subWidth, minY+subHeight, minZ+subDepth), Max: vector3.New(minX+2*subWidth, minY+2*subHeight, minZ+2*subDepth)}
-	ot.Children[7] = NewOctree(level, nef, scene)
+	ot.Children[6] = NewOctree(level, nef, scene)
+	// children[6] = inTop && inLeft && inFront (7)
+	nwf := BoundingBox{Min: vector3.New(minX, minY+subHeight, minZ+subDepth), Max: vector3.New(minX+subWidth, minY+2*subHeight, minZ+2*subDepth)}
+	ot.Children[7] = NewOctree(level, nwf, scene)
 
 	ot.divided = true
 }
@@ -202,39 +202,39 @@ func (ot *Octree) getIndices(obj Unit) []int {
 	indices := make([]int, 0, 8) // Preallocazione con la dimensione massima possibile
 
 	// Condizioni ottimizzate e raggruppate
-	if maxX >= midX {
-		if maxY >= midY {
-			if maxZ >= midZ {
-				indices = append(indices, 7)
+	if maxX >= midX { // upper half
+		if maxY >= midY { // right
+			if maxZ >= midZ { // front
+				indices = append(indices, 6)
 			}
-			if minZ <= midZ {
-				indices = append(indices, 3)
-			}
-		}
-		if minY <= midY {
-			if maxZ >= midZ {
+			if minZ <= midZ { // back
 				indices = append(indices, 5)
 			}
-			if minZ <= midZ {
-				indices = append(indices, 1)
+		}
+		if minY <= midY { // upper left
+			if maxZ >= midZ { // front
+				indices = append(indices, 7)
+			}
+			if minZ <= midZ { // back
+				indices = append(indices, 4)
 			}
 		}
 	}
-	if minX <= midX {
-		if maxY >= midY {
-			if maxZ >= midZ {
-				indices = append(indices, 6)
+	if minX <= midX { // lower half
+		if maxY >= midY { // left
+			if maxZ >= midZ { // front
+				indices = append(indices, 3)
 			}
-			if minZ <= midZ {
-				indices = append(indices, 2)
+			if minZ <= midZ { // back
+				indices = append(indices, 0)
 			}
 		}
-		if minY <= midY {
-			if maxZ >= midZ {
-				indices = append(indices, 4)
+		if minY <= midY { // lower right
+			if maxZ >= midZ { // front
+				indices = append(indices, 2)
 			}
-			if minZ <= midZ {
-				indices = append(indices, 0)
+			if minZ <= midZ { // back
+				indices = append(indices, 1)
 			}
 		}
 	}

@@ -19,7 +19,7 @@
   gravity = -9.81
   
 # unit config
-  unit_number = 2000
+  unit_number = 200
   unit_initial_spacing = 5
   units_emit_gravity = true
   unit_gravitational_multiplier = 1
