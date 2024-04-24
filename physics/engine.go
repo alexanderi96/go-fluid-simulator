@@ -322,7 +322,7 @@ func (u *Unit) CalcolaVettoreVelocitaRotazione(p *vector3.Vector[float64]) {
 	d := math.Sqrt(u.Position.X()*u.Position.X() + u.Position.Y()*u.Position.Y())
 
 	// Calcola la velocità di rotazione proporzionale alla distanza
-	k := 0.1 // Costante di proporzionalità (personalizzabile)
+	k := 0.5 // Costante di proporzionalità (personalizzabile)
 	v := k * d
 
 	// Calcola le componenti di velocità lungo gli assi x e y

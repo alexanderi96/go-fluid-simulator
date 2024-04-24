@@ -105,6 +105,12 @@ func main() {
 			s.PositionNewUnitsFibonacci(units)
 			s.GiveRotationalVelocity(units)
 			s.Fluid = append(s.Fluid, units...)
+		} else if mev.Button == window.MouseButtonLeft && mev.Mods == window.ModShift {
+			// Controlla se sia il pulsante destro del mouse sia il pulsante Ctrl sinistro sono premuti
+			units := s.GetUnits()
+			s.PositionNewUnitsCube(units)
+			s.GiveRotationalVelocity(units)
+			s.Fluid = append(s.Fluid, units...)
 		}
 	})
 
