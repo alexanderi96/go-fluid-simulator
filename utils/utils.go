@@ -9,6 +9,10 @@ import (
 	"strconv"
 
 	"github.com/EliCDavis/vector/vector3"
+	"github.com/g3n/engine/geometry"
+	"github.com/g3n/engine/gls"
+	"github.com/g3n/engine/graphic"
+	"github.com/g3n/engine/material"
 	"github.com/g3n/engine/math32"
 	// rl "github.com/gen2brain/raylib-go/raylib"
 )
@@ -147,4 +151,32 @@ func RgbaToMath32(rgba color.RGBA) *math32.Color {
 		G: float32(rgba.G) / 255.0,
 		B: float32(rgba.B) / 255.0,
 	}
+}
+
+func GetBoundsLine(min, max vector3.Vector[float64]) *graphic.Lines {
+
+	// Crea il wireframe per il nodo corrente
+	vertices := math32.NewArrayF32(0, 16)
+	vertices.Append(
+		min.ToFloat32().X(), min.ToFloat32().Y(), min.ToFloat32().Z(), max.ToFloat32().X(), min.ToFloat32().Y(), min.ToFloat32().Z(),
+		max.ToFloat32().X(), min.ToFloat32().Y(), min.ToFloat32().Z(), max.ToFloat32().X(), max.ToFloat32().Y(), min.ToFloat32().Z(),
+		max.ToFloat32().X(), max.ToFloat32().Y(), min.ToFloat32().Z(), min.ToFloat32().X(), max.ToFloat32().Y(), min.ToFloat32().Z(),
+		min.ToFloat32().X(), max.ToFloat32().Y(), min.ToFloat32().Z(), min.ToFloat32().X(), min.ToFloat32().Y(), min.ToFloat32().Z(),
+		min.ToFloat32().X(), min.ToFloat32().Y(), max.ToFloat32().Z(), max.ToFloat32().X(), min.ToFloat32().Y(), max.ToFloat32().Z(),
+		max.ToFloat32().X(), min.ToFloat32().Y(), max.ToFloat32().Z(), max.ToFloat32().X(), max.ToFloat32().Y(), max.ToFloat32().Z(),
+		max.ToFloat32().X(), max.ToFloat32().Y(), max.ToFloat32().Z(), min.ToFloat32().X(), max.ToFloat32().Y(), max.ToFloat32().Z(),
+		min.ToFloat32().X(), max.ToFloat32().Y(), max.ToFloat32().Z(), min.ToFloat32().X(), min.ToFloat32().Y(), max.ToFloat32().Z(),
+		min.ToFloat32().X(), min.ToFloat32().Y(), min.ToFloat32().Z(), min.ToFloat32().X(), min.ToFloat32().Y(), max.ToFloat32().Z(),
+		max.ToFloat32().X(), min.ToFloat32().Y(), min.ToFloat32().Z(), max.ToFloat32().X(), min.ToFloat32().Y(), max.ToFloat32().Z(),
+		max.ToFloat32().X(), max.ToFloat32().Y(), min.ToFloat32().Z(), max.ToFloat32().X(), max.ToFloat32().Y(), max.ToFloat32().Z(),
+		min.ToFloat32().X(), max.ToFloat32().Y(), min.ToFloat32().Z(), min.ToFloat32().X(), max.ToFloat32().Y(), max.ToFloat32().Z(),
+	)
+	vbo := gls.NewVBO(vertices).AddAttrib(gls.VertexPosition)
+
+	geom := geometry.NewGeometry()
+	geom.AddVBO(vbo)
+	mat := material.NewStandard(math32.NewColor("White"))
+	mat.SetLineWidth(1.5)
+	mat.SetSide(material.SideDouble)
+	return graphic.NewLines(geom, mat)
 }

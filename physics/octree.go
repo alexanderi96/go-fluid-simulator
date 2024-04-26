@@ -3,12 +3,10 @@ package physics
 import (
 	"github.com/EliCDavis/vector/vector3"
 	"github.com/alexanderi96/go-fluid-simulator/config"
+	"github.com/alexanderi96/go-fluid-simulator/utils"
+
 	"github.com/g3n/engine/core"
-	"github.com/g3n/engine/geometry"
-	"github.com/g3n/engine/gls"
 	"github.com/g3n/engine/graphic"
-	"github.com/g3n/engine/material"
-	"github.com/g3n/engine/math32"
 )
 
 var (
@@ -32,40 +30,11 @@ type Octree struct {
 	TotalMass    float64
 }
 
-// NewWireframeOctree crea un oggetto grafico che rappresenta il wireframe dell'octree.
-func getOctreeWireframe(min, max vector3.Vector[float64]) *graphic.Lines {
-
-	// Crea il wireframe per il nodo corrente
-	vertices := math32.NewArrayF32(0, 16)
-	vertices.Append(
-		min.ToFloat32().X(), min.ToFloat32().Y(), min.ToFloat32().Z(), max.ToFloat32().X(), min.ToFloat32().Y(), min.ToFloat32().Z(),
-		max.ToFloat32().X(), min.ToFloat32().Y(), min.ToFloat32().Z(), max.ToFloat32().X(), max.ToFloat32().Y(), min.ToFloat32().Z(),
-		max.ToFloat32().X(), max.ToFloat32().Y(), min.ToFloat32().Z(), min.ToFloat32().X(), max.ToFloat32().Y(), min.ToFloat32().Z(),
-		min.ToFloat32().X(), max.ToFloat32().Y(), min.ToFloat32().Z(), min.ToFloat32().X(), min.ToFloat32().Y(), min.ToFloat32().Z(),
-		min.ToFloat32().X(), min.ToFloat32().Y(), max.ToFloat32().Z(), max.ToFloat32().X(), min.ToFloat32().Y(), max.ToFloat32().Z(),
-		max.ToFloat32().X(), min.ToFloat32().Y(), max.ToFloat32().Z(), max.ToFloat32().X(), max.ToFloat32().Y(), max.ToFloat32().Z(),
-		max.ToFloat32().X(), max.ToFloat32().Y(), max.ToFloat32().Z(), min.ToFloat32().X(), max.ToFloat32().Y(), max.ToFloat32().Z(),
-		min.ToFloat32().X(), max.ToFloat32().Y(), max.ToFloat32().Z(), min.ToFloat32().X(), min.ToFloat32().Y(), max.ToFloat32().Z(),
-		min.ToFloat32().X(), min.ToFloat32().Y(), min.ToFloat32().Z(), min.ToFloat32().X(), min.ToFloat32().Y(), max.ToFloat32().Z(),
-		max.ToFloat32().X(), min.ToFloat32().Y(), min.ToFloat32().Z(), max.ToFloat32().X(), min.ToFloat32().Y(), max.ToFloat32().Z(),
-		max.ToFloat32().X(), max.ToFloat32().Y(), min.ToFloat32().Z(), max.ToFloat32().X(), max.ToFloat32().Y(), max.ToFloat32().Z(),
-		min.ToFloat32().X(), max.ToFloat32().Y(), min.ToFloat32().Z(), min.ToFloat32().X(), max.ToFloat32().Y(), max.ToFloat32().Z(),
-	)
-	vbo := gls.NewVBO(vertices).AddAttrib(gls.VertexPosition)
-
-	geom := geometry.NewGeometry()
-	geom.AddVBO(vbo)
-	mat := material.NewStandard(math32.NewColor("Red"))
-	mat.SetLineWidth(1)
-	mat.SetSide(material.SideDouble)
-	return graphic.NewLines(geom, mat)
-}
-
 // Octree crea un nuovo Octree.
 func NewOctree(level int8, bounds BoundingBox, scene *core.Node) *Octree {
 	wireframe := &graphic.Lines{}
 	if true {
-		wireframe = getOctreeWireframe(bounds.Min, bounds.Max)
+		wireframe = utils.GetBoundsLine(bounds.Min, bounds.Max)
 		wireframe.SetVisible(true)
 		scene.Add(wireframe)
 	}
@@ -112,29 +81,29 @@ func (ot *Octree) Split(scene *core.Node) {
 
 	// Creazione dei nuovi otto sotto-octrees.
 	// children[0] = inBottom && inLeft && inBack (0)
-	swb := BoundingBox{Min: vector3.New(minX, minY, minZ), Max: vector3.New(minX+subWidth, minY+subHeight, minZ+subDepth)}
-	ot.Children[0] = NewOctree(level, swb, scene)
+	BLB := BoundingBox{Min: vector3.New(minX, minY, minZ), Max: vector3.New(minX+subWidth, minY+subHeight, minZ+subDepth)}
+	ot.Children[0] = NewOctree(level, BLB, scene)
 	// children[1] = inBottom && inRight && inBack (1)
-	seb := BoundingBox{Min: vector3.New(minX+subWidth, minY, minZ), Max: vector3.New(minX+2*subWidth, minY+subHeight, minZ+subDepth)}
-	ot.Children[1] = NewOctree(level, seb, scene)
+	BRB := BoundingBox{Min: vector3.New(minX+subWidth, minY, minZ), Max: vector3.New(minX+2*subWidth, minY+subHeight, minZ+subDepth)}
+	ot.Children[1] = NewOctree(level, BRB, scene)
 	// children[5] = inBottom && inRight && inFront (2)
-	sef := BoundingBox{Min: vector3.New(minX+subWidth, minY, minZ+subDepth), Max: vector3.New(minX+2*subWidth, minY+subHeight, minZ+2*subDepth)}
-	ot.Children[2] = NewOctree(level, sef, scene)
+	BRF := BoundingBox{Min: vector3.New(minX+subWidth, minY, minZ+subDepth), Max: vector3.New(minX+2*subWidth, minY+subHeight, minZ+2*subDepth)}
+	ot.Children[2] = NewOctree(level, BRF, scene)
 	// children[4] = inBottom && inLeft && inFront (3)
-	swf := BoundingBox{Min: vector3.New(minX, minY, minZ+subDepth), Max: vector3.New(minX+subWidth, minY+subHeight, minZ+2*subDepth)}
-	ot.Children[3] = NewOctree(level, swf, scene)
+	BLF := BoundingBox{Min: vector3.New(minX, minY, minZ+subDepth), Max: vector3.New(minX+subWidth, minY+subHeight, minZ+2*subDepth)}
+	ot.Children[3] = NewOctree(level, BLF, scene)
 	// children[2] = inTop && inLeft && inBack (4)
-	nwb := BoundingBox{Min: vector3.New(minX, minY+subHeight, minZ), Max: vector3.New(minX+subWidth, minY+2*subHeight, minZ+subDepth)}
-	ot.Children[4] = NewOctree(level, nwb, scene)
+	TLB := BoundingBox{Min: vector3.New(minX, minY+subHeight, minZ), Max: vector3.New(minX+subWidth, minY+2*subHeight, minZ+subDepth)}
+	ot.Children[4] = NewOctree(level, TLB, scene)
 	// children[3] = inTop && inRight && inBack (5)
-	neb := BoundingBox{Min: vector3.New(minX+subWidth, minY+subHeight, minZ), Max: vector3.New(minX+2*subWidth, minY+2*subHeight, minZ+subDepth)}
-	ot.Children[5] = NewOctree(level, neb, scene)
+	TRB := BoundingBox{Min: vector3.New(minX+subWidth, minY+subHeight, minZ), Max: vector3.New(minX+2*subWidth, minY+2*subHeight, minZ+subDepth)}
+	ot.Children[5] = NewOctree(level, TRB, scene)
 	// children[7] = inTop && inRight && inFront (6)
-	nef := BoundingBox{Min: vector3.New(minX+subWidth, minY+subHeight, minZ+subDepth), Max: vector3.New(minX+2*subWidth, minY+2*subHeight, minZ+2*subDepth)}
-	ot.Children[6] = NewOctree(level, nef, scene)
+	TRF := BoundingBox{Min: vector3.New(minX+subWidth, minY+subHeight, minZ+subDepth), Max: vector3.New(minX+2*subWidth, minY+2*subHeight, minZ+2*subDepth)}
+	ot.Children[6] = NewOctree(level, TRF, scene)
 	// children[6] = inTop && inLeft && inFront (7)
-	nwf := BoundingBox{Min: vector3.New(minX, minY+subHeight, minZ+subDepth), Max: vector3.New(minX+subWidth, minY+2*subHeight, minZ+2*subDepth)}
-	ot.Children[7] = NewOctree(level, nwf, scene)
+	TLF := BoundingBox{Min: vector3.New(minX, minY+subHeight, minZ+subDepth), Max: vector3.New(minX+subWidth, minY+2*subHeight, minZ+2*subDepth)}
+	ot.Children[7] = NewOctree(level, TLF, scene)
 
 	ot.divided = true
 }
@@ -186,56 +155,15 @@ func (ot *Octree) updateMassAndCenterOfMass(obj *Unit) {
 
 // getIndex determina in quale sotto-Octree un oggetto appartiene.
 func (ot *Octree) getIndices(obj Unit) []int {
-	// Calcola una volta e riutilizza
-	midX := (ot.Bounds.Min.X() + ot.Bounds.Max.X()) / 2
-	midY := (ot.Bounds.Min.Y() + ot.Bounds.Max.Y()) / 2
-	midZ := (ot.Bounds.Min.Z() + ot.Bounds.Max.Z()) / 2
-
-	treshold := obj.Radius
-	minX := obj.Position.X() - treshold
-	maxX := obj.Position.X() + treshold
-	minY := obj.Position.Y() - treshold
-	maxY := obj.Position.Y() + treshold
-	minZ := obj.Position.Z() - treshold
-	maxZ := obj.Position.Z() + treshold
-
 	indices := make([]int, 0, 8) // Preallocazione con la dimensione massima possibile
 
-	// Condizioni ottimizzate e raggruppate
-	if maxX >= midX { // upper half
-		if maxY >= midY { // right
-			if maxZ >= midZ { // front
-				indices = append(indices, 6)
-			}
-			if minZ <= midZ { // back
-				indices = append(indices, 5)
-			}
-		}
-		if minY <= midY { // upper left
-			if maxZ >= midZ { // front
-				indices = append(indices, 7)
-			}
-			if minZ <= midZ { // back
-				indices = append(indices, 4)
-			}
-		}
-	}
-	if minX <= midX { // lower half
-		if maxY >= midY { // left
-			if maxZ >= midZ { // front
-				indices = append(indices, 3)
-			}
-			if minZ <= midZ { // back
-				indices = append(indices, 0)
-			}
-		}
-		if minY <= midY { // lower right
-			if maxZ >= midZ { // front
-				indices = append(indices, 2)
-			}
-			if minZ <= midZ { // back
-				indices = append(indices, 1)
-			}
+	// Confronta direttamente le coordinate dell'oggetto con i limiti dell'Octree
+	for i := 0; i < 8; i++ {
+		child := ot.Children[i]
+		if child != nil && obj.Position.X() >= child.Bounds.Min.X() && obj.Position.X() <= child.Bounds.Max.X() &&
+			obj.Position.Y() >= child.Bounds.Min.Y() && obj.Position.Y() <= child.Bounds.Max.Y() &&
+			obj.Position.Z() >= child.Bounds.Min.Z() && obj.Position.Z() <= child.Bounds.Max.Z() {
+			indices = append(indices, i)
 		}
 	}
 
