@@ -19,13 +19,13 @@
   gravity = -9.81
   
 # unit config
-  unit_number = 200
+  unit_number = 2
   unit_initial_spacing = 5
   units_emit_gravity = true
   unit_gravitational_multiplier = 1
 
   unit_radius = 1
-  unit_radius_multiplier = 0.01
+  unit_radius_multiplier = 1
   set_random_radius = false
   radius_min = 0.1
   radius_max = 10

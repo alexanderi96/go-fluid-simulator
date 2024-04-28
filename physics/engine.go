@@ -11,16 +11,30 @@ import (
 	"github.com/EliCDavis/vector/vector3"
 	"github.com/alexanderi96/go-fluid-simulator/config"
 	"github.com/alexanderi96/go-fluid-simulator/metrics"
+	"github.com/alexanderi96/go-fluid-simulator/utils"
 	"github.com/google/uuid"
 
 	"github.com/g3n/engine/app"
 	"github.com/g3n/engine/camera"
 	"github.com/g3n/engine/core"
+	"github.com/g3n/engine/graphic"
 	"github.com/g3n/engine/window"
 )
 
 type BoundingBox struct {
 	Min, Max vector3.Vector[float64]
+	wf       *graphic.Lines
+}
+
+func (b *BoundingBox) Draw(scene *core.Node) {
+	b.wf = utils.GetBoundsLine(b.Min, b.Max)
+	b.wf.SetVisible(true)
+	scene.Add(b.wf)
+}
+
+func (b *BoundingBox) RemoveFromScene(scene *core.Node) {
+	scene.Remove(b.wf)
+	b.wf = nil
 }
 
 type Simulation struct {

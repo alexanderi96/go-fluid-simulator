@@ -22,7 +22,10 @@ import (
 )
 
 var (
-	s *physics.Simulation
+	s            *physics.Simulation
+	ambientLight = &math32.Color{R: 1.0, G: 1.0, B: 1.0}
+	pointLight   = &math32.Color{R: 1.0, G: 1.0, B: 1.0}
+	bgColor      = &math32.Color{R: 0.5, G: 0.5, B: 0.5}
 )
 
 func init() {
@@ -75,11 +78,11 @@ func main() {
 	}
 
 	// Set background color to gray
-	s.App.Gls().ClearColor(10, 10, 10, 1.0)
+	s.App.Gls().ClearColor(bgColor.R, bgColor.G, bgColor.B, 1.0)
 
 	// Create and add lights to the scene
-	s.Scene.Add(light.NewAmbient(&math32.Color{R: 1.0, G: 1.0, B: 1.0}, 0.1))
-	pointLight := light.NewPoint(&math32.Color{R: 1, G: 1, B: 1}, 1000.0)
+	s.Scene.Add(light.NewAmbient(ambientLight, 0.1))
+	pointLight := light.NewPoint(pointLight, 1000.0)
 	pointLight.SetPosition(float32(s.Config.GameX), float32(s.Config.GameY), float32(s.Config.GameZ))
 	s.Scene.Add(pointLight)
 
@@ -125,7 +128,7 @@ func main() {
 			s.IsPause = !s.IsPause
 		}
 		if kev.Key == window.KeyS {
-			s.SaveSimulation("simulation.json")
+			s.SaveSimulation("simulation" + time.Now().Format("2006-01-02 15:04:05") + ".json")
 		}
 		if kev.Key == window.KeyL {
 

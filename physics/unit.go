@@ -142,3 +142,38 @@ func (unit *Unit) CheckAndResolveWallCollision(wallBounds BoundingBox, wallElast
 	return collided
 
 }
+
+// Calcola la massa parziale e il centro di massa di una porzione di sfera all'interno di una BoundingBox
+func (u *Unit) GiveMassAndCenterOfMassForBounds(bounds BoundingBox) (vector3.Vector[float64], float64) {
+	// Discretizza la sfera in punti (questo è un esempio molto semplice e non ottimizzato)
+	points := make([]vector3.Vector[float64], 0)
+	for phi := 0.0; phi < 2*math.Pi; phi += math.Pi / 10 { // Incremento arbitrario
+		for theta := 0.0; theta < math.Pi; theta += math.Pi / 10 { // Incremento arbitrario
+			x := u.Radius * math.Sin(theta) * math.Cos(phi)
+			y := u.Radius * math.Sin(theta) * math.Sin(phi)
+			z := u.Radius * math.Cos(theta)
+			point := vector3.New(x, y, z).Add(u.Position)
+			points = append(points, point)
+		}
+	}
+
+	// Calcola la massa parziale e il centro di massa
+	var totalMass float64
+	centerOfMass := vector3.Zero[float64]()
+	for _, point := range points {
+		if point.X() >= bounds.Min.X() && point.X() <= bounds.Max.X() &&
+			point.Y() >= bounds.Min.Y() && point.Y() <= bounds.Max.Y() &&
+			point.Z() >= bounds.Min.Z() && point.Z() <= bounds.Max.Z() {
+			// Assumi che ogni punto abbia una massa uguale (massa totale / numero di punti)
+			pointMass := u.Mass / float64(len(points))
+			totalMass += pointMass
+			centerOfMass = centerOfMass.Add(point.Scale(pointMass))
+		}
+	}
+
+	if totalMass > 0 {
+		centerOfMass = centerOfMass.Scale(1 / totalMass)
+	}
+
+	return centerOfMass, totalMass
+}

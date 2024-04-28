@@ -33,7 +33,7 @@ type Octree struct {
 // Octree crea un nuovo Octree.
 func NewOctree(level int8, bounds BoundingBox, scene *core.Node) *Octree {
 	wireframe := &graphic.Lines{}
-	if true {
+	if false {
 		wireframe = utils.GetBoundsLine(bounds.Min, bounds.Max)
 		wireframe.SetVisible(true)
 		scene.Add(wireframe)
@@ -128,7 +128,7 @@ func (ot *Octree) Insert(obj *Unit, scene *core.Node) {
 }
 
 func (ot *Octree) insertUnitIntoChildren(obj *Unit, scene *core.Node) {
-	indices := ot.getIndices(*obj)
+	indices := ot.getIndices(obj.Position, obj.Radius)
 	inserted := false
 	for _, index := range indices {
 		if index != -1 {
@@ -140,30 +140,35 @@ func (ot *Octree) insertUnitIntoChildren(obj *Unit, scene *core.Node) {
 	if !inserted {
 		ot.objects = append(ot.objects, obj)
 	}
-	// ot.updateMassAndCenterOfMass(obj)
 }
 
 func (ot *Octree) updateMassAndCenterOfMass(obj *Unit) {
 	oldTotalMass := ot.TotalMass
 	ot.TotalMass += obj.Mass
+	massPosition, mass := obj.Position, obj.Mass //obj.GiveMassAndCenterOfMassForBounds(ot.Bounds)
 	if oldTotalMass == 0 {
-		ot.CenterOfMass = obj.Position
+		ot.CenterOfMass = massPosition
 	} else {
-		ot.CenterOfMass = ot.CenterOfMass.Scale(oldTotalMass).Add(obj.Position.Scale(obj.Mass)).Scale(1 / ot.TotalMass)
+		ot.CenterOfMass = ot.CenterOfMass.Scale(oldTotalMass).Add(massPosition.Scale(mass)).Scale(1 / ot.TotalMass)
 	}
 }
 
 // getIndex determina in quale sotto-Octree un oggetto appartiene.
-func (ot *Octree) getIndices(obj Unit) []int {
+func (ot *Octree) getIndices(position vector3.Vector[float64], radius float64) []int {
 	indices := make([]int, 0, 8) // Preallocazione con la dimensione massima possibile
 
-	// Confronta direttamente le coordinate dell'oggetto con i limiti dell'Octree
-	for i := 0; i < 8; i++ {
-		child := ot.Children[i]
-		if child != nil && obj.Position.X() >= child.Bounds.Min.X() && obj.Position.X() <= child.Bounds.Max.X() &&
-			obj.Position.Y() >= child.Bounds.Min.Y() && obj.Position.Y() <= child.Bounds.Max.Y() &&
-			obj.Position.Z() >= child.Bounds.Min.Z() && obj.Position.Z() <= child.Bounds.Max.Z() {
-			indices = append(indices, i)
+	// Confronta la sfera dell'oggetto con i limiti dell'Octree
+	for i, child := range ot.Children {
+		if child != nil {
+			minX, minY, minZ := child.Bounds.Min.X(), child.Bounds.Min.Y(), child.Bounds.Min.Z()
+			maxX, maxY, maxZ := child.Bounds.Max.X(), child.Bounds.Max.Y(), child.Bounds.Max.Z()
+
+			// Verifica se la sfera si sovrappone ai limiti dell'ottante
+			if position.X()-radius <= maxX && position.X()+radius >= minX &&
+				position.Y()-radius <= maxY && position.Y()+radius >= minY &&
+				position.Z()-radius <= maxZ && position.Z()+radius >= minZ {
+				indices = append(indices, i)
+			}
 		}
 	}
 
@@ -176,7 +181,7 @@ func (ot *Octree) getIndices(obj Unit) []int {
 
 // Retrieve restituisce tutti gli oggetti che potrebbero collidere con l'oggetto dato.
 func (ot *Octree) Retrieve(returnObjects *[]*Unit, obj *Unit) {
-	indices := ot.getIndices(*obj)
+	indices := ot.getIndices(obj.Position, obj.Radius)
 	for _, index := range indices {
 		if index != -1 && ot.Children[index] != nil {
 			ot.Children[index].Retrieve(returnObjects, obj)
