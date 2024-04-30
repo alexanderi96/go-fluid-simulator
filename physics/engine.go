@@ -23,18 +23,18 @@ import (
 
 type BoundingBox struct {
 	Min, Max vector3.Vector[float64]
-	wf       *graphic.Lines
+	Wf       *graphic.Lines
 }
 
-func (b *BoundingBox) Draw(scene *core.Node) {
-	b.wf = utils.GetBoundsLine(b.Min, b.Max)
-	b.wf.SetVisible(true)
-	scene.Add(b.wf)
+func (b *BoundingBox) DrawBounds(scene *core.Node) {
+	b.Wf = utils.GetBoundsLine(b.Min, b.Max)
+	b.Wf.SetVisible(true)
+	scene.Add(b.Wf)
 }
 
-func (b *BoundingBox) RemoveFromScene(scene *core.Node) {
-	scene.Remove(b.wf)
-	b.wf = nil
+func (b *BoundingBox) RemoveBounds(scene *core.Node) {
+	scene.Remove(b.Wf)
+	b.Wf = nil
 }
 
 type Simulation struct {
@@ -97,7 +97,7 @@ func NewSimulation(config *config.Config) (*Simulation, error) {
 	sim.App.IWindow.(*window.GlfwWindow).SetTitle("Go Fluid Simulator")
 	sim.App.IWindow.(*window.GlfwWindow).SetSize(int(config.WindowWidth), int(config.WindowHeight))
 
-	sim.Octree = NewOctree(0, sim.WorldBoundray, sim.Scene)
+	sim.Octree = NewOctree(0, sim.WorldBoundray, sim.Scene, config.ShowOctree)
 
 	return sim, nil
 }

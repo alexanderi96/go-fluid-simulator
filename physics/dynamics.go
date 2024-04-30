@@ -45,7 +45,7 @@ func (s *Simulation) UpdateWithOctrees() error {
 	for _, unit := range s.Fluid {
 		go func(u *Unit) {
 			defer wg.Done()
-			u.accelerate(s.Octree.CalculateGravity(u, 0.5))
+			u.accelerate(s.Octree.CalculateGravity(u, 0.9))
 		}(unit)
 	}
 
