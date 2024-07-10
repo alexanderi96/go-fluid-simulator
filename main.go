@@ -25,7 +25,7 @@ var (
 	s            *physics.Simulation
 	ambientLight = &math32.Color{R: 1.0, G: 1.0, B: 1.0}
 	pointLight   = &math32.Color{R: 1.0, G: 1.0, B: 1.0}
-	bgColor      = &math32.Color{R: 0.5, G: 0.5, B: 0.5}
+	bgColor      = &math32.Color{R: 0.01, G: 0.01, B: 0.01}
 )
 
 func init() {
@@ -82,7 +82,7 @@ func main() {
 
 	// Create and add lights to the scene
 	s.Scene.Add(light.NewAmbient(ambientLight, 0.1))
-	pointLight := light.NewPoint(pointLight, 1000.0)
+	pointLight := light.NewPoint(pointLight, 1000000.0)
 	pointLight.SetPosition(float32(s.Config.GameX), float32(s.Config.GameY), float32(s.Config.GameZ))
 	s.Scene.Add(pointLight)
 

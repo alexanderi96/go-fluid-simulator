@@ -11,20 +11,22 @@
   frametime = 0.001 # 0.01 s = 100 hz
 
 # world config
-  game_x = 20
-  game_y = 20
-  game_z = 20
+  game_x = 200
+  game_y = 200
+  game_z = 200
   wall_elasticity = 0.5
   apply_gravity = false
   gravity = -9.81
+
+  central_mass = 10000000
   
 # unit config
-  unit_number = 200
+  unit_number = 1000
   unit_initial_spacing = 1
   units_emit_gravity = true
   unit_gravitational_multiplier = 1
 
-  unit_radius = 0.1
+  unit_radius = 1
   unit_radius_multiplier = 1
   set_random_radius = false
   radius_min = 0.1

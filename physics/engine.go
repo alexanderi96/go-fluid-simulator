@@ -21,6 +21,10 @@ import (
 	"github.com/g3n/engine/window"
 )
 
+var (
+	static = vector3.Zero[float64]()
+)
+
 type BoundingBox struct {
 	Min, Max vector3.Vector[float64]
 	Wf       *graphic.Lines
@@ -99,6 +103,10 @@ func NewSimulation(config *config.Config) (*Simulation, error) {
 
 	sim.Octree = NewOctree(0, sim.WorldBoundray, sim.Scene, config.ShowOctree)
 
+	if config.CentralMass > 0 {
+		sim.Fluid = append(sim.Fluid, sim.newUnitWithPropertiesAtPosition(WorldCenter, static, static, 0.01, config.CentralMass, 0, false, color.RGBA{uint8(255), uint8(1), uint8(1), 255}))
+	}
+
 	return sim, nil
 }
 
@@ -160,7 +168,7 @@ func (s *Simulation) IsSpawnInRange() bool {
 		s.FinalSpawnPosition.Z() >= s.WorldBoundray.Min.Z() && s.FinalSpawnPosition.Z() <= s.WorldBoundray.Max.Z()
 }
 
-func (s *Simulation) newUnitWithPropertiesAtPosition(position, acceleration, velocity vector3.Vector[float64], radius, massMultiplier, elasticity float64, color color.RGBA) *Unit {
+func (s *Simulation) newUnitWithPropertiesAtPosition(position, acceleration, velocity vector3.Vector[float64], radius, massMultiplier, elasticity float64, canBeAltered bool, color color.RGBA) *Unit {
 
 	unit := &Unit{
 		Id:       uuid.New(),
@@ -173,6 +181,8 @@ func (s *Simulation) newUnitWithPropertiesAtPosition(position, acceleration, vel
 		Elasticity:     elasticity,
 		Color:          color,
 		Heat:           0.0,
+
+		CanBeAltered: canBeAltered,
 	}
 
 	unit.GenerateMesh()
@@ -211,8 +221,7 @@ func (s *Simulation) GetUnits() []*Unit {
 		// if s.Config.SetRandomColor {
 		// 	color = utils.RandomRaylibColor()
 		// }
-		static := vector3.Zero[float64]()
-		unts = append(unts, s.newUnitWithPropertiesAtPosition(s.FinalSpawnPosition, static, static, currentRadius, currentMassMultiplier, currentElasticity, color))
+		unts = append(unts, s.newUnitWithPropertiesAtPosition(s.FinalSpawnPosition, static, static, currentRadius, currentMassMultiplier, currentElasticity, true, color))
 	}
 	return unts
 }

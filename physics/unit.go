@@ -34,6 +34,7 @@ type Unit struct {
 	MassMultiplier float64
 	Mass           float64
 	Color          color.RGBA
+	CanBeAltered   bool
 
 	Heat float64
 }

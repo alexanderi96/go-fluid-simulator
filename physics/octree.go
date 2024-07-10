@@ -20,15 +20,14 @@ func InitOctree(config *config.Config) {
 }
 
 type Octree struct {
-	level    int8
-	Bounds   BoundingBox
-	objects  []*Unit
-	Children [8]*Octree
-	divided  bool
-	wf       *graphic.Lines
-	com      *graphic.Mesh
-	showWf   bool
-
+	level        int8
+	Bounds       BoundingBox
+	objects      []*Unit
+	Children     [8]*Octree
+	divided      bool
+	wf           *graphic.Lines
+	com          *graphic.Mesh
+	showWf       bool
 	CenterOfMass vector3.Vector[float64]
 	TotalMass    float64
 }
@@ -36,20 +35,17 @@ type Octree struct {
 // Octree crea un nuovo Octree.
 func NewOctree(level int8, bounds BoundingBox, scene *core.Node, showWf bool) *Octree {
 	wireframe := &graphic.Lines{}
-
 	if showWf {
 		wireframe = utils.GetBoundsLine(bounds.Min, bounds.Max)
 		wireframe.SetVisible(true)
 		scene.Add(wireframe)
 	}
-
 	return &Octree{
-		level:   level,
-		Bounds:  bounds,
-		divided: false,
-		wf:      wireframe,
-		showWf:  showWf,
-
+		level:        level,
+		Bounds:       bounds,
+		divided:      false,
+		wf:           wireframe,
+		showWf:       showWf,
 		CenterOfMass: vector3.Zero[float64](),
 		TotalMass:    0,
 	}
@@ -68,7 +64,6 @@ func (ot *Octree) Clear(scene *core.Node) {
 		scene.Remove(ot.com)
 		ot.com = nil
 	}
-
 	for i := 0; i < len(ot.Children); i++ {
 		if ot.Children[i] != nil {
 			ot.Children[i].Clear(scene)
@@ -77,7 +72,7 @@ func (ot *Octree) Clear(scene *core.Node) {
 	}
 }
 
-// Split divide il Octree in quattro sotto-Octrees.
+// Split divide il Octree in otto sotto-Octrees.
 func (ot *Octree) Split(scene *core.Node) {
 	subWidth := (ot.Bounds.Max.X() - ot.Bounds.Min.X()) / 2
 	subHeight := (ot.Bounds.Max.Y() - ot.Bounds.Min.Y()) / 2
@@ -89,31 +84,28 @@ func (ot *Octree) Split(scene *core.Node) {
 
 	level := ot.level + 1
 
-	// Creazione dei nuovi otto sotto-octrees.
-	// children[0] = inBottom && inLeft && inBack (0)
-	BLB := BoundingBox{Min: vector3.New(minX, minY, minZ), Max: vector3.New(minX+subWidth, minY+subHeight, minZ+subDepth)}
-	ot.Children[0] = NewOctree(level, BLB, scene, ot.showWf)
-	// children[1] = inBottom && inRight && inBack (1)
-	BRB := BoundingBox{Min: vector3.New(minX+subWidth, minY, minZ), Max: vector3.New(minX+2*subWidth, minY+subHeight, minZ+subDepth)}
-	ot.Children[1] = NewOctree(level, BRB, scene, ot.showWf)
-	// children[5] = inBottom && inRight && inFront (2)
-	BRF := BoundingBox{Min: vector3.New(minX+subWidth, minY, minZ+subDepth), Max: vector3.New(minX+2*subWidth, minY+subHeight, minZ+2*subDepth)}
-	ot.Children[2] = NewOctree(level, BRF, scene, ot.showWf)
-	// children[4] = inBottom && inLeft && inFront (3)
-	BLF := BoundingBox{Min: vector3.New(minX, minY, minZ+subDepth), Max: vector3.New(minX+subWidth, minY+subHeight, minZ+2*subDepth)}
-	ot.Children[3] = NewOctree(level, BLF, scene, ot.showWf)
-	// children[2] = inTop && inLeft && inBack (4)
-	TLB := BoundingBox{Min: vector3.New(minX, minY+subHeight, minZ), Max: vector3.New(minX+subWidth, minY+2*subHeight, minZ+subDepth)}
-	ot.Children[4] = NewOctree(level, TLB, scene, ot.showWf)
-	// children[3] = inTop && inRight && inBack (5)
-	TRB := BoundingBox{Min: vector3.New(minX+subWidth, minY+subHeight, minZ), Max: vector3.New(minX+2*subWidth, minY+2*subHeight, minZ+subDepth)}
-	ot.Children[5] = NewOctree(level, TRB, scene, ot.showWf)
-	// children[7] = inTop && inRight && inFront (6)
-	TRF := BoundingBox{Min: vector3.New(minX+subWidth, minY+subHeight, minZ+subDepth), Max: vector3.New(minX+2*subWidth, minY+2*subHeight, minZ+2*subDepth)}
-	ot.Children[6] = NewOctree(level, TRF, scene, ot.showWf)
-	// children[6] = inTop && inLeft && inFront (7)
-	TLF := BoundingBox{Min: vector3.New(minX, minY+subHeight, minZ+subDepth), Max: vector3.New(minX+subWidth, minY+2*subHeight, minZ+2*subDepth)}
-	ot.Children[7] = NewOctree(level, TLF, scene, ot.showWf)
+	childrenBounds := []BoundingBox{
+		// [0] Bottom Left Back
+		{Min: vector3.New(minX, minY, minZ), Max: vector3.New(minX+subWidth, minY+subHeight, minZ+subDepth)},
+		// [1] Bottom Right Back
+		{Min: vector3.New(minX+subWidth, minY, minZ), Max: vector3.New(minX+2*subWidth, minY+subHeight, minZ+subDepth)},
+		// [2] Bottom Right Front
+		{Min: vector3.New(minX+subWidth, minY, minZ+subDepth), Max: vector3.New(minX+2*subWidth, minY+subHeight, minZ+2*subDepth)},
+		// [3] Bottom Left Front
+		{Min: vector3.New(minX, minY, minZ+subDepth), Max: vector3.New(minX+subWidth, minY+subHeight, minZ+2*subDepth)},
+		// [4] Top Left Back
+		{Min: vector3.New(minX, minY+subHeight, minZ), Max: vector3.New(minX+subWidth, minY+2*subHeight, minZ+subDepth)},
+		// [5] Top Right Back
+		{Min: vector3.New(minX+subWidth, minY+subHeight, minZ), Max: vector3.New(minX+2*subWidth, minY+2*subHeight, minZ+subDepth)},
+		// [6] Top Right Front
+		{Min: vector3.New(minX+subWidth, minY+subHeight, minZ+subDepth), Max: vector3.New(minX+2*subWidth, minY+2*subHeight, minZ+2*subDepth)},
+		// [7] Top Left Front
+		{Min: vector3.New(minX, minY+subHeight, minZ+subDepth), Max: vector3.New(minX+subWidth, minY+2*subHeight, minZ+2*subDepth)},
+	}
+
+	for i := 0; i < 8; i++ {
+		ot.Children[i] = NewOctree(level, childrenBounds[i], scene, ot.showWf)
+	}
 
 	ot.divided = true
 }
@@ -132,9 +124,9 @@ func (ot *Octree) Insert(obj *Unit, scene *core.Node) {
 			ot.insertUnitIntoChildren(item, scene)
 		}
 		ot.objects = ot.objects[:0]
-	} else {
-		ot.insertUnitIntoChildren(obj, scene)
 	}
+
+	ot.insertUnitIntoChildren(obj, scene)
 }
 
 func (ot *Octree) insertUnitIntoChildren(obj *Unit, scene *core.Node) {
@@ -146,7 +138,6 @@ func (ot *Octree) insertUnitIntoChildren(obj *Unit, scene *core.Node) {
 			inserted = true
 		}
 	}
-
 	if !inserted {
 		ot.objects = append(ot.objects, obj)
 	}
@@ -155,7 +146,8 @@ func (ot *Octree) insertUnitIntoChildren(obj *Unit, scene *core.Node) {
 func (ot *Octree) updateMassAndCenterOfMass(obj *Unit, scene *core.Node) {
 	oldTotalMass := ot.TotalMass
 	ot.TotalMass += obj.Mass
-	massPosition, mass := obj.Position, obj.Mass //obj.GiveMassAndCenterOfMassForBounds(ot.Bounds)
+	massPosition, mass := obj.Position, obj.Mass
+
 	if oldTotalMass == 0 {
 		ot.CenterOfMass = massPosition
 	} else {
@@ -166,22 +158,21 @@ func (ot *Octree) updateMassAndCenterOfMass(obj *Unit, scene *core.Node) {
 		com := graphic.NewMesh(geometry.NewSphere(ot.TotalMass, seg, seg), overlapMat)
 		com.SetPosition(ot.CenterOfMass.ToFloat32().X(), ot.CenterOfMass.ToFloat32().Y(), ot.CenterOfMass.ToFloat32().Z())
 		scene.Add(com)
+		if ot.com != nil {
+			scene.Remove(ot.com)
+		}
 		ot.com = com
 	}
-
 }
 
 // getIndex determina in quale sotto-Octree un oggetto appartiene.
 func (ot *Octree) getIndices(position vector3.Vector[float64], radius float64) []int {
-	indices := make([]int, 0, 8) // Preallocazione con la dimensione massima possibile
-
-	// Confronta la sfera dell'oggetto con i limiti dell'Octree
+	indices := make([]int, 0, 8)
 	for i, child := range ot.Children {
 		if child != nil {
 			minX, minY, minZ := child.Bounds.Min.X(), child.Bounds.Min.Y(), child.Bounds.Min.Z()
 			maxX, maxY, maxZ := child.Bounds.Max.X(), child.Bounds.Max.Y(), child.Bounds.Max.Z()
 
-			// Verifica se la sfera si sovrappone ai limiti dell'ottante
 			if position.X()-radius <= maxX && position.X()+radius >= minX &&
 				position.Y()-radius <= maxY && position.Y()+radius >= minY &&
 				position.Z()-radius <= maxZ && position.Z()+radius >= minZ {
@@ -205,7 +196,5 @@ func (ot *Octree) Retrieve(returnObjects *[]*Unit, obj *Unit) {
 			ot.Children[index].Retrieve(returnObjects, obj)
 		}
 	}
-
-	// Aggiungere gli oggetti di questo nodo Octree alla lista di ritorno.
 	*returnObjects = append(*returnObjects, ot.objects...)
 }

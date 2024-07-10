@@ -45,14 +45,14 @@ func (s *Simulation) UpdateWithOctrees() error {
 	for _, unit := range s.Fluid {
 		go func(u *Unit) {
 			defer wg.Done()
-			u.accelerate(s.Octree.CalculateGravity(u, 0.9))
+			u.accelerate(s.Octree.CalculateGravity(u, 0.5))
 		}(unit)
 	}
 
 	wg.Wait()
 
 	for _, unitA := range s.Fluid {
-		if unitA == nil {
+		if unitA == nil || !unitA.CanBeAltered {
 			continue
 		}
 		// Gestisci le collisioni con le pareti
@@ -64,7 +64,7 @@ func (s *Simulation) UpdateWithOctrees() error {
 
 		// Gestisci le collisioni tra particelle vicine
 		for _, unitB := range nearUnits {
-			if unitB != nil && unitA.Id != unitB.Id {
+			if unitB != nil && unitA.Id != unitB.Id && unitB.CanBeAltered {
 				collData := s.gatherCollisionData(unitA, unitB)
 
 				if collData.collided {
@@ -136,7 +136,6 @@ func (s *Simulation) gatherCollisionData(uA, uB *Unit) *CollData {
 
 	collData.collided = collData.distance < collData.totalRadius
 
-	// todo: continua
 	if collData.collided {
 		collData.e = math.Min(uA.Elasticity, uB.Elasticity)
 		collData.impulseDirection = uA.Position.Sub(uB.Position).Normalized()
@@ -159,8 +158,6 @@ func handleCollision(collData *CollData) {
 	collData.uB.Velocity = collData.uB.Velocity.Sub(jn.Scale(1 / collData.uB.Mass))
 
 	// move the units along the normals
-	// collData.uA.Mesh.SetMaterial(overlapMat)
-	// collData.uB.Mesh.SetMaterial(overlapMat)
 	overlap := collData.totalRadius - collData.distance
 	massTotal := collData.totalMass
 	moveDistanceA := (collData.uB.Mass / massTotal) * overlap
@@ -176,5 +173,4 @@ func handleCollision(collData *CollData) {
 	heatTransfer := collData.rVelNormal * collData.distance * 0.5
 	collData.uA.Heat += heatTransfer * (1.0 - collData.uA.Elasticity)
 	collData.uB.Heat += heatTransfer * (1.0 - collData.uB.Elasticity)
-
 }
