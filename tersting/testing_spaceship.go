@@ -31,6 +31,8 @@ func main() {
 	cam.SetPosition(0, 2, 8) // Posiziona la camera leggermente più in alto e indietro
 	scene.Add(cam)
 
+	camera.NewOrbitControl(cam)
+
 	// Set up callback to update viewport and camera aspect ratio when the window is resized
 	onResize := func(evname string, ev interface{}) {
 		width, height := a.GetSize()
@@ -88,7 +90,7 @@ func main() {
 	var maxSpeed float32 = 0.1     // Velocità massima
 	var acceleration float32 = 0.0 // Acceleration control
 	var rotationSpeed float32 = 0.01
-	var dragCoefficient float32 = 0.01 // Coefficiente di drag
+	var dragCoefficient float32 = 0.0001 // Coefficiente di drag
 
 	// Map to keep track of pressed keys
 	keys := make(map[window.Key]bool)
@@ -105,7 +107,7 @@ func main() {
 	})
 
 	// Offset for the camera relative to the plane
-	cameraOffset := math32.NewVector3(0, 3, 10) // Fissa la posizione relativa della camera alla navicella
+	// cameraOffset := math32.NewVector3(0, 3, 10) // Fissa la posizione relativa della camera alla navicella
 
 	// Run the application
 	a.Run(func(renderer *renderer.Renderer, deltaTime time.Duration) {
@@ -166,12 +168,28 @@ func main() {
 		// Update the position of the point light to follow the first planet
 		pointLight.SetPosition(planet1.Position().X, planet1.Position().Y, planet1.Position().Z)
 
-		// **Camera Update**
-		// Mantieni la posizione della camera fissa rispetto alla navicella
+		// Offset per la camera rispetto alla navicella (può essere regolato)
+		cameraOffset := math32.NewVector3(0, 3, -10) // Sposta la camera dietro la navicella
+
+		// Ottieni la posizione e la rotazione della navicella
 		planePos := plane.Position()
-		// La camera segue la navicella, ma mantiene un offset costante
-		cam.SetPositionVec(planePos.Clone().Add(cameraOffset))
-		cam.LookAt(&planePos, math32.NewVector3(0, 1, 0)) // La camera guarda sempre la navicella
+
+		// Prendi l'orientamento attuale della navicella come angoli di Eulero (vettore)
+		planeRotationEuler := plane.Rotation()
+
+		// Crea un quaternion e imposta la rotazione a partire dagli angoli di Eulero della navicella
+		planeQuaternion := new(math32.Quaternion)
+		planeQuaternion.SetFromEuler(&planeRotationEuler) // Usa un vettore invece di passare singoli valori
+
+		// Applica l'offset alla navicella, ma rispettando la sua rotazione attuale (usando il quaternion)
+		offsetRotated := math32.NewVector3(cameraOffset.X, cameraOffset.Y, cameraOffset.Z)
+		offsetRotated.ApplyQuaternion(planeQuaternion)
+
+		// Posiziona la camera rispetto alla navicella con l'offset ruotato
+		cam.SetPositionVec(planePos.Clone().Add(offsetRotated))
+
+		// Fai in modo che la camera guardi sempre la navicella
+		cam.LookAt(&planePos, math32.NewVector3(0, 1, 0))
 
 		// Rotate reference planets for visual interest
 		planet1.RotateY(0.01)
