@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-	"math"
 	"time"
 
 	"github.com/g3n/engine/app"
@@ -70,8 +68,8 @@ func main() {
 
 	// Create and add lights to the scene
 	scene.Add(light.NewAmbient(&math32.Color{1.0, 1.0, 1.0}, 0.8))
-	pointLight := light.NewPoint(&math32.Color{1, 1, 1}, 5.0)
-	pointLight.SetPosition(1, 0, 2)
+	pointLight := light.NewPoint(&math32.Color{1, 1, 1}, 500.0)
+	pointLight.SetPosition(planet1.Position().X, planet1.Position().Y, planet1.Position().Z) // Posiziona la luce nel pianeta 1
 	scene.Add(pointLight)
 
 	// Create and add an axis helper to the scene
@@ -80,163 +78,106 @@ func main() {
 	// Set background color to dark
 	a.Gls().ClearColor(0.1, 0.1, 0.2, 1.0)
 
-	// Constants for movement and rotation
-	const (
-		moveSpeed       = 0.05
-		rotationSpeed   = 0.05
-		speedMultiplier = 0.5
-		drag            = 0.98 // Resistance factor
-		cameraLag       = 0.1  // How quickly the camera follows (0-1)
-		cameraDistance  = 8.0  // Distance the camera maintains behind the ship
-		cameraHeight    = 2.0  // Height of the camera above the ship
-	)
-
-	// Current rotation angles
-	rotX := float32(0)
-	rotY := float32(0)
-	rotZ := float32(0)
-
-	// Variables for movement
-	var velocity math32.Vector3
-	var isMoving bool
-
-	// Direction vector (initially pointing forward)
-	direction := math32.NewVector3(0, 0, 1)
-
 	// For displaying object data
-	infoLabel := gui.NewLabel("Position: (0,0,0)\nVelocity: (0,0,0)\nRotation: (0,0,0)\nDirection: (0,0,0)")
+	infoLabel := gui.NewLabel("Position: (0,0,0)")
 	infoLabel.SetPosition(10, 10)
 	scene.Add(infoLabel)
 
-	// Function to update camera position
-	updateCamera := func() {
-		// Get current plane position
-		planePos := plane.Position()
+	// Variable to control movement and rotation
+	var speed float32 = 0.0        // Inizializza la velocità a zero
+	var maxSpeed float32 = 0.1     // Velocità massima
+	var acceleration float32 = 0.0 // Acceleration control
+	var rotationSpeed float32 = 0.01
+	var dragCoefficient float32 = 0.01 // Coefficiente di drag
 
-		// Calculate desired camera position (behind and slightly above the plane)
-		desiredPos := math32.NewVector3(
-			planePos.X-direction.X*float32(cameraDistance),
-			planePos.Y+float32(cameraHeight),
-			planePos.Z-direction.Z*float32(cameraDistance),
-		)
+	// Map to keep track of pressed keys
+	keys := make(map[window.Key]bool)
 
-		// Get current camera position
-		currentPos := cam.Position()
-
-		// Interpolate between current and desired position
-		currentPos.X += (desiredPos.X - currentPos.X) * float32(cameraLag)
-		currentPos.Y += (desiredPos.Y - currentPos.Y) * float32(cameraLag)
-		currentPos.Z += (desiredPos.Z - currentPos.Z) * float32(cameraLag)
-
-		// Update camera position
-		cam.SetPosition(currentPos.X, currentPos.Y, currentPos.Z)
-
-		// Make camera look at plane
-		cam.LookAt(&planePos, math32.NewVector3(0, 1, 0))
-	}
-
-	// Function to calculate direction vector based on rotation angles
-	updateDirection := func() {
-		// Convert rotation angles to radians
-		rx := float64(rotX)
-		ry := float64(rotY)
-		// rz := float64(rotZ)
-
-		// Calculate direction using rotation matrices
-		x := float32(math.Cos(ry) * math.Sin(rx))
-		y := float32(math.Sin(ry))
-		z := float32(math.Cos(ry) * math.Cos(rx))
-
-		direction.Set(x, y, z)
-		direction.Normalize()
-	}
-
-	// Handle keyboard input
+	// Subscribe to keyboard events
 	a.Subscribe(window.OnKeyDown, func(evname string, ev interface{}) {
 		kev := ev.(*window.KeyEvent)
-
-		updateDirection()
-
-		switch kev.Key {
-		case window.KeyW: // Forward
-			velocity.X += direction.X * moveSpeed * speedMultiplier
-			velocity.Y += direction.Y * moveSpeed * speedMultiplier
-			velocity.Z += direction.Z * moveSpeed * speedMultiplier
-			isMoving = true
-		case window.KeyS: // Backward
-			velocity.X -= direction.X * moveSpeed * speedMultiplier
-			velocity.Y -= direction.Y * moveSpeed * speedMultiplier
-			velocity.Z -= direction.Z * moveSpeed * speedMultiplier
-			isMoving = true
-		case window.KeyA: // Strafe left
-			left := math32.NewVector3(0, 1, 0).Cross(direction)
-			velocity.X += left.X * moveSpeed * speedMultiplier
-			velocity.Z += left.Z * moveSpeed * speedMultiplier
-			isMoving = true
-		case window.KeyD: // Strafe right
-			right := direction.Cross(math32.NewVector3(0, 1, 0))
-			velocity.X += right.X * moveSpeed * speedMultiplier
-			velocity.Z += right.Z * moveSpeed * speedMultiplier
-			isMoving = true
-		case window.KeyUp: // Pitch up
-			rotX += rotationSpeed
-			plane.SetRotationX(rotX)
-		case window.KeyDown: // Pitch down
-			rotX -= rotationSpeed
-			plane.SetRotationX(rotX)
-		case window.KeyLeft: // Yaw left
-			rotY += rotationSpeed
-			plane.SetRotationY(rotY)
-		case window.KeyRight: // Yaw right
-			rotY -= rotationSpeed
-			plane.SetRotationY(rotY)
-		case window.KeyQ: // Roll left
-			rotZ += rotationSpeed
-			plane.SetRotationZ(rotZ)
-		case window.KeyE: // Roll right
-			rotZ -= rotationSpeed
-			plane.SetRotationZ(rotZ)
-		}
+		keys[kev.Key] = true
 	})
 
-	// Stop movement when key is released
 	a.Subscribe(window.OnKeyUp, func(evname string, ev interface{}) {
 		kev := ev.(*window.KeyEvent)
-		switch kev.Key {
-		case window.KeyW, window.KeyS, window.KeyA, window.KeyD:
-			isMoving = false
-		}
+		keys[kev.Key] = false
 	})
+
+	// Offset for the camera relative to the plane
+	cameraOffset := math32.NewVector3(0, 3, 10) // Fissa la posizione relativa della camera alla navicella
 
 	// Run the application
 	a.Run(func(renderer *renderer.Renderer, deltaTime time.Duration) {
-		// Apply drag to velocity when not actively moving
-		if !isMoving {
-			velocity.MultiplyScalar(drag)
+		// Check which keys are pressed and apply the corresponding transformations
+		if keys[window.KeyW] {
+			acceleration = 0.01 // Aumenta l'accelerazione
+		} else if keys[window.KeyS] {
+			acceleration = -0.01 // Diminuisci l'accelerazione
+		} else {
+			acceleration = 0 // Se nessun tasto è premuto, non accelerare
 		}
 
-		// Update position based on velocity
-		pos := plane.Position()
-		pos.Add(&velocity)
-		plane.SetPosition(pos.X, pos.Y, pos.Z)
+		// Applica l'accelerazione alla velocità
+		speed += acceleration
+		if speed > maxSpeed {
+			speed = maxSpeed // Limita la velocità massima
+		} else if speed < -maxSpeed {
+			speed = -maxSpeed // Limita la velocità minima
+		}
 
-		// Update camera position
-		updateCamera()
+		// Applica il coefficiente di drag alla velocità
+		if acceleration == 0 { // Se non stiamo accelerando o decelerando
+			if speed > 0 {
+				speed -= dragCoefficient
+				if speed < 0 {
+					speed = 0 // Non andare sotto zero
+				}
+			} else if speed < 0 {
+				speed += dragCoefficient
+				if speed > 0 {
+					speed = 0 // Non andare sopra zero
+				}
+			}
+		}
+
+		// Applica la velocità al piano
+		plane.TranslateY(speed)
+
+		if keys[window.KeyA] {
+			plane.TranslateX(-speed)
+		}
+		if keys[window.KeyD] {
+			plane.TranslateX(speed)
+		}
+		if keys[window.KeyLeft] {
+			plane.RotateZ(rotationSpeed)
+		}
+		if keys[window.KeyRight] {
+			plane.RotateZ(-rotationSpeed)
+		}
+		if keys[window.KeyUp] {
+			plane.RotateX(-rotationSpeed)
+		}
+		if keys[window.KeyDown] {
+			plane.RotateX(rotationSpeed)
+		}
+
+		// Update the position of the point light to follow the first planet
+		pointLight.SetPosition(planet1.Position().X, planet1.Position().Y, planet1.Position().Z)
+
+		// **Camera Update**
+		// Mantieni la posizione della camera fissa rispetto alla navicella
+		planePos := plane.Position()
+		// La camera segue la navicella, ma mantiene un offset costante
+		cam.SetPositionVec(planePos.Clone().Add(cameraOffset))
+		cam.LookAt(&planePos, math32.NewVector3(0, 1, 0)) // La camera guarda sempre la navicella
 
 		// Rotate reference planets for visual interest
 		planet1.RotateY(0.01)
 		planet2.RotateY(-0.005)
 		planet3.RotateX(0.007)
 		planet4.RotateZ(0.003)
-
-		// Update info label
-		infoLabel.SetText(fmt.Sprintf(
-			"Position: (%.2f, %.2f, %.2f)\nVelocity: (%.2f, %.2f, %.2f)\nRotation: (%.2f, %.2f, %.2f)\nDirection: (%.2f, %.2f, %.2f)",
-			pos.X, pos.Y, pos.Z,
-			velocity.X, velocity.Y, velocity.Z,
-			rotX, rotY, rotZ,
-			direction.X, direction.Y, direction.Z,
-		))
 
 		// Render
 		a.Gls().Clear(gls.DEPTH_BUFFER_BIT | gls.STENCIL_BUFFER_BIT | gls.COLOR_BUFFER_BIT)
