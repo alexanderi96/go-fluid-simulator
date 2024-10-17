@@ -18,16 +18,16 @@
   apply_gravity = false
   gravity = -9.81
 
-  central_mass = 10000000
+  #central_mass = 10000000
   
 # unit config
-  unit_number = 1000
-  unit_initial_spacing = 1
+  unit_number = 100
+  unit_initial_spacing = 5
   units_emit_gravity = true
   unit_gravitational_multiplier = 1
 
   unit_radius = 1
-  unit_radius_multiplier = 1
+  unit_radius_multiplier = 0.01
   set_random_radius = false
   radius_min = 0.1
   radius_max = 10
