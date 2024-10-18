@@ -1,6 +1,9 @@
 package main
 
 import (
+	"fmt"
+	"math"
+	"strings"
 	"time"
 
 	"github.com/g3n/engine/app"
@@ -10,7 +13,7 @@ import (
 	"github.com/g3n/engine/gls"
 	"github.com/g3n/engine/graphic"
 	"github.com/g3n/engine/gui"
-	"github.com/g3n/engine/light"
+	"github.com/g3n/engine/light" // per file .obj
 	"github.com/g3n/engine/material"
 	"github.com/g3n/engine/math32"
 	"github.com/g3n/engine/renderer"
@@ -18,198 +21,366 @@ import (
 	"github.com/g3n/engine/window"
 )
 
-func main() {
-	// Create application and scene
-	a := app.App()
-	scene := core.NewNode()
+type GameState struct {
+	app           *app.Application
+	scene         *core.Node
+	cam           *camera.Camera
+	plane         *graphic.Mesh
+	planets       []*graphic.Mesh
+	pointLight    *light.Point
+	speed         float32
+	maxSpeed      float32
+	acceleration  float32
+	rotationSpeed float32
+	dragCoeff     float32
+	airBrake      float32
+	keys          map[window.Key]bool
+	cameraOffset  *math32.Vector3
 
-	// Set the scene to be managed by the gui manager
-	gui.Manager().Set(scene)
-
-	// Create perspective camera
-	cam := camera.New(1)
-	cam.SetPosition(0, 2, 8) // Posiziona la camera leggermente più in alto e indietro
-	scene.Add(cam)
-
-	camera.NewOrbitControl(cam)
-
-	// Disabilita il controllo manuale della camera per evitare conflitti
-	// camera.NewOrbitControl(cam)
-
-	// Set up callback to update viewport and camera aspect ratio when the window is resized
-	onResize := func(evname string, ev interface{}) {
-		width, height := a.GetSize()
-		a.Gls().Viewport(0, 0, int32(width), int32(height))
-		cam.SetAspect(float32(width) / float32(height))
+	hud struct {
+		positionLabel    *gui.Label
+		speedLabel       *gui.Label
+		directionLabel   *gui.Label
+		orientationLabel *gui.Label
+		statusLabel      *gui.Label
 	}
-	a.Subscribe(window.OnWindowSize, onResize)
+}
+
+func initGameState(a *app.Application) *GameState {
+	return &GameState{
+		app:           a,
+		scene:         core.NewNode(),
+		speed:         0.0,
+		maxSpeed:      0.05,
+		acceleration:  0.0,
+		rotationSpeed: 0.005,
+		dragCoeff:     0.00001,
+		airBrake:      0.001,
+		keys:          make(map[window.Key]bool),
+		cameraOffset:  math32.NewVector3(0, 5, -10),
+	}
+}
+
+func setupHUD(gs *GameState) {
+	// Posizione
+	gs.hud.positionLabel = gui.NewLabel("")
+	gs.hud.positionLabel.SetPosition(10, 10)
+	gs.scene.Add(gs.hud.positionLabel)
+
+	// Velocità
+	gs.hud.speedLabel = gui.NewLabel("")
+	gs.hud.speedLabel.SetPosition(10, 30)
+	gs.scene.Add(gs.hud.speedLabel)
+
+	// Direzione di movimento
+	gs.hud.directionLabel = gui.NewLabel("")
+	gs.hud.directionLabel.SetPosition(10, 50)
+	gs.scene.Add(gs.hud.directionLabel)
+
+	// Orientamento
+	gs.hud.orientationLabel = gui.NewLabel("")
+	gs.hud.orientationLabel.SetPosition(10, 70)
+	gs.scene.Add(gs.hud.orientationLabel)
+
+	// Status
+	gs.hud.statusLabel = gui.NewLabel("")
+	gs.hud.statusLabel.SetPosition(10, 90)
+	gs.scene.Add(gs.hud.statusLabel)
+
+	// Aggiungi una bussola grafica semplice
+	width, _ := gs.app.GetSize() // Usa GetSize invece di GetWidth
+	compassSize := float32(100)
+	compass := gui.NewPanel(compassSize, compassSize)
+	compass.SetPosition(float32(width)-compassSize-10, 10)
+
+	// Aggiungi indicatori N/S/E/W
+	addCompassLabel := func(text string, x, y float32) {
+		label := gui.NewLabel(text)
+		label.SetPosition(x, y)
+		compass.Add(label)
+	}
+
+	addCompassLabel("N", compassSize/2-5, 0)
+	addCompassLabel("S", compassSize/2-5, compassSize-20)
+	addCompassLabel("E", compassSize-20, compassSize/2-10)
+	addCompassLabel("W", 0, compassSize/2-10)
+
+	gs.scene.Add(compass)
+}
+
+func updateHUD(gs *GameState) {
+	// Aggiorna posizione
+	pos := gs.plane.Position()
+	gs.hud.positionLabel.SetText(fmt.Sprintf("Position: X: %.1f Y: %.1f Z: %.1f", pos.X, pos.Y, pos.Z))
+
+	// Aggiorna velocità
+	gs.hud.speedLabel.SetText(fmt.Sprintf("Speed: %.1f units/s", gs.speed))
+
+	// Calcola e aggiorna la direzione
+	forward := math32.NewVector3(0, 0, 1)
+	matrix := gs.plane.Matrix()
+	forward.ApplyMatrix4(&matrix)
+	forward.Normalize()
+
+	// Determina le direzioni cardinali
+	directions := []string{}
+
+	if forward.Z > 0.3 {
+		directions = append(directions, "North")
+	}
+	if forward.Z < -0.3 {
+		directions = append(directions, "South")
+	}
+	if forward.X > 0.3 {
+		directions = append(directions, "East")
+	}
+	if forward.X < -0.3 {
+		directions = append(directions, "West")
+	}
+	if forward.Y > 0.3 {
+		directions = append(directions, "Up")
+	}
+	if forward.Y < -0.3 {
+		directions = append(directions, "Down")
+	}
+
+	directionText := strings.Join(directions, "-")
+	if directionText == "" {
+		directionText = "Neutral"
+	}
+	gs.hud.directionLabel.SetText(fmt.Sprintf("Direction: %s", directionText))
+
+	// Calcola e aggiorna l'orientamento in gradi
+	rot := gs.plane.Rotation()
+	gs.hud.orientationLabel.SetText(fmt.Sprintf("Orientation - Pitch: %.1f° Roll: %.1f° Yaw: %.1f°",
+		math32.RadToDeg(rot.X),
+		math32.RadToDeg(rot.Z),
+		math32.RadToDeg(rot.Y)))
+
+	// Aggiornamento status
+	var status []string
+
+	if math.Abs(float64(gs.speed)) < 0.001 {
+		status = append(status, "HOVERING")
+	} else if gs.speed > 0 {
+		status = append(status, "FORWARD")
+	} else {
+		status = append(status, "REVERSE")
+	}
+
+	if math.Abs(float64(rot.Z)) > 0.1 {
+		if rot.Z > 0 {
+			status = append(status, "ROLLING RIGHT")
+		} else {
+			status = append(status, "ROLLING LEFT")
+		}
+	}
+
+	if math.Abs(float64(rot.X)) > 0.1 {
+		if rot.X > 0 {
+			status = append(status, "PITCHING UP")
+		} else {
+			status = append(status, "PITCHING DOWN")
+		}
+	}
+
+	statusText := strings.Join(status, " | ")
+	gs.hud.statusLabel.SetText(fmt.Sprintf("Status: %s", statusText))
+}
+
+func setupCamera(gs *GameState) {
+	gs.cam = camera.New(1)
+	gs.cam.SetPosition(0, 2, 8)
+	gs.scene.Add(gs.cam)
+
+	cameraAxes := helper.NewAxes(1.0)
+	gs.cam.Add(cameraAxes)
+}
+
+func setupScene(gs *GameState) {
+	gui.Manager().Set(gs.scene)
+
+	// Add grid helper
+	grid := helper.NewGrid(50, 1, &math32.Color{0.4, 0.4, 0.4})
+	gs.scene.Add(grid)
+
+	// Set background color
+	gs.app.Gls().ClearColor(0.1, 0.1, 0.2, 1.0)
+}
+
+func createSphere(radius float32, color string, x, y, z float32, scene *core.Node) *graphic.Mesh {
+	geom := geometry.NewSphere(float64(radius), 32, 32)
+	mat := material.NewStandard(math32.NewColor(color))
+	sphere := graphic.NewMesh(geom, mat)
+	sphere.SetPosition(x, y, z)
+	scene.Add(sphere)
+	return sphere
+}
+
+func setupPlanets(gs *GameState) {
+	gs.planets = make([]*graphic.Mesh, 4)
+	gs.planets[0] = createSphere(1.0, "Red", 10, 0, 10, gs.scene)
+	gs.planets[1] = createSphere(0.7, "Green", -10, 5, -10, gs.scene)
+	gs.planets[2] = createSphere(0.5, "Yellow", -5, -3, 15, gs.scene)
+	gs.planets[3] = createSphere(0.3, "Purple", 15, 2, -8, gs.scene)
+}
+
+func setupPlane(gs *GameState) {
+	geom := geometry.NewCone(1, 3, 3, 1, true)
+	mat := material.NewStandard(math32.NewColor("DarkGreen"))
+	gs.plane = graphic.NewMesh(geom, mat)
+	gs.scene.Add(gs.plane)
+
+	planeAxes := helper.NewAxes(2.0)
+	gs.plane.Add(planeAxes)
+}
+
+func setupLighting(gs *GameState) {
+	gs.scene.Add(light.NewAmbient(&math32.Color{1.0, 1.0, 1.0}, 0.8))
+	gs.pointLight = light.NewPoint(&math32.Color{1, 1, 1}, 500.0)
+	gs.pointLight.SetPosition(gs.planets[0].Position().X, gs.planets[0].Position().Y, gs.planets[0].Position().Z)
+	gs.scene.Add(gs.pointLight)
+}
+
+func setupCallbacks(gs *GameState) {
+	// Window resize callback
+	onResize := func(evname string, ev interface{}) {
+		width, height := gs.app.GetSize()
+		gs.app.Gls().Viewport(0, 0, int32(width), int32(height))
+		gs.cam.SetAspect(float32(width) / float32(height))
+	}
+	gs.app.Subscribe(window.OnWindowSize, onResize)
 	onResize("", nil)
 
-	// Create reference objects (planets/asteroids)
-	createSphere := func(radius float32, color string, x, y, z float32) *graphic.Mesh {
-		geom := geometry.NewSphere(float64(radius), 32, 32)
-		mat := material.NewStandard(math32.NewColor(color))
-		sphere := graphic.NewMesh(geom, mat)
-		sphere.SetPosition(x, y, z)
-		scene.Add(sphere)
-		return sphere
+	// Keyboard callbacks
+	gs.app.Subscribe(window.OnKeyDown, func(evname string, ev interface{}) {
+		kev := ev.(*window.KeyEvent)
+		gs.keys[kev.Key] = true
+	})
+
+	gs.app.Subscribe(window.OnKeyUp, func(evname string, ev interface{}) {
+		kev := ev.(*window.KeyEvent)
+		gs.keys[kev.Key] = false
+	})
+}
+
+func updateMovement(gs *GameState) {
+	// Update acceleration based on input
+	if gs.keys[window.KeyW] {
+		gs.acceleration = 0.01
+	} else if gs.keys[window.KeyS] {
+		gs.acceleration = -0.01
+	} else {
+		gs.acceleration = 0
 	}
 
-	// Create various reference objects
-	planet1 := createSphere(1.0, "Red", 10, 0, 10)
-	planet2 := createSphere(0.7, "Green", -10, 5, -10)
-	planet3 := createSphere(0.5, "Yellow", -5, -3, 15)
-	planet4 := createSphere(0.3, "Purple", 15, 2, -8)
+	// Update speed
+	gs.speed += gs.acceleration
+	gs.speed = math32.Clamp(gs.speed, -gs.maxSpeed, gs.maxSpeed)
 
-	// Add a grid helper for reference
-	grid := helper.NewGrid(50, 1, &math32.Color{0.4, 0.4, 0.4})
-	scene.Add(grid)
+	// Apply drag
+	if gs.acceleration == 0 {
+		if gs.speed > 0 {
+			gs.speed = math32.Max(0, gs.speed-gs.dragCoeff)
+		} else if gs.speed < 0 {
+			gs.speed = math32.Min(0, gs.speed+gs.dragCoeff)
+		}
+	}
 
-	// Create a blue torus (the "plane") and add it to the scene
-	geom := geometry.NewCone(1, 3, 3, 1, true) // Base larga, altezza lunga
-	mat := material.NewStandard(math32.NewColor("DarkGreen"))
-	plane := graphic.NewMesh(geom, mat)
+	// Apply movement
+	gs.plane.TranslateZ(gs.speed)
+	if gs.keys[window.KeySpace] {
+		if gs.speed > 0 {
+			gs.speed = math32.Max(0, gs.speed-gs.airBrake)
+		} else if gs.speed < 0 {
+			gs.speed = math32.Min(0, gs.speed+gs.airBrake)
+		}
+	}
+	if gs.keys[window.KeyE] {
+		gs.plane.RotateY(-gs.rotationSpeed)
+	}
+	if gs.keys[window.KeyQ] {
+		gs.plane.RotateY(gs.rotationSpeed)
+	}
+	if gs.keys[window.KeyA] {
+		gs.plane.RotateZ(-gs.rotationSpeed)
+	}
+	if gs.keys[window.KeyD] {
+		gs.plane.RotateZ(gs.rotationSpeed)
+	}
+	if gs.keys[window.KeyM] {
+		gs.plane.RotateX(-gs.rotationSpeed)
+	}
+	if gs.keys[window.KeyK] {
+		gs.plane.RotateX(gs.rotationSpeed)
+	}
+}
 
-	scene.Add(plane)
+func updateCamera(gs *GameState) {
+	// Crea una matrice di trasformazione per la camera basata sulla trasformazione dell'aereo
+	planeMatrix := gs.plane.Matrix()
 
-	// Create and add lights to the scene
-	scene.Add(light.NewAmbient(&math32.Color{1.0, 1.0, 1.0}, 0.8))
-	pointLight := light.NewPoint(&math32.Color{1, 1, 1}, 500.0)
-	pointLight.SetPosition(planet1.Position().X, planet1.Position().Y, planet1.Position().Z) // Posiziona la luce nel pianeta 1
-	scene.Add(pointLight)
+	// Crea il vettore di offset della camera nel sistema di coordinate locale
+	offset := gs.cameraOffset.Clone()
 
-	// Create and add axis helpers for the plane and camera
-	planeAxes := helper.NewAxes(2.0) // Assi della navicella
-	plane.Add(planeAxes)             // Aggiungi gli assi alla navicella
+	// Calcola la posizione della camera
+	cameraPos := gs.plane.Position()
 
-	cameraAxes := helper.NewAxes(1.0) // Assi della camera
-	cam.Add(cameraAxes)               // Aggiungi gli assi alla camera
+	// Crea una matrice di rotazione basata solo sulla rotazione dell'aereo
+	rotMatrix := math32.NewMatrix4()
+	rotMatrix.ExtractRotation(&planeMatrix)
 
-	// Set background color to dark
-	a.Gls().ClearColor(0.1, 0.1, 0.2, 1.0)
+	// Applica la rotazione all'offset
+	offset.ApplyMatrix4(rotMatrix)
 
-	// For displaying object data
-	infoLabel := gui.NewLabel("Position: (0,0,0)")
-	infoLabel.SetPosition(10, 10)
-	scene.Add(infoLabel)
+	// Aggiungi l'offset alla posizione dell'aereo
+	cameraPos.Add(offset)
 
-	// Variable to control movement and rotation
-	var speed float32 = 0.0        // Inizializza la velocità a zero
-	var maxSpeed float32 = 0.1     // Velocità massima
-	var acceleration float32 = 0.0 // Acceleration control
-	var rotationSpeed float32 = 0.01
-	var dragCoefficient float32 = 0.0001 // Coefficiente di drag
+	// Imposta la posizione della camera
+	gs.cam.SetPositionVec(&cameraPos)
 
-	// Map to keep track of pressed keys
-	keys := make(map[window.Key]bool)
+	// Calcola il vettore "up" ruotato
+	up := math32.NewVector3(0, 1, 0)
+	up.ApplyMatrix4(rotMatrix)
 
-	// Subscribe to keyboard events
-	a.Subscribe(window.OnKeyDown, func(evname string, ev interface{}) {
-		kev := ev.(*window.KeyEvent)
-		keys[kev.Key] = true
-	})
+	// Fai puntare la camera verso l'aereo
+	planePos := gs.plane.Position()
+	gs.cam.LookAt(&planePos, up)
+}
 
-	a.Subscribe(window.OnKeyUp, func(evname string, ev interface{}) {
-		kev := ev.(*window.KeyEvent)
-		keys[kev.Key] = false
-	})
+func updatePlanets(gs *GameState) {
+	gs.planets[0].RotateY(0.01)
+	gs.planets[1].RotateY(-0.005)
+	gs.planets[2].RotateX(0.007)
+	gs.planets[3].RotateZ(0.003)
 
-	// Offset per la camera rispetto alla navicella (legata al piano di riferimento)
-	cameraOffset := math32.NewVector3(0, 5, -10) // Posiziona la camera dietro e sopra la navicella
+	// Update light position
+	gs.pointLight.SetPosition(gs.planets[0].Position().X, gs.planets[0].Position().Y, gs.planets[0].Position().Z)
+}
 
-	// Run the application
+func main() {
+	a := app.App()
+	gs := initGameState(a)
+
+	setupScene(gs)
+	setupCamera(gs)
+	setupPlanets(gs)
+	setupPlane(gs)
+	setupLighting(gs)
+	setupCallbacks(gs)
+	setupHUD(gs) // Aggiungi questa riga
+
+	// Main game loop
 	a.Run(func(renderer *renderer.Renderer, deltaTime time.Duration) {
-		// Check which keys are pressed and apply the corresponding transformations
-		if keys[window.KeyW] {
-			acceleration = 0.01 // Aumenta l'accelerazione
-		} else if keys[window.KeyS] {
-			acceleration = -0.01 // Diminuisci l'accelerazione
-		} else {
-			acceleration = 0 // Se nessun tasto è premuto, non accelerare
-		}
+		updateMovement(gs)
+		updateCamera(gs)
+		updatePlanets(gs)
 
-		// Applica l'accelerazione alla velocità
-		speed += acceleration
-		if speed > maxSpeed {
-			speed = maxSpeed // Limita la velocità massima
-		} else if speed < -maxSpeed {
-			speed = -maxSpeed // Limita la velocità minima
-		}
-
-		// Applica il coefficiente di drag alla velocità
-		if acceleration == 0 { // Se non stiamo accelerando o decelerando
-			if speed > 0 {
-				speed -= dragCoefficient
-				if speed < 0 {
-					speed = 0 // Non andare sotto zero
-				}
-			} else if speed < 0 {
-				speed += dragCoefficient
-				if speed > 0 {
-					speed = 0 // Non andare sopra zero
-				}
-			}
-		}
-
-		// Applica la velocità al piano
-		plane.TranslateZ(speed)
-
-		if keys[window.KeyA] {
-			plane.TranslateX(-speed)
-		}
-		if keys[window.KeyD] {
-			plane.TranslateX(speed)
-		}
-		if keys[window.KeyQ] {
-			plane.RotateZ(-rotationSpeed)
-		}
-		if keys[window.KeyE] {
-			plane.RotateZ(rotationSpeed)
-		}
-		if keys[window.KeyM] {
-			plane.RotateX(-rotationSpeed)
-		}
-		if keys[window.KeyK] {
-			plane.RotateX(rotationSpeed)
-		}
-
-		// Update the position of the point light to follow the first planet
-		pointLight.SetPosition(planet1.Position().X, planet1.Position().Y, planet1.Position().Z)
-
-		// Ottieni la posizione e la rotazione della navicella
-		planePos := plane.Position()
-
-		// Prendi l'orientamento attuale della navicella come angoli di Eulero (vettore)
-		planeRotationEuler := plane.Rotation()
-
-		// Crea un quaternion e imposta la rotazione a partire dagli angoli di Eulero della navicella
-		planeQuaternion := new(math32.Quaternion)
-		planeQuaternion.SetFromEuler(&planeRotationEuler)
-
-		// Crea un vettore che rappresenta il "sopra" della navicella nel suo sistema locale
-		localUp := math32.NewVector3(0, 1, 0)
-
-		// Applica la rotazione della navicella al vettore "sopra" per ottenere il vettore "sopra" nel sistema globale
-		globalUp := localUp.Clone().ApplyQuaternion(planeQuaternion)
-
-		// Calcola la posizione della camera rispetto alla navicella con l'offset ruotato
-		offsetRotated := math32.NewVector3(cameraOffset.X, cameraOffset.Y, cameraOffset.Z)
-		offsetRotated.ApplyQuaternion(planeQuaternion)
-
-		// Posiziona la camera rispetto alla navicella con l'offset ruotato
-		cam.SetPositionVec(planePos.Clone().Add(offsetRotated))
-
-		// Fai in modo che la camera guardi sempre la navicella, con il vettore "sopra" dinamico
-		cam.LookAt(&planePos, globalUp)
-
-		// Rotate reference planets for visual interest
-		planet1.RotateY(0.01)
-		planet2.RotateY(-0.005)
-		planet3.RotateX(0.007)
-		planet4.RotateZ(0.003)
+		// Update HUD
+		updateHUD(gs)
 
 		// Render
 		a.Gls().Clear(gls.DEPTH_BUFFER_BIT | gls.STENCIL_BUFFER_BIT | gls.COLOR_BUFFER_BIT)
-		renderer.Render(scene, cam)
+		renderer.Render(gs.scene, gs.cam)
 	})
 }
