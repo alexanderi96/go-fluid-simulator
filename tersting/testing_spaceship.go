@@ -33,6 +33,9 @@ func main() {
 
 	camera.NewOrbitControl(cam)
 
+	// Disabilita il controllo manuale della camera per evitare conflitti
+	// camera.NewOrbitControl(cam)
+
 	// Set up callback to update viewport and camera aspect ratio when the window is resized
 	onResize := func(evname string, ev interface{}) {
 		width, height := a.GetSize()
@@ -66,6 +69,7 @@ func main() {
 	geom := geometry.NewCone(1, 3, 3, 1, true) // Base larga, altezza lunga
 	mat := material.NewStandard(math32.NewColor("DarkGreen"))
 	plane := graphic.NewMesh(geom, mat)
+
 	scene.Add(plane)
 
 	// Create and add lights to the scene
@@ -74,8 +78,12 @@ func main() {
 	pointLight.SetPosition(planet1.Position().X, planet1.Position().Y, planet1.Position().Z) // Posiziona la luce nel pianeta 1
 	scene.Add(pointLight)
 
-	// Create and add an axis helper to the scene
-	scene.Add(helper.NewAxes(0.5))
+	// Create and add axis helpers for the plane and camera
+	planeAxes := helper.NewAxes(2.0) // Assi della navicella
+	plane.Add(planeAxes)             // Aggiungi gli assi alla navicella
+
+	cameraAxes := helper.NewAxes(1.0) // Assi della camera
+	cam.Add(cameraAxes)               // Aggiungi gli assi alla camera
 
 	// Set background color to dark
 	a.Gls().ClearColor(0.1, 0.1, 0.2, 1.0)
@@ -106,8 +114,8 @@ func main() {
 		keys[kev.Key] = false
 	})
 
-	// Offset for the camera relative to the plane
-	// cameraOffset := math32.NewVector3(0, 3, 10) // Fissa la posizione relativa della camera alla navicella
+	// Offset per la camera rispetto alla navicella (legata al piano di riferimento)
+	cameraOffset := math32.NewVector3(0, 5, -10) // Posiziona la camera dietro e sopra la navicella
 
 	// Run the application
 	a.Run(func(renderer *renderer.Renderer, deltaTime time.Duration) {
@@ -144,7 +152,7 @@ func main() {
 		}
 
 		// Applica la velocità al piano
-		plane.TranslateY(speed)
+		plane.TranslateZ(speed)
 
 		if keys[window.KeyA] {
 			plane.TranslateX(-speed)
@@ -152,24 +160,21 @@ func main() {
 		if keys[window.KeyD] {
 			plane.TranslateX(speed)
 		}
-		if keys[window.KeyLeft] {
-			plane.RotateZ(rotationSpeed)
-		}
-		if keys[window.KeyRight] {
+		if keys[window.KeyQ] {
 			plane.RotateZ(-rotationSpeed)
 		}
-		if keys[window.KeyUp] {
+		if keys[window.KeyE] {
+			plane.RotateZ(rotationSpeed)
+		}
+		if keys[window.KeyM] {
 			plane.RotateX(-rotationSpeed)
 		}
-		if keys[window.KeyDown] {
+		if keys[window.KeyK] {
 			plane.RotateX(rotationSpeed)
 		}
 
 		// Update the position of the point light to follow the first planet
 		pointLight.SetPosition(planet1.Position().X, planet1.Position().Y, planet1.Position().Z)
-
-		// Offset per la camera rispetto alla navicella (può essere regolato)
-		cameraOffset := math32.NewVector3(0, 3, -10) // Sposta la camera dietro la navicella
 
 		// Ottieni la posizione e la rotazione della navicella
 		planePos := plane.Position()
@@ -179,17 +184,23 @@ func main() {
 
 		// Crea un quaternion e imposta la rotazione a partire dagli angoli di Eulero della navicella
 		planeQuaternion := new(math32.Quaternion)
-		planeQuaternion.SetFromEuler(&planeRotationEuler) // Usa un vettore invece di passare singoli valori
+		planeQuaternion.SetFromEuler(&planeRotationEuler)
 
-		// Applica l'offset alla navicella, ma rispettando la sua rotazione attuale (usando il quaternion)
+		// Crea un vettore che rappresenta il "sopra" della navicella nel suo sistema locale
+		localUp := math32.NewVector3(0, 1, 0)
+
+		// Applica la rotazione della navicella al vettore "sopra" per ottenere il vettore "sopra" nel sistema globale
+		globalUp := localUp.Clone().ApplyQuaternion(planeQuaternion)
+
+		// Calcola la posizione della camera rispetto alla navicella con l'offset ruotato
 		offsetRotated := math32.NewVector3(cameraOffset.X, cameraOffset.Y, cameraOffset.Z)
 		offsetRotated.ApplyQuaternion(planeQuaternion)
 
 		// Posiziona la camera rispetto alla navicella con l'offset ruotato
 		cam.SetPositionVec(planePos.Clone().Add(offsetRotated))
 
-		// Fai in modo che la camera guardi sempre la navicella
-		cam.LookAt(&planePos, math32.NewVector3(0, 1, 0))
+		// Fai in modo che la camera guardi sempre la navicella, con il vettore "sopra" dinamico
+		cam.LookAt(&planePos, globalUp)
 
 		// Rotate reference planets for visual interest
 		planet1.RotateY(0.01)
