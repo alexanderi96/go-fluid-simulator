@@ -1,12 +1,13 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"runtime/pprof"
 	"time"
 
 	"github.com/alexanderi96/go-fluid-simulator/config"
+	"github.com/alexanderi96/go-fluid-simulator/draw"
+	"github.com/alexanderi96/go-fluid-simulator/spaceship"
 
 	"log"
 
@@ -23,7 +24,7 @@ import (
 
 var (
 	s            *physics.Simulation
-	ambientLight = &math32.Color{R: 1.0, G: 1.0, B: 1.0}
+	ambientLight = &math32.Color{R: 0.1, G: 0.1, B: 0.8}
 	pointLight   = &math32.Color{R: 1.0, G: 1.0, B: 1.0}
 	bgColor      = &math32.Color{R: 0.01, G: 0.01, B: 0.01}
 )
@@ -45,7 +46,8 @@ func init() {
 
 	// Create perspective camera
 	s.Cam = camera.New(1)
-	s.Cam.SetPosition(0, 0, 3)
+	s.Cam.SetPosition(0, 2, 8)
+	s.Cam.SetFar(100000) // Imposta il valore desiderato (es. 1000 unità)
 	s.Scene.Add(s.Cam)
 
 	// Set up orbit control for the camera
@@ -63,8 +65,29 @@ func init() {
 		s.Cam.SetAspect(float32(width) / float32(height))
 	}
 	s.App.Subscribe(window.OnWindowSize, onResize)
+
+	draw.SetupHUD(s)
 	onResize("", nil)
 
+}
+
+func UpdateCamera(s *physics.Simulation) {
+	planeMatrix := s.SpaceShip.Ship.Matrix()
+	offset := s.SpaceShip.CameraOffset.Clone()
+	cameraPos := s.SpaceShip.Ship.Position()
+
+	rotMatrix := math32.NewMatrix4()
+	rotMatrix.ExtractRotation(&planeMatrix)
+	offset.ApplyMatrix4(rotMatrix)
+	cameraPos.Add(offset)
+
+	s.Cam.SetPositionVec(&cameraPos)
+
+	up := math32.NewVector3(0, 1, 0)
+	up.ApplyMatrix4(rotMatrix)
+
+	planePos := s.SpaceShip.Ship.Position()
+	s.Cam.LookAt(&planePos, up)
 }
 
 func main() {
@@ -81,7 +104,7 @@ func main() {
 	s.App.Gls().ClearColor(bgColor.R, bgColor.G, bgColor.B, 1.0)
 
 	// Create and add lights to the scene
-	s.Scene.Add(light.NewAmbient(ambientLight, 0.1))
+	s.Scene.Add(light.NewAmbient(ambientLight, 1))
 	pointLight := light.NewPoint(pointLight, 1000000.0)
 	pointLight.SetPosition(float32(s.Config.GameX), float32(s.Config.GameY), float32(s.Config.GameZ))
 	s.Scene.Add(pointLight)
@@ -89,31 +112,33 @@ func main() {
 	// Handle mouse input
 	s.App.Subscribe(window.OnMouseDown, func(evname string, ev interface{}) {
 
-		mev := ev.(*window.MouseEvent)
-		if mev.Button == window.MouseButtonLeft && mev.Mods == window.ModControl {
-			// Controlla se sia il pulsante destro del mouse sia il pulsante Ctrl sinistro sono premuti
-			units := s.GetUnits()
-			s.PositionNewUnitsCube(units)
+		if !s.Fly {
+			mev := ev.(*window.MouseEvent)
+			if mev.Button == window.MouseButtonLeft && mev.Mods == window.ModControl {
+				// Controlla se sia il pulsante destro del mouse sia il pulsante Ctrl sinistro sono premuti
+				units := s.GetUnits()
+				s.PositionNewUnitsCube(units)
 
-			s.Fluid = append(s.Fluid, units...)
-		} else if mev.Button == window.MouseButtonRight && mev.Mods == window.ModControl {
-			// Controlla se sia il pulsante destro del mouse sia il pulsante Ctrl sinistro sono premuti
-			units := s.GetUnits()
-			s.PositionNewUnitsFibonacci(units)
+				s.Fluid = append(s.Fluid, units...)
+			} else if mev.Button == window.MouseButtonRight && mev.Mods == window.ModControl {
+				// Controlla se sia il pulsante destro del mouse sia il pulsante Ctrl sinistro sono premuti
+				units := s.GetUnits()
+				s.PositionNewUnitsFibonacci(units)
 
-			s.Fluid = append(s.Fluid, units...)
-		} else if mev.Button == window.MouseButtonRight && mev.Mods == window.ModShift {
-			// Controlla se sia il pulsante destro del mouse sia il pulsante Ctrl sinistro sono premuti
-			units := s.GetUnits()
-			s.PositionNewUnitsFibonacci(units)
-			s.GiveRotationalVelocity(units)
-			s.Fluid = append(s.Fluid, units...)
-		} else if mev.Button == window.MouseButtonLeft && mev.Mods == window.ModShift {
-			// Controlla se sia il pulsante destro del mouse sia il pulsante Ctrl sinistro sono premuti
-			units := s.GetUnits()
-			s.PositionNewUnitsCube(units)
-			s.GiveRotationalVelocity(units)
-			s.Fluid = append(s.Fluid, units...)
+				s.Fluid = append(s.Fluid, units...)
+			} else if mev.Button == window.MouseButtonRight && mev.Mods == window.ModShift {
+				// Controlla se sia il pulsante destro del mouse sia il pulsante Ctrl sinistro sono premuti
+				units := s.GetUnits()
+				s.PositionNewUnitsFibonacci(units)
+				s.GiveRotationalVelocity(units)
+				s.Fluid = append(s.Fluid, units...)
+			} else if mev.Button == window.MouseButtonLeft && mev.Mods == window.ModShift {
+				// Controlla se sia il pulsante destro del mouse sia il pulsante Ctrl sinistro sono premuti
+				units := s.GetUnits()
+				s.PositionNewUnitsCube(units)
+				s.GiveRotationalVelocity(units)
+				s.Fluid = append(s.Fluid, units...)
+			}
 		}
 	})
 
@@ -121,62 +146,50 @@ func main() {
 	s.App.Subscribe(window.OnKeyDown, func(evname string, ev interface{}) {
 
 		kev := ev.(*window.KeyEvent)
-		if kev.Key == window.KeyR {
-			s.ResetSimulation()
-		}
-		if kev.Key == window.KeySpace {
-			s.IsPause = !s.IsPause
-		}
-		if kev.Key == window.KeyS {
-			s.SaveSimulation("simulation" + time.Now().Format("2006-01-02 15:04:05") + ".json")
-		}
-		if kev.Key == window.KeyL {
+		s.SpaceShip.Keys[kev.Key] = true
 
-			sim, err := physics.LoadSimulation("simulation.json")
-			if err != nil {
-				log.Fatal(err)
+		if kev.Key == window.KeyF {
+			s.Fly = !s.Fly
+		}
+
+		if !s.Fly {
+			if kev.Key == window.KeyR {
+				s.ResetSimulation()
 			}
-			s.ResetSimulation()
-
-			s.Fluid = sim.Fluid
-
-			for _, unit := range s.Fluid {
-				unit.GenerateMesh()
-				s.Scene.Add(unit.Mesh)
+			if kev.Key == window.KeySpace {
+				s.IsPause = !s.IsPause
 			}
-			s.Config = sim.Config
-			s.IsPause = sim.IsPause
-			s.WorldBoundray = sim.WorldBoundray
-			s.WorldCenter = sim.WorldCenter
+			if kev.Key == window.KeyS {
+				s.SaveSimulation("simulation" + time.Now().Format("2006-01-02 15:04:05") + ".json")
+			}
+			if kev.Key == window.KeyL {
+
+				sim, err := physics.LoadSimulation("simulation.json")
+				if err != nil {
+					log.Fatal(err)
+				}
+				s.ResetSimulation()
+
+				s.Fluid = sim.Fluid
+
+				for _, unit := range s.Fluid {
+					unit.GenerateMesh()
+					s.Scene.Add(unit.Mesh)
+				}
+				s.Config = sim.Config
+				s.IsPause = sim.IsPause
+				s.WorldBoundray = sim.WorldBoundray
+				s.WorldCenter = sim.WorldCenter
+			}
 		}
 	})
 
-	// Create FPS label
-	fpsLabel := gui.NewLabel("FPS: 0")
-	fpsLabel.SetPosition(10, 10)
-	s.Scene.Add(fpsLabel)
+	s.App.Subscribe(window.OnKeyUp, func(evname string, ev interface{}) {
+		kev := ev.(*window.KeyEvent)
+		s.SpaceShip.Keys[kev.Key] = false
+	})
 
-	// Create FPS label
-	ftLabel := gui.NewLabel("FrameTime: 0")
-	ftLabel.SetPosition(100, 10)
-	s.Scene.Add(ftLabel)
-
-	// Create FPS label
-	unitLabel := gui.NewLabel("unit: 0")
-	unitLabel.SetPosition(10, 25)
-	s.Scene.Add(unitLabel)
-
-	// Create FPS label
-	simDurationLabel := gui.NewLabel("Simulation duration: 0")
-	simDurationLabel.SetPosition(10, 40)
-	s.Scene.Add(simDurationLabel)
-
-	// Create FPS label
-	realDurationLabel := gui.NewLabel("Real duration: 0")
-	realDurationLabel.SetPosition(10, 55)
-	s.Scene.Add(realDurationLabel)
-
-	appStartTime := time.Now()
+	s.AppStartTime = time.Now()
 	s.App.Run(func(renderer *renderer.Renderer, deltaTime time.Duration) {
 		if !s.IsPause {
 			if err := s.Update(); err != nil {
@@ -185,17 +198,12 @@ func main() {
 
 		}
 
-		fps := 1.0 / float64(deltaTime.Seconds())
-		fpsLabel.SetText("FPS: " + fmt.Sprintf("%.2f", fps))
+		draw.UpdateHUD(s, deltaTime)
 
-		ftLabel.SetText("FrameTime: " + fmt.Sprintf("%.2f", s.Config.Frametime))
-
-		unitLabel.SetText("unit: " + fmt.Sprintf("%d", len(s.Fluid)))
-
-		simDurationLabel.SetText("Simulation duration: " + fmt.Sprintf("%.2f", s.Metrics.SimDuration))
-
-		realDurationLabel.SetText("Real duration: " + fmt.Sprintf("%.2f", -time.Until(appStartTime).Seconds()))
-
+		if s.Fly {
+			spaceship.UpdateMovement(s.SpaceShip)
+			UpdateCamera(s)
+		}
 		// gui.Draw(s)
 		s.App.Gls().Clear(gls.DEPTH_BUFFER_BIT | gls.STENCIL_BUFFER_BIT | gls.COLOR_BUFFER_BIT)
 

@@ -6,11 +6,13 @@ import (
 	"math"
 	"math/rand"
 	"os"
+	"time"
 
 	"github.com/EliCDavis/vector/vector2"
 	"github.com/EliCDavis/vector/vector3"
 	"github.com/alexanderi96/go-fluid-simulator/config"
 	"github.com/alexanderi96/go-fluid-simulator/metrics"
+	"github.com/alexanderi96/go-fluid-simulator/spaceship"
 	"github.com/alexanderi96/go-fluid-simulator/utils"
 	"github.com/google/uuid"
 
@@ -18,6 +20,9 @@ import (
 	"github.com/g3n/engine/camera"
 	"github.com/g3n/engine/core"
 	"github.com/g3n/engine/graphic"
+	"github.com/g3n/engine/gui"
+	"github.com/g3n/engine/math32"
+	"github.com/g3n/engine/util/helper"
 	"github.com/g3n/engine/window"
 )
 
@@ -48,15 +53,32 @@ type Simulation struct {
 	Octree  *Octree `json:"-"`
 
 	IsPause              bool
+	Fly                  bool
 	InitialMousePosition vector2.Float64 `json:"-"`
 	FinalMousePosition   vector2.Float64 `json:"-"`
 	MouseButtonPressed   bool            `json:"-"`
 	IsInputBeingHandled  bool            `json:"-"`
+	AppStartTime         time.Time
 
 	// variables added for the g3n branch
 	App   *app.Application `json:"-"`
 	Scene *core.Node       `json:"-"`
 	Cam   *camera.Camera   `json:"-"`
+
+	SpaceShip *spaceship.SpaceShip
+	Hud       struct {
+		FpsLabel          *gui.Label
+		FtLabel           *gui.Label
+		UnitLabel         *gui.Label
+		SimDurationLabel  *gui.Label
+		RealDurationLabel *gui.Label
+
+		PositionLabel    *gui.Label
+		SpeedLabel       *gui.Label
+		DirectionLabel   *gui.Label
+		OrientationLabel *gui.Label
+		StatusLabel      *gui.Label
+	}
 
 	// Velocità di rotazione
 	MovementSpeed float64 `json:"-"`
@@ -84,6 +106,7 @@ func NewSimulation(config *config.Config) (*Simulation, error) {
 		Metrics: &metrics.Metrics{},
 		Config:  config,
 		IsPause: false,
+		Fly:     true,
 		WorldBoundray: BoundingBox{
 			Min: vector3.New(-config.GameX/2, -config.GameY/2, -config.GameZ/2),
 			Max: vector3.New(config.GameX/2, config.GameY/2, config.GameZ/2),
@@ -92,6 +115,17 @@ func NewSimulation(config *config.Config) (*Simulation, error) {
 
 		App:   app.App(),
 		Scene: core.NewNode(),
+
+		SpaceShip: &spaceship.SpaceShip{
+			Speed:           0.0,
+			MaxSpeed:        100,
+			MaxEngineThrust: 100,
+			Thrust:          0.0,
+			RotationSpeed:   0.01,
+			BreakingPower:   5,
+			Keys:            make(map[window.Key]bool),
+			CameraOffset:    math32.NewVector3(0, 5, -10),
+		},
 
 		SpawnDistance:        0,
 		InitialSpawnPosition: WorldCenter,
@@ -106,6 +140,21 @@ func NewSimulation(config *config.Config) (*Simulation, error) {
 	if config.CentralMass > 0 {
 		sim.Fluid = append(sim.Fluid, sim.newUnitWithPropertiesAtPosition(WorldCenter, static, static, 0.01, config.CentralMass, 0, false, color.RGBA{uint8(255), uint8(1), uint8(1), 255}))
 	}
+
+	spaceship.SetupPlane(sim.SpaceShip)
+
+	sim.Scene.Add(sim.SpaceShip.Ship)
+	planeAxes := helper.NewAxes(2.0)
+	sim.Scene.Add(planeAxes)
+
+	// Create Skybox
+	skybox, err := graphic.NewSkybox(graphic.SkyboxData{
+		"./assets/img/space/dark-s_", "jpg",
+		[6]string{"px", "nx", "py", "ny", "pz", "nz"}})
+	if err != nil {
+		panic(err)
+	}
+	sim.Scene.Add(skybox)
 
 	return sim, nil
 }

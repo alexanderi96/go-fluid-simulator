@@ -51,7 +51,7 @@ func initGameState(a *app.Application) *GameState {
 		app:           a,
 		scene:         core.NewNode(),
 		speed:         0.0,
-		maxSpeed:      0.05,
+		maxSpeed:      0.1,
 		acceleration:  0.0,
 		rotationSpeed: 0.005,
 		dragCoeff:     0.00001,
@@ -226,11 +226,54 @@ func setupPlanets(gs *GameState) {
 }
 
 func setupPlane(gs *GameState) {
-	geom := geometry.NewCone(1, 3, 3, 1, true)
-	mat := material.NewStandard(math32.NewColor("DarkGreen"))
-	gs.plane = graphic.NewMesh(geom, mat)
+	// Creiamo il corpo principale della nave
+	bodyGeom := geometry.NewBox(1, 0.3, 2) // Corpo allungato e sottile
+	bodyMat := material.NewStandard(math32.NewColor("Gray"))
+	bodyMesh := graphic.NewMesh(bodyGeom, bodyMat)
+
+	// Parte frontale appuntita (cockpit a forma di prisma)
+	noseGeom := geometry.NewCone(0.2, 0.5, 4, 1, true) // Cono a base quadrata
+	noseMat := material.NewStandard(math32.NewColor("Black"))
+	noseMesh := graphic.NewMesh(noseGeom, noseMat)
+	noseMesh.SetRotationX(math32.Pi / 2) // Ruotiamo il cono per farlo puntare in avanti
+	noseMesh.SetPosition(0, 0.1, 1.2)    // Posizioniamo la parte frontale sulla nave
+
+	// Creiamo le ali larghe, puntate verso il fronte e il basso
+	wingGeom := geometry.NewBox(1.5, 0.05, 0.6) // Ali più larghe e sottili
+	wingMat := material.NewStandard(math32.NewColor("Gray"))
+	leftWingMesh := graphic.NewMesh(wingGeom, wingMat)
+	rightWingMesh := graphic.NewMesh(wingGeom, wingMat)
+
+	// Impostiamo l'inclinazione delle ali
+	leftWingMesh.SetRotationZ(math32.DegToRad(20))   // Inclinazione verso il basso
+	leftWingMesh.SetRotationY(math32.DegToRad(15))   // Inclinazione verso il fronte
+	rightWingMesh.SetRotationZ(-math32.DegToRad(20)) // Inclinazione verso il basso
+	rightWingMesh.SetRotationY(-math32.DegToRad(15)) // Inclinazione verso il fronte
+
+	leftWingMesh.SetPosition(-0.9, -0.2, -0.3) // Posiziona l'ala sinistra
+	rightWingMesh.SetPosition(0.9, -0.2, -0.3) // Posiziona l'ala destra
+
+	// Aggiungiamo dei bracci anteriori (cannoni)
+	armGeom := geometry.NewBox(0.05, 0.05, 0.6) // Bracci allungati
+	armMat := material.NewStandard(math32.NewColor("Gray"))
+	leftArmMesh := graphic.NewMesh(armGeom, armMat)
+	rightArmMesh := graphic.NewMesh(armGeom, armMat)
+
+	leftArmMesh.SetPosition(-0.4, 0, 0.8) // Posiziona il braccio sinistro verso la parte anteriore
+	rightArmMesh.SetPosition(0.4, 0, 0.8) // Posiziona il braccio destro
+
+	// Aggiungi tutte le componenti al corpo principale della nave
+	bodyMesh.Add(noseMesh)      // Aggiungi il "cockpit" anteriore
+	bodyMesh.Add(leftWingMesh)  // Aggiungi l'ala sinistra
+	bodyMesh.Add(rightWingMesh) // Aggiungi l'ala destra
+	bodyMesh.Add(leftArmMesh)   // Aggiungi il braccio sinistro
+	bodyMesh.Add(rightArmMesh)  // Aggiungi il braccio destro
+
+	// Aggiungi la nave alla scena
+	gs.plane = bodyMesh
 	gs.scene.Add(gs.plane)
 
+	// Aggiungiamo degli assi di riferimento per visualizzare l'orientamento
 	planeAxes := helper.NewAxes(2.0)
 	gs.plane.Add(planeAxes)
 }

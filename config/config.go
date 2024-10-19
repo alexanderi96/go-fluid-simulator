@@ -49,6 +49,7 @@ type Config struct {
 	CentralMass             float64
 	// TestDuration          float32
 	// TestIterations        int32
+	SpawnWorld bool
 }
 
 func ReadConfig(filepath string) (*Config, error) {
@@ -100,6 +101,7 @@ func ReadConfig(filepath string) (*Config, error) {
 		CentralMass:             viper.GetFloat64("central_mass"),
 		// TestDuration:          viper.GetFloat64("test_duration"),
 		// TestIterations:        viper.GetInt32("test_iterations"),
+		SpawnWorld: viper.GetBool("spawn_world"),
 	}
 
 	config.Frametime = 1.0 / float64(config.TargetFPS)

@@ -9,11 +9,12 @@
   max_unit_number_per_level = 1
   show_octree = false
   frametime = 0.001 # 0.01 s = 100 hz
+  generate_world = true
 
 # world config
-  game_x = 200
-  game_y = 200
-  game_z = 200
+  game_x = 20000
+  game_y = 20000
+  game_z = 20000
   wall_elasticity = 0.5
   apply_gravity = false
   gravity = -9.81
@@ -21,14 +22,14 @@
   #central_mass = 10000000
   
 # unit config
-  unit_number = 100
+  unit_number = 5
   unit_initial_spacing = 5
   units_emit_gravity = true
   unit_gravitational_multiplier = 1
 
   unit_radius = 1
-  unit_radius_multiplier = 0.01
-  set_random_radius = false
+  unit_radius_multiplier = 10
+  set_random_radius = true
   radius_min = 0.1
   radius_max = 10
   
