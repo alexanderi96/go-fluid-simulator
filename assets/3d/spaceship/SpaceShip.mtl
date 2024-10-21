@@ -2,19 +2,19 @@
 # Material Count: 2
 
 newmtl Base
-Ns 96.078431
+Ns 500.000000                # Aumentata per aumentare la lucentezza
 Ka 0.000000 0.000000 0.000000
 Kd 0.640000 0.640000 0.640000
-Ks 0.500000 0.500000 0.500000
-Ni 1.000000
+Ks 0.900000 0.900000 0.900000 # Aumentata per un'alta riflettività speculare
+Ni 1.500000                  # Aumentata per simulare l'indice di rifrazione di materiali più densi
 d 1.000000
 illum 2
 
 newmtl Black
-Ns 96.078431
+Ns 500.000000                # Aumentata per dare lucentezza anche al nero
 Ka 0.000000 0.000000 0.000000
 Kd 0.000000 0.000000 0.000000
-Ks 0.500000 0.500000 0.500000
-Ni 1.000000
+Ks 0.900000 0.900000 0.900000 # Aumentata per riflettività speculare anche per il nero
+Ni 1.500000                  # Aumentata per migliorare l'effetto riflettente
 d 1.000000
 illum 2

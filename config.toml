@@ -10,11 +10,12 @@
   show_octree = false
   frametime = 0.001 # 0.01 s = 100 hz
   generate_world = true
+  show_skybox = true
 
 # world config
-  game_x = 20000
-  game_y = 20000
-  game_z = 20000
+  game_x = 1e6
+  game_y = 1e6
+  game_z = 1e6
   wall_elasticity = 0.5
   apply_gravity = false
   gravity = -9.81

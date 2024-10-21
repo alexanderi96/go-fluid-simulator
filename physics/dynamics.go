@@ -7,7 +7,7 @@ import (
 	"github.com/EliCDavis/vector/vector3"
 )
 
-const G = 10 //6.67430e-11 // Costante gravitazionale universale (m^3 kg^-1 s^-2)
+const G = 6.67430e-5 // Costante gravitazionale universale (m^3 kg^-1 s^-2)
 
 type CollData struct {
 	uA, uB *Unit
@@ -45,10 +45,11 @@ func (s *Simulation) UpdateWithOctrees() error {
 	for _, unit := range s.Fluid {
 		go func(u *Unit) {
 			defer wg.Done()
-			u.accelerate(s.Octree.CalculateGravity(u, 0.5))
+			u.ApplyForce(s.Octree.CalculateGravity(u, 0.5))
 		}(unit)
 	}
 
+	// s.SpaceShip.ApplyForce(s.Octree.CalculateGravity(s.SpaceShip, 0.5))
 	wg.Wait()
 
 	for _, unitA := range s.Fluid {
@@ -79,22 +80,22 @@ func (s *Simulation) UpdateWithOctrees() error {
 	return nil
 }
 
-func (ot *Octree) CalculateGravity(unit *Unit, theta float64) vector3.Vector[float64] {
+func (ot *Octree) CalculateGravity(unit Gravitable, theta float64) vector3.Vector[float64] {
 	var force = vector3.Zero[float64]()
 	ot.calculateGravityRecursive(unit, theta, &force)
 	return force
 }
 
-func (ot *Octree) calculateGravityRecursive(unit *Unit, theta float64, force *vector3.Vector[float64]) {
+func (ot *Octree) calculateGravityRecursive(g Gravitable, theta float64, force *vector3.Vector[float64]) {
 	if !ot.divided {
 		// Se siamo in un nodo foglia, calcoliamo la forza tra tutti gli oggetti e la unit.
 		for _, obj := range ot.objects {
-			if obj != unit {
-				deltaPos := obj.Position.Sub(unit.Position)
+			if obj != g.GetUnit() {
+				deltaPos := obj.Position.Sub(g.GetPosition())
 				distance := deltaPos.Length()
 				if distance > 0 {
 					// Calcolo della forza gravitazionale.
-					magnitude := G * unit.Mass * obj.Mass / (distance * distance)
+					magnitude := G * g.GetMass() * obj.Mass / (distance * distance)
 					direction := deltaPos.Normalized()
 					forceToAdd := direction.Scale(magnitude)
 					*force = force.Add(forceToAdd)
@@ -104,13 +105,13 @@ func (ot *Octree) calculateGravityRecursive(unit *Unit, theta float64, force *ve
 	} else {
 		// Se non siamo in un nodo foglia, decidiamo se calcolare la forza con il centro di massa o scendere nell'Octree.
 		width := ot.Bounds.Max.X() - ot.Bounds.Min.X()
-		distance := unit.Position.Distance(ot.CenterOfMass)
+		distance := g.GetPosition().Distance(ot.CenterOfMass)
 		if (width / distance) < theta {
 			// Usiamo il centro di massa per approssimare la forza.
-			deltaPos := ot.CenterOfMass.Sub(unit.Position)
+			deltaPos := ot.CenterOfMass.Sub(g.GetPosition())
 			distance := deltaPos.Length()
 			if distance > 0 {
-				magnitude := G * unit.Mass * ot.TotalMass / (distance * distance)
+				magnitude := G * g.GetMass() * ot.TotalMass / (distance * distance)
 				direction := deltaPos.Normalized()
 				forceToAdd := direction.Scale(magnitude)
 				*force = force.Add(forceToAdd)
@@ -119,7 +120,7 @@ func (ot *Octree) calculateGravityRecursive(unit *Unit, theta float64, force *ve
 			// Altrimenti, calcoliamo la forza ricorsivamente sui figli dell'Octree.
 			for _, child := range ot.Children {
 				if child != nil {
-					child.calculateGravityRecursive(unit, theta, force)
+					child.calculateGravityRecursive(g, theta, force)
 				}
 			}
 		}

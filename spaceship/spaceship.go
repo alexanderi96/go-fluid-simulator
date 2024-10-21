@@ -1,72 +1,140 @@
 package spaceship
 
 import (
+	"log"
+
+	"github.com/EliCDavis/vector/vector3"
+	"github.com/g3n/engine/core"
 	"github.com/g3n/engine/geometry"
 	"github.com/g3n/engine/graphic"
+	"github.com/g3n/engine/loader/obj"
 	"github.com/g3n/engine/material"
 	"github.com/g3n/engine/math32"
 	"github.com/g3n/engine/window"
 )
 
 type SpaceShip struct {
-	Ship            *graphic.Mesh
+	Ship            *core.Node
 	Speed           float32
 	MaxSpeed        float32
 	MaxEngineThrust float32
 	Thrust          float32
 	RotationSpeed   float32
 	BreakingPower   float32
+	Position        vector3.Vector[float64]
+	Acceleration    vector3.Vector[float64]
+	Mass            float64
 	Keys            map[window.Key]bool
 	CameraOffset    *math32.Vector3
 }
 
-func SetupPlane(s *SpaceShip) {
-	// Creiamo il corpo principale della nave
-	bodyGeom := geometry.NewBox(1, 0.3, 2) // Corpo allungato e sottile
-	bodyMat := material.NewStandard(math32.NewColor("Gray"))
+func (s *SpaceShip) ApplyForce(f vector3.Vector[float64]) {
+	s.Acceleration = s.Acceleration.Add(f.Scale(1 / s.Mass))
+}
+
+// func (s *SpaceShip) UpdatePosition(dt float64) {
+// 	s.Position = s.Position.Add(s.Velocity.Scale(dt))
+// 	s.Velocity = s.Velocity.Add(s.Acceleration.Scale(dt))
+
+// 	s.Acceleration = vector3.Zero[float64]()
+
+// 	s.Mesh.SetPosition(s.Position.ToFloat32().X(), s.Position.ToFloat32().Y(), s.Position.ToFloat32().Z())
+
+// }
+
+func (s *SpaceShip) SetupShip() {
+	// Corpo principale: un cilindro conica per dare un aspetto più fluido e aerodinamico
+	bodyGeom := geometry.NewCylinder(0.3, 0.2, 2, 32, true, true) // Più segmenti per rotondità e una base più piccola
+	bodyMat := material.NewStandard(math32.NewColor("Silver"))
 	bodyMesh := graphic.NewMesh(bodyGeom, bodyMat)
+	bodyMesh.SetRotationZ(math32.Pi / 2) // Ruotiamo il cilindro orizzontalmente
 
-	// Parte frontale appuntita (cockpit a forma di prisma)
-	noseGeom := geometry.NewCone(0.2, 0.5, 4, 1, true) // Cono a base quadrata
-	noseMat := material.NewStandard(math32.NewColor("Black"))
-	noseMesh := graphic.NewMesh(noseGeom, noseMat)
-	noseMesh.SetRotationX(math32.Pi / 2) // Ruotiamo il cono per farlo puntare in avanti
-	noseMesh.SetPosition(0, 0.1, 1.2)    // Posizioniamo la parte frontale sulla nave
+	// Cockpit: utilizziamo una sfera per un aspetto moderno e liscio
+	cockpitGeom := geometry.NewSphere(0.4, 16, 16) // Più segmenti per una sfera più liscia
+	cockpitMat := material.NewStandard(math32.NewColor("Black"))
+	cockpitMesh := graphic.NewMesh(cockpitGeom, cockpitMat)
+	cockpitMesh.SetPosition(0, 0, 1.1)
 
-	// Creiamo le ali larghe, puntate verso il fronte e il basso
-	wingGeom := geometry.NewBox(1.5, 0.05, 0.6) // Ali più larghe e sottili
-	wingMat := material.NewStandard(math32.NewColor("Gray"))
+	// Ali: usiamo dei pannelli trapezoidali per un look più avanzato
+	wingGeom := geometry.NewBox(1.5, 0.05, 0.5) // Ali più ampie e sottili per dare l'idea di velocità
+	wingMat := material.NewStandard(math32.NewColor("DarkGray"))
 	leftWingMesh := graphic.NewMesh(wingGeom, wingMat)
 	rightWingMesh := graphic.NewMesh(wingGeom, wingMat)
 
-	// Impostiamo l'inclinazione delle ali
-	leftWingMesh.SetRotationZ(math32.DegToRad(20))   // Inclinazione verso il basso
-	leftWingMesh.SetRotationY(math32.DegToRad(15))   // Inclinazione verso il fronte
-	rightWingMesh.SetRotationZ(-math32.DegToRad(20)) // Inclinazione verso il basso
-	rightWingMesh.SetRotationY(-math32.DegToRad(15)) // Inclinazione verso il fronte
+	// Rotazione e posizionamento delle ali
+	leftWingMesh.SetRotationY(math32.DegToRad(10)) // Leggera angolazione verso il basso
+	rightWingMesh.SetRotationY(-math32.DegToRad(10))
+	leftWingMesh.SetPosition(-0.9, -0.3, 0) // Ali spostate indietro per bilanciamento
+	rightWingMesh.SetPosition(0.9, -0.3, 0)
 
-	leftWingMesh.SetPosition(-0.9, -0.2, -0.3) // Posiziona l'ala sinistra
-	rightWingMesh.SetPosition(0.9, -0.2, -0.3) // Posiziona l'ala destra
+	// Cannoni: piccoli cilindri allineati sotto le ali
+	cannonGeom := geometry.NewCylinder(0.05, 0.05, 1, 16, true, true)
+	cannonMat := material.NewStandard(math32.NewColor("Gray"))
+	leftCannonMesh := graphic.NewMesh(cannonGeom, cannonMat)
+	rightCannonMesh := graphic.NewMesh(cannonGeom, cannonMat)
 
-	// Aggiungiamo dei bracci anteriori (cannoni)
-	armGeom := geometry.NewBox(0.05, 0.05, 0.6) // Bracci allungati
-	armMat := material.NewStandard(math32.NewColor("Gray"))
-	leftArmMesh := graphic.NewMesh(armGeom, armMat)
-	rightArmMesh := graphic.NewMesh(armGeom, armMat)
+	// Posizionamento cannoni
+	leftCannonMesh.SetRotationZ(math32.Pi / 2)
+	rightCannonMesh.SetRotationZ(math32.Pi / 2)
+	leftCannonMesh.SetPosition(-0.7, -0.2, 0.5)
+	rightCannonMesh.SetPosition(0.7, -0.2, 0.5)
 
-	leftArmMesh.SetPosition(-0.4, 0, 0.8) // Posiziona il braccio sinistro verso la parte anteriore
-	rightArmMesh.SetPosition(0.4, 0, 0.8) // Posiziona il braccio destro
+	// Motori posteriori: cilindri inclinati per un look più dinamico
+	engineGeom := geometry.NewCylinder(0.15, 0.1, 1, 16, true, true)
+	engineMat := material.NewStandard(math32.NewColor("DarkGray"))
+	leftEngineMesh := graphic.NewMesh(engineGeom, engineMat)
+	rightEngineMesh := graphic.NewMesh(engineGeom, engineMat)
 
-	// Aggiungi tutte le componenti al corpo principale della nave
-	bodyMesh.Add(noseMesh)      // Aggiungi il "cockpit" anteriore
-	bodyMesh.Add(leftWingMesh)  // Aggiungi l'ala sinistra
-	bodyMesh.Add(rightWingMesh) // Aggiungi l'ala destra
-	bodyMesh.Add(leftArmMesh)   // Aggiungi il braccio sinistro
-	bodyMesh.Add(rightArmMesh)  // Aggiungi il braccio destro
+	// Posizionamento motori
+	leftEngineMesh.SetRotationX(-math32.DegToRad(45))
+	rightEngineMesh.SetRotationX(-math32.DegToRad(45))
+	leftEngineMesh.SetPosition(-0.4, 0, -1.2)
+	rightEngineMesh.SetPosition(0.4, 0, -1.2)
 
-	// Aggiungi la nave alla scena
-	s.Ship = bodyMesh
+	// Dettagli aggiuntivi: antenne e componenti di sensoristica
+	antennaGeom := geometry.NewCylinder(0.02, 0.02, 1, 8, true, true)
+	antennaMat := material.NewStandard(math32.NewColor("Black"))
+	antennaMesh := graphic.NewMesh(antennaGeom, antennaMat)
+	antennaMesh.SetRotationZ(math32.Pi / 2)
+	antennaMesh.SetPosition(0, 0.5, -0.8)
 
+	// Assemblaggio della navicella
+	bodyMesh.Add(cockpitMesh)
+	bodyMesh.Add(leftWingMesh)
+	bodyMesh.Add(rightWingMesh)
+	bodyMesh.Add(leftCannonMesh)
+	bodyMesh.Add(rightCannonMesh)
+	bodyMesh.Add(leftEngineMesh)
+	bodyMesh.Add(rightEngineMesh)
+	bodyMesh.Add(antennaMesh)
+
+	s.Mass = 10
+	s.Ship = &bodyMesh.Node
+}
+
+func (s *SpaceShip) LoadShip() {
+	// Decodes obj file and associated mtl file
+	dec, err := obj.Decode("./assets/3d/spaceship/SpaceShip.obj", "./assets/3d/spaceship/SpaceShip.mtl")
+	if err != nil {
+		log.Panic(err)
+	}
+
+	// Creates a new node with all the objects in the decoded file and adds it to the scene
+	group, err := dec.NewGroup()
+	if err != nil {
+		log.Panic(err)
+	}
+
+	// material := material.NewStandard(math32.NewColor("red"))
+
+	// for _, child := range s.Ship.Children() {
+
+	// 	if mesh, ok := child.(*graphic.Mesh); ok {
+	// 		mesh.SetMaterial(material)
+	// 	}
+	// }
+
+	s.Ship = group
 }
 
 func UpdateMovement(s *SpaceShip) {

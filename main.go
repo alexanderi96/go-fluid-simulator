@@ -24,7 +24,7 @@ import (
 
 var (
 	s            *physics.Simulation
-	ambientLight = &math32.Color{R: 0.1, G: 0.1, B: 0.8}
+	ambientLight = &math32.Color{R: 0.1, G: 0.1, B: 0.1}
 	pointLight   = &math32.Color{R: 1.0, G: 1.0, B: 1.0}
 	bgColor      = &math32.Color{R: 0.01, G: 0.01, B: 0.01}
 )
@@ -47,7 +47,7 @@ func init() {
 	// Create perspective camera
 	s.Cam = camera.New(1)
 	s.Cam.SetPosition(0, 2, 8)
-	s.Cam.SetFar(100000) // Imposta il valore desiderato (es. 1000 unità)
+	s.Cam.SetFar(1.7e38) // Imposta il valore desiderato, max 1.7e38
 	s.Scene.Add(s.Cam)
 
 	// Set up orbit control for the camera
@@ -105,9 +105,9 @@ func main() {
 
 	// Create and add lights to the scene
 	s.Scene.Add(light.NewAmbient(ambientLight, 1))
-	pointLight := light.NewPoint(pointLight, 1000000.0)
-	pointLight.SetPosition(float32(s.Config.GameX), float32(s.Config.GameY), float32(s.Config.GameZ))
-	s.Scene.Add(pointLight)
+	// pointLight := light.NewPoint(pointLight, 1e10)
+	// pointLight.SetPosition(float32(s.Config.GameX), float32(s.Config.GameY), float32(s.Config.GameZ))
+	// s.Scene.Add(pointLight)
 
 	// Handle mouse input
 	s.App.Subscribe(window.OnMouseDown, func(evname string, ev interface{}) {
@@ -173,7 +173,7 @@ func main() {
 				s.Fluid = sim.Fluid
 
 				for _, unit := range s.Fluid {
-					unit.GenerateMesh()
+					unit.NewPointLightMesh()
 					s.Scene.Add(unit.Mesh)
 				}
 				s.Config = sim.Config

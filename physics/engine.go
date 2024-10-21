@@ -22,7 +22,6 @@ import (
 	"github.com/g3n/engine/graphic"
 	"github.com/g3n/engine/gui"
 	"github.com/g3n/engine/math32"
-	"github.com/g3n/engine/util/helper"
 	"github.com/g3n/engine/window"
 )
 
@@ -118,11 +117,11 @@ func NewSimulation(config *config.Config) (*Simulation, error) {
 
 		SpaceShip: &spaceship.SpaceShip{
 			Speed:           0.0,
-			MaxSpeed:        100,
-			MaxEngineThrust: 100,
+			MaxSpeed:        1e1,
+			MaxEngineThrust: 1e5,
 			Thrust:          0.0,
 			RotationSpeed:   0.01,
-			BreakingPower:   5,
+			BreakingPower:   1e10,
 			Keys:            make(map[window.Key]bool),
 			CameraOffset:    math32.NewVector3(0, 5, -10),
 		},
@@ -141,20 +140,26 @@ func NewSimulation(config *config.Config) (*Simulation, error) {
 		sim.Fluid = append(sim.Fluid, sim.newUnitWithPropertiesAtPosition(WorldCenter, static, static, 0.01, config.CentralMass, 0, false, color.RGBA{uint8(255), uint8(1), uint8(1), 255}))
 	}
 
-	spaceship.SetupPlane(sim.SpaceShip)
+	if config.GenerateWorld {
+		sim.generatePlanetarySystem(0.0000001)
+	}
+
+	sim.SpaceShip.SetupShip()
 
 	sim.Scene.Add(sim.SpaceShip.Ship)
-	planeAxes := helper.NewAxes(2.0)
-	sim.Scene.Add(planeAxes)
+	// planeAxes := helper.NewAxes(2.0)
+	// sim.Scene.Add(planeAxes)
 
 	// Create Skybox
-	skybox, err := graphic.NewSkybox(graphic.SkyboxData{
-		"./assets/img/space/dark-s_", "jpg",
-		[6]string{"px", "nx", "py", "ny", "pz", "nz"}})
-	if err != nil {
-		panic(err)
+	if sim.Config.ShowSkybox {
+		skybox, err := graphic.NewSkybox(graphic.SkyboxData{
+			"./assets/img/space/dark-s_", "jpg",
+			[6]string{"px", "nx", "py", "ny", "pz", "nz"}})
+		if err != nil {
+			panic(err)
+		}
+		sim.Scene.Add(skybox)
 	}
-	sim.Scene.Add(skybox)
 
 	return sim, nil
 }
@@ -234,13 +239,121 @@ func (s *Simulation) newUnitWithPropertiesAtPosition(position, acceleration, vel
 		CanBeAltered: canBeAltered,
 	}
 
-	unit.GenerateMesh()
+	unit.NewPointLightMesh()
 
 	s.Scene.Add(unit.Mesh)
+	// s.Scene.Add(unit.Mesh.Light)
 
 	unit.Mass = unit.GetMass()
 
 	return unit
+}
+
+func (sim *Simulation) generatePlanetarySystem(sf float64) {
+	// Dimensione del mondo
+	worldSize := 1e5
+
+	// Fattori di scala adattati al mondo
+	maxSystemRadius := worldSize * 0.4
+	starRadius := worldSize * 0.05
+
+	// Massa della stella
+	const SOLAR_MASS = 1e5
+
+	// Creiamo la stella centrale
+	star := sim.newUnitWithPropertiesAtPosition(
+		vector3.New(0.0, 0.0, 0.0),
+		vector3.New(0.0, 0.0, 0.0),
+		vector3.New(0.0, 0.0, 0.0),
+		starRadius,
+		SOLAR_MASS,
+		0.0,
+		true,
+		color.RGBA{255, 225, 0, 255},
+	)
+	sim.Fluid = append(sim.Fluid, star)
+
+	// Numero di pianeti (3-6)
+	numPlanets := rand.Intn(4) + 3
+
+	// Parametri per la distribuzione dei pianeti
+	minDistance := starRadius * 2.5
+	maxDistance := maxSystemRadius
+
+	planetSizeFactors := []float64{
+		0.15, // Mercurio
+		0.25, // Venere
+		0.3,  // Terra
+		0.2,  // Marte
+		0.45, // Giove
+		0.4,  // Saturno
+		0.35, // Urano
+		0.35, // Nettuno
+	}
+
+	for i := 0; i < numPlanets; i++ {
+		// Distanza con progressione più compatta
+		ratio := math.Pow(1.4, float64(i))
+		distance := minDistance * ratio
+		if distance > maxDistance {
+			distance = maxDistance
+		}
+
+		// Calcolo dell'accelerazione gravitazionale iniziale
+		// a = GM/r² * direzione
+		acceleration := G * SOLAR_MASS / (distance * distance) * 15.0 // Fattore di scala per accelerazione più forte
+
+		// Raggio del pianeta
+		planetRadius := starRadius * planetSizeFactors[i%len(planetSizeFactors)]
+
+		// Angolo casuale per posizione iniziale
+		angle := rand.Float64() * 2 * math.Pi
+
+		// Posizione iniziale su un'orbita circolare
+		position := vector3.New(
+			distance*math.Cos(angle),
+			0.0,
+			distance*math.Sin(angle),
+		)
+
+		// Vettore accelerazione perpendicolare alla posizione
+		accelerationVector := vector3.New(
+			-acceleration*math.Sin(angle),
+			0.0,
+			acceleration*math.Cos(angle),
+		)
+
+		// Massa del pianeta
+		planetMass := 1.0
+
+		// Creazione del pianeta con velocità iniziale zero e accelerazione perpendicolare
+		planet := sim.newUnitWithPropertiesAtPosition(
+			position,
+			vector3.New(0.0, 0.0, 0.0), // Velocità iniziale zero
+			accelerationVector,         // Accelerazione perpendicolare
+			planetRadius,
+			planetMass,
+			0.2,
+			true,
+			generatePlanetColor(i),
+		)
+
+		sim.Fluid = append(sim.Fluid, planet)
+	}
+}
+
+func generatePlanetColor(index int) color.RGBA {
+	planetColors := []color.RGBA{
+		{170, 150, 140, 255}, // Grigio-marrone (tipo Mercurio)
+		{255, 198, 73, 255},  // Giallo-crema (tipo Venere)
+		{100, 149, 237, 255}, // Blu (tipo Terra)
+		{193, 68, 14, 255},   // Rosso (tipo Marte)
+		{176, 127, 53, 255},  // Marrone chiaro (tipo Giove)
+		{238, 232, 205, 255}, // Beige (tipo Saturno)
+		{173, 216, 230, 255}, // Azzurro chiaro (tipo Urano)
+		{0, 0, 128, 255},     // Blu scuro (tipo Nettuno)
+	}
+	return planetColors[index%len(planetColors)]
 }
 
 func (s *Simulation) PositionNewUnitsCube(units []*Unit) {

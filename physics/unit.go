@@ -7,6 +7,7 @@ import (
 	"github.com/EliCDavis/vector/vector3"
 	"github.com/g3n/engine/geometry"
 	"github.com/g3n/engine/graphic"
+	"github.com/g3n/engine/light"
 	"github.com/g3n/engine/material"
 	"github.com/g3n/engine/math32"
 	"github.com/google/uuid"
@@ -22,8 +23,9 @@ var (
 )
 
 type Unit struct {
-	Id   uuid.UUID
-	Mesh *graphic.Mesh `json:"-"`
+	Id uuid.UUID
+
+	Mesh *PointLightMesh
 
 	Position     vector3.Vector[float64]
 	Velocity     vector3.Vector[float64]
@@ -39,8 +41,53 @@ type Unit struct {
 	Heat float64
 }
 
-func (u *Unit) GenerateMesh() {
-	u.Mesh = graphic.NewMesh(geometry.NewSphere(float64(u.Radius), seg, seg), mat)
+type PointLightMesh struct {
+	*graphic.Mesh
+	Light *light.Point
+}
+
+func (u *Unit) GetUnit() *Unit {
+	return u
+}
+
+func (u *Unit) GetPosition() vector3.Vector[float64] {
+	return u.Position
+}
+
+func (u *Unit) NewPointLightMesh() {
+
+	// Calcola il colore in base alla dimensione del pianeta
+	// Definisci i valori minimi e massimi per la dimensione
+	minSize := 0e1 // Dimensione minima in metri
+	maxSize := 5e3 // Dimensione massima in metri
+
+	// Normalizza la dimensione del pianeta tra 0 e 1
+	normalizedSize := (float64(u.Radius) - minSize) / (maxSize - minSize)
+	normalizedSize = float64(math32.Clamp(float32(normalizedSize), 0, 1)) // Limita il valore tra 0 e 1
+
+	// Interpolazione dei colori
+	col := math32.Color{
+		R: float32(normalizedSize),       // Più grande = rosso
+		G: 0.0,                           // Verde fisso a 0
+		B: float32(1.0 - normalizedSize), // Più piccolo = blu
+	}
+
+	u.Mesh = new(PointLightMesh)
+
+	geom := geometry.NewSphere(float64(u.Radius), seg, seg)
+	mat := material.NewStandard(&col)
+	mat.SetUseLights(0)
+	mat.SetEmissiveColor(&col)
+	u.Mesh.Mesh = graphic.NewMesh(geom, mat)
+	u.Mesh.Mesh.SetVisible(true)
+
+	u.Mesh.Light = light.NewPoint(&col, 1e10)
+	u.Mesh.Light.SetPosition(0, 0, 0)
+	u.Mesh.Light.SetLinearDecay(1)
+	u.Mesh.Light.SetQuadraticDecay(1)
+	u.Mesh.Light.SetVisible(true)
+
+	u.Mesh.Add(u.Mesh.Light)
 }
 
 func (u *Unit) GetVolume() float64 {
@@ -53,7 +100,7 @@ func (u *Unit) GetMass() float64 {
 	return u.GetVolume() * u.MassMultiplier
 }
 
-func (u *Unit) accelerate(f vector3.Vector[float64]) {
+func (u *Unit) ApplyForce(f vector3.Vector[float64]) {
 	u.Acceleration = u.Acceleration.Add(f.Scale(1 / u.Mass))
 }
 
