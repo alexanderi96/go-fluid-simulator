@@ -24,8 +24,7 @@ import (
 
 var (
 	s            *physics.Simulation
-	ambientLight = &math32.Color{R: 0.1, G: 0.1, B: 0.1}
-	pointLight   = &math32.Color{R: 1.0, G: 1.0, B: 1.0}
+	ambientLight = &math32.Color{R: 0.3, G: 0.3, B: 0.4} // Adjusted for medium galaxy intensity with slight blue tint
 	bgColor      = &math32.Color{R: 0.01, G: 0.01, B: 0.01}
 )
 
@@ -103,11 +102,8 @@ func main() {
 	// Set background color to gray
 	s.App.Gls().ClearColor(bgColor.R, bgColor.G, bgColor.B, 0.1)
 
-	// Create and add lights to the scene
-	// s.Scene.Add(light.NewAmbient(ambientLight, 1))
-	pointLight := light.NewPoint(pointLight, 1e15)
-	pointLight.SetPosition(float32(s.Config.GameX), float32(s.Config.GameY), float32(s.Config.GameZ))
-	s.Scene.Add(pointLight)
+	// Create and add ambient light to simulate galaxy lighting
+	s.Scene.Add(light.NewAmbient(ambientLight, 1.0))
 
 	// Handle mouse input
 	s.App.Subscribe(window.OnMouseDown, func(evname string, ev interface{}) {
