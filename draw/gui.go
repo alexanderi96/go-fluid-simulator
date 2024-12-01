@@ -12,82 +12,155 @@ import (
 )
 
 func SetupHUD(s *physics.Simulation) {
-	// Debug info (in alto a sinistra)
+	// Create a panel for mode indicators (top right)
+	modePanel := gui.NewPanel(200, 80)
+	modePanel.SetPosition(float32(800-210), 10)
+	modePanel.SetBorders(1, 1, 1, 1)
+	modePanel.SetBordersColor(math32.NewColor("darkgray"))
+	modePanel.SetColor4(&math32.Color4{R: 0.2, G: 0.2, B: 0.2, A: 0.7})
+	s.Scene.Add(modePanel)
+
+	// Navigation mode label
+	s.Hud.NavigationLabel = gui.NewLabel("MODE: CAMERA")
+	s.Hud.NavigationLabel.SetPosition(10, 10)
+	s.Hud.NavigationLabel.SetColor(math32.NewColor("lightgreen"))
+	modePanel.Add(s.Hud.NavigationLabel)
+
+	// Spaceship status
+	s.Hud.ShipStatusLabel = gui.NewLabel("SHIP: NOT PRESENT")
+	s.Hud.ShipStatusLabel.SetPosition(10, 30)
+	s.Hud.ShipStatusLabel.SetColor(math32.NewColor("yellow"))
+	modePanel.Add(s.Hud.ShipStatusLabel)
+
+	// Controls panel (top left)
+	controlsPanel := gui.NewPanel(180, 140)
+	controlsPanel.SetPosition(10, 10)
+	controlsPanel.SetBorders(1, 1, 1, 1)
+	controlsPanel.SetBordersColor(math32.NewColor("darkgray"))
+	controlsPanel.SetColor4(&math32.Color4{R: 0.2, G: 0.2, B: 0.2, A: 0.7})
+	s.Scene.Add(controlsPanel)
+
+	// Debug info
 	s.Hud.FpsLabel = gui.NewLabel("FPS: 0")
 	s.Hud.FpsLabel.SetPosition(10, 10)
-	s.Scene.Add(s.Hud.FpsLabel)
+	s.Hud.FpsLabel.SetColor(math32.NewColor("white"))
+	controlsPanel.Add(s.Hud.FpsLabel)
 
 	s.Hud.FtLabel = gui.NewLabel("FrameTime: 0")
-	s.Hud.FtLabel.SetPosition(100, 10)
-	s.Scene.Add(s.Hud.FtLabel)
+	s.Hud.FtLabel.SetPosition(10, 30)
+	s.Hud.FtLabel.SetColor(math32.NewColor("white"))
+	controlsPanel.Add(s.Hud.FtLabel)
 
-	s.Hud.UnitLabel = gui.NewLabel("units: 0")
-	s.Hud.UnitLabel.SetPosition(10, 25)
-	s.Scene.Add(s.Hud.UnitLabel)
+	s.Hud.UnitLabel = gui.NewLabel("Units: 0")
+	s.Hud.UnitLabel.SetPosition(10, 50)
+	s.Hud.UnitLabel.SetColor(math32.NewColor("white"))
+	controlsPanel.Add(s.Hud.UnitLabel)
 
-	s.Hud.SimDurationLabel = gui.NewLabel("Simulation duration: 0")
-	s.Hud.SimDurationLabel.SetPosition(10, 40)
-	s.Scene.Add(s.Hud.SimDurationLabel)
+	s.Hud.SimDurationLabel = gui.NewLabel("Sim duration: 0")
+	s.Hud.SimDurationLabel.SetPosition(10, 70)
+	s.Hud.SimDurationLabel.SetColor(math32.NewColor("white"))
+	controlsPanel.Add(s.Hud.SimDurationLabel)
 
 	s.Hud.RealDurationLabel = gui.NewLabel("Real duration: 0")
-	s.Hud.RealDurationLabel.SetPosition(10, 55)
-	s.Scene.Add(s.Hud.RealDurationLabel)
+	s.Hud.RealDurationLabel.SetPosition(10, 90)
+	s.Hud.RealDurationLabel.SetColor(math32.NewColor("white"))
+	controlsPanel.Add(s.Hud.RealDurationLabel)
 
-	// Info navicella (in basso al centro)
-	// Calcola la posizione centrale dello schermo
-	width := float32(800)  // Sostituisci con la larghezza effettiva della finestra
-	height := float32(600) // Sostituisci con l'altezza effettiva della finestra
-	centerX := width / 2
-	bottomY := height - 120 // Spazio dal fondo dello schermo
+	// Key controls info (bottom left)
+	keysPanel := gui.NewPanel(200, 160)
+	keysPanel.SetPosition(10, float32(600-170))
+	keysPanel.SetBorders(1, 1, 1, 1)
+	keysPanel.SetBordersColor(math32.NewColor("darkgray"))
+	keysPanel.SetColor4(&math32.Color4{R: 0.2, G: 0.2, B: 0.2, A: 0.7})
+	s.Scene.Add(keysPanel)
 
-	// Posiziona le etichette della navicella centrate in basso
+	keyTitle := gui.NewLabel("CONTROLS")
+	keyTitle.SetPosition(10, 10)
+	keyTitle.SetColor(math32.NewColor("orange"))
+	keysPanel.Add(keyTitle)
+
+	keyControls := []string{
+		"F - Toggle Flight Mode",
+		"W/S - Thrust Control",
+		"A/D - Roll Left/Right",
+		"Q/E - Yaw Left/Right",
+		"K/M - Pitch Up/Down",
+		"SPACE - Brake",
+	}
+
+	for i, control := range keyControls {
+		label := gui.NewLabel(control)
+		label.SetPosition(10, float32(35+i*20))
+		label.SetColor(math32.NewColor("lightblue"))
+		keysPanel.Add(label)
+	}
+
+	// Ship info panel (bottom center)
+	shipPanel := gui.NewPanel(300, 140)
+	shipPanel.SetPosition(float32(800/2-150), float32(600-150))
+	shipPanel.SetBorders(1, 1, 1, 1)
+	shipPanel.SetBordersColor(math32.NewColor("darkgray"))
+	shipPanel.SetColor4(&math32.Color4{R: 0.2, G: 0.2, B: 0.2, A: 0.7})
+	s.Scene.Add(shipPanel)
+
 	s.Hud.PositionLabel = gui.NewLabel("")
-	s.Hud.PositionLabel.SetPosition(centerX-100, bottomY)
-	s.Scene.Add(s.Hud.PositionLabel)
+	s.Hud.PositionLabel.SetPosition(10, 10)
+	s.Hud.PositionLabel.SetColor(math32.NewColor("white"))
+	shipPanel.Add(s.Hud.PositionLabel)
 
 	s.Hud.SpeedLabel = gui.NewLabel("")
-	s.Hud.SpeedLabel.SetPosition(centerX-100, bottomY+20)
-	s.Scene.Add(s.Hud.SpeedLabel)
+	s.Hud.SpeedLabel.SetPosition(10, 30)
+	s.Hud.SpeedLabel.SetColor(math32.NewColor("white"))
+	shipPanel.Add(s.Hud.SpeedLabel)
 
 	s.Hud.DirectionLabel = gui.NewLabel("")
-	s.Hud.DirectionLabel.SetPosition(centerX-100, bottomY+40)
-	s.Scene.Add(s.Hud.DirectionLabel)
+	s.Hud.DirectionLabel.SetPosition(10, 50)
+	s.Hud.DirectionLabel.SetColor(math32.NewColor("white"))
+	shipPanel.Add(s.Hud.DirectionLabel)
 
 	s.Hud.OrientationLabel = gui.NewLabel("")
-	s.Hud.OrientationLabel.SetPosition(centerX-100, bottomY+60)
-	s.Scene.Add(s.Hud.OrientationLabel)
+	s.Hud.OrientationLabel.SetPosition(10, 70)
+	s.Hud.OrientationLabel.SetColor(math32.NewColor("white"))
+	shipPanel.Add(s.Hud.OrientationLabel)
 
 	s.Hud.StatusLabel = gui.NewLabel("")
-	s.Hud.StatusLabel.SetPosition(centerX-100, bottomY+80)
-	s.Scene.Add(s.Hud.StatusLabel)
+	s.Hud.StatusLabel.SetPosition(10, 90)
+	s.Hud.StatusLabel.SetColor(math32.NewColor("white"))
+	shipPanel.Add(s.Hud.StatusLabel)
 }
 
 func UpdateHUD(s *physics.Simulation, deltaTime time.Duration) {
 	fps := 1.0 / float64(deltaTime.Seconds())
-	s.Hud.FpsLabel.SetText("FPS: " + fmt.Sprintf("%.2f", fps))
+	s.Hud.FpsLabel.SetText(fmt.Sprintf("FPS: %.0f", fps))
+	s.Hud.FtLabel.SetText(fmt.Sprintf("FrameTime: %.2f", s.Config.Frametime))
+	s.Hud.UnitLabel.SetText(fmt.Sprintf("Units: %d", len(s.Fluid)))
+	s.Hud.SimDurationLabel.SetText(fmt.Sprintf("Sim duration: %.1f", s.Metrics.SimDuration))
+	s.Hud.RealDurationLabel.SetText(fmt.Sprintf("Real duration: %.1f", -time.Until(s.AppStartTime).Seconds()))
 
-	s.Hud.FtLabel.SetText("FrameTime: " + fmt.Sprintf("%.2f", s.Config.Frametime))
+	// Update navigation mode and ship status
+	if s.Fly {
+		s.Hud.NavigationLabel.SetText("MODE: FLIGHT")
+		s.Hud.NavigationLabel.SetColor(math32.NewColor("lightgreen"))
+	} else {
+		s.Hud.NavigationLabel.SetText("MODE: CAMERA")
+		s.Hud.NavigationLabel.SetColor(math32.NewColor("skyblue"))
+	}
 
-	s.Hud.UnitLabel.SetText("unit: " + fmt.Sprintf("%d", len(s.Fluid)))
-
-	s.Hud.SimDurationLabel.SetText("Simulation duration: " + fmt.Sprintf("%.2f", s.Metrics.SimDuration))
-
-	s.Hud.RealDurationLabel.SetText("Real duration: " + fmt.Sprintf("%.2f", -time.Until(s.AppStartTime).Seconds()))
-
-	// Aggiorna posizione
 	if s.SpaceShip != nil {
+		s.Hud.ShipStatusLabel.SetText("SHIP: ACTIVE")
+		s.Hud.ShipStatusLabel.SetColor(math32.NewColor("lightgreen"))
+
+		// Update ship information
 		pos := s.SpaceShip.Ship.Position()
-		s.Hud.PositionLabel.SetText(fmt.Sprintf("Position: X: %.1f Y: %.1f Z: %.1f", pos.X, pos.Y, pos.Z))
-		// Aggiorna velocità
+		s.Hud.PositionLabel.SetText(fmt.Sprintf("Position: X:%.1f Y:%.1f Z:%.1f", pos.X, pos.Y, pos.Z))
 		s.Hud.SpeedLabel.SetText(fmt.Sprintf("Speed: %.1f units/s", s.SpaceShip.Speed))
 
-		// Calcola e aggiorna la direzione
+		// Calculate and update direction
 		forward := math32.NewVector3(0, 0, 1)
 		matrix := s.SpaceShip.Ship.Matrix()
 		forward.ApplyMatrix4(&matrix)
 		forward.Normalize()
 
-		// Determina le direzioni cardinali
 		directions := []string{}
 		if forward.Z > 0.3 {
 			directions = append(directions, "North")
@@ -113,14 +186,14 @@ func UpdateHUD(s *physics.Simulation, deltaTime time.Duration) {
 		}
 		s.Hud.DirectionLabel.SetText(fmt.Sprintf("Direction: %s", directionText))
 
-		// Calcola e aggiorna l'orientamento in gradi
+		// Update orientation
 		rot := s.SpaceShip.Ship.Rotation()
-		s.Hud.OrientationLabel.SetText(fmt.Sprintf("Orientation - Pitch: %.1f° Roll: %.1f° Yaw: %.1f°",
+		s.Hud.OrientationLabel.SetText(fmt.Sprintf("Orientation - P:%.1f° R:%.1f° Y:%.1f°",
 			math32.RadToDeg(rot.X),
 			math32.RadToDeg(rot.Z),
 			math32.RadToDeg(rot.Y)))
 
-		// Aggiornamento status
+		// Update status
 		var status []string
 		if math.Abs(float64(s.SpaceShip.Speed)) < 0.001 {
 			status = append(status, "HOVERING")
@@ -145,6 +218,15 @@ func UpdateHUD(s *physics.Simulation, deltaTime time.Duration) {
 		}
 		statusText := strings.Join(status, " | ")
 		s.Hud.StatusLabel.SetText(fmt.Sprintf("Status: %s", statusText))
-	}
+	} else {
+		s.Hud.ShipStatusLabel.SetText("SHIP: NOT PRESENT")
+		s.Hud.ShipStatusLabel.SetColor(math32.NewColor("yellow"))
 
+		// Clear ship information when no ship is present
+		s.Hud.PositionLabel.SetText("")
+		s.Hud.SpeedLabel.SetText("")
+		s.Hud.DirectionLabel.SetText("")
+		s.Hud.OrientationLabel.SetText("")
+		s.Hud.StatusLabel.SetText("")
+	}
 }

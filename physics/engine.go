@@ -12,7 +12,6 @@ import (
 	"github.com/EliCDavis/vector/vector3"
 	"github.com/alexanderi96/go-fluid-simulator/config"
 	"github.com/alexanderi96/go-fluid-simulator/metrics"
-	"github.com/alexanderi96/go-fluid-simulator/physics/gravity"
 	"github.com/alexanderi96/go-fluid-simulator/spaceship"
 	"github.com/alexanderi96/go-fluid-simulator/utils"
 	"github.com/google/uuid"
@@ -70,12 +69,13 @@ type Simulation struct {
 		UnitLabel         *gui.Label
 		SimDurationLabel  *gui.Label
 		RealDurationLabel *gui.Label
-
-		PositionLabel    *gui.Label
-		SpeedLabel       *gui.Label
-		DirectionLabel   *gui.Label
-		OrientationLabel *gui.Label
-		StatusLabel      *gui.Label
+		NavigationLabel   *gui.Label
+		ShipStatusLabel   *gui.Label
+		PositionLabel     *gui.Label
+		SpeedLabel        *gui.Label
+		DirectionLabel    *gui.Label
+		OrientationLabel  *gui.Label
+		StatusLabel       *gui.Label
 	}
 
 	MovementSpeed float64 `json:"-"`
@@ -87,10 +87,6 @@ type Simulation struct {
 	InitialSpawnPosition vector3.Vector[float64] `json:"-"`
 	FinalSpawnPosition   vector3.Vector[float64] `json:"-"`
 }
-
-var (
-	fovy = 60.0
-)
 
 func NewSimulation(config *config.Config) (*Simulation, error) {
 	InitOctree(config)
@@ -177,16 +173,6 @@ func (s *Simulation) Update() error {
 	return s.UpdateWithOctrees()
 }
 
-func (s *Simulation) UpdateCameraPosition() error {
-	return nil
-}
-
-func (s *Simulation) IsSpawnInRange() bool {
-	return s.FinalSpawnPosition.X() >= s.WorldBoundray.Min.X() && s.FinalSpawnPosition.X() <= s.WorldBoundray.Max.X() &&
-		s.FinalSpawnPosition.Y() >= s.WorldBoundray.Min.Y() && s.FinalSpawnPosition.Y() <= s.WorldBoundray.Max.Y() &&
-		s.FinalSpawnPosition.Z() >= s.WorldBoundray.Min.Z() && s.FinalSpawnPosition.Z() <= s.WorldBoundray.Max.Z()
-}
-
 func (s *Simulation) newUnitWithPropertiesAtPosition(position, acceleration, velocity vector3.Vector[float64], radius, massMultiplier, elasticity float64, canBeAltered bool, color color.RGBA) *Unit {
 	unit := &Unit{
 		Id:       uuid.New(),
@@ -208,91 +194,6 @@ func (s *Simulation) newUnitWithPropertiesAtPosition(position, acceleration, vel
 	unit.Mass = unit.GetMass()
 
 	return unit
-}
-
-func (sim *Simulation) generatePlanetarySystem(sf float64) {
-	worldSize := 1e5
-	maxSystemRadius := worldSize * 0.4
-	starRadius := worldSize * 0.05
-	const SOLAR_MASS = 1e5
-
-	star := sim.newUnitWithPropertiesAtPosition(
-		vector3.New(0.0, 0.0, 0.0),
-		vector3.New(0.0, 0.0, 0.0),
-		vector3.New(0.0, 0.0, 0.0),
-		starRadius,
-		SOLAR_MASS,
-		0.0,
-		true,
-		color.RGBA{255, 225, 0, 255},
-	)
-	sim.Fluid = append(sim.Fluid, star)
-
-	numPlanets := rand.Intn(4) + 3
-	minDistance := starRadius * 2.5
-	maxDistance := maxSystemRadius
-
-	planetSizeFactors := []float64{
-		0.15, 0.25, 0.3, 0.2, 0.45, 0.4, 0.35, 0.35,
-	}
-
-	for i := 0; i < numPlanets; i++ {
-		ratio := math.Pow(1.4, float64(i))
-		distance := minDistance * ratio
-		if distance > maxDistance {
-			distance = maxDistance
-		}
-
-		acceleration := gravity.UniversalGravitationalConstant * SOLAR_MASS / (distance * distance) * 15.0
-
-		planetRadius := starRadius * planetSizeFactors[i%len(planetSizeFactors)]
-		angle := rand.Float64() * 2 * math.Pi
-
-		position := vector3.New(
-			distance*math.Cos(angle),
-			0.0,
-			distance*math.Sin(angle),
-		)
-
-		accelerationVector := vector3.New(
-			-acceleration*math.Sin(angle),
-			0.0,
-			acceleration*math.Cos(angle),
-		)
-
-		planetMass := 1.0
-
-		planet := sim.newUnitWithPropertiesAtPosition(
-			position,
-			vector3.New(0.0, 0.0, 0.0),
-			accelerationVector,
-			planetRadius,
-			planetMass,
-			0.2,
-			true,
-			generatePlanetColor(i),
-		)
-
-		sim.Fluid = append(sim.Fluid, planet)
-	}
-}
-
-func generatePlanetColor(index int) color.RGBA {
-	planetColors := []color.RGBA{
-		{170, 150, 140, 255},
-		{255, 198, 73, 255},
-		{100, 149, 237, 255},
-		{193, 68, 14, 255},
-		{176, 127, 53, 255},
-		{238, 232, 205, 255},
-		{173, 216, 230, 255},
-		{0, 0, 128, 255},
-	}
-	return planetColors[index%len(planetColors)]
-}
-
-func (s *Simulation) PositionNewUnitsCube(units []*Unit) {
-	positionUnitsCuboidally(units, s.InitialSpawnPosition, s.Config.UnitInitialSpacing*s.Config.UnitRadiusMultiplier)
 }
 
 func (s *Simulation) GetUnits() []*Unit {
@@ -320,6 +221,10 @@ func (s *Simulation) GetUnits() []*Unit {
 	return unts
 }
 
+func (s *Simulation) PositionNewUnitsCube(units []*Unit) {
+	positionUnitsCuboidally(units, s.InitialSpawnPosition, s.Config.UnitInitialSpacing*s.Config.UnitRadiusMultiplier)
+}
+
 func (s *Simulation) PositionNewUnitsFibonacci(units []*Unit) {
 	positionUnitsInFibonacciSpiral(units, &s.WorldCenter)
 }
@@ -333,6 +238,24 @@ func (s *Simulation) ResetSimulation() {
 	s.Fluid = []*Unit{}
 }
 
+func (s *Simulation) GiveRotationalVelocity(units []*Unit) {
+	for _, u := range units {
+		u.CalcolaVettoreVelocitaRotazione(&s.WorldCenter)
+	}
+}
+
+func (u *Unit) CalcolaVettoreVelocitaRotazione(p *vector3.Vector[float64]) {
+	d := math.Sqrt(u.Position.X()*u.Position.X() + u.Position.Y()*u.Position.Y())
+	k := 0.5
+	v := k * d
+
+	v_x := v * u.Position.Y() / d
+	v_y := -v * u.Position.X() / d
+
+	u.Velocity = vector3.New(v_x, v_y, 0)
+}
+
+// Helper functions remain unchanged
 func positionUnitsCuboidally(units []*Unit, finalSpawnPosition vector3.Vector[float64], spacing float64) error {
 	if len(units) == 0 {
 		return nil
@@ -396,33 +319,4 @@ func positionUnitsInFibonacciSpiral(units []*Unit, center *vector3.Vector[float6
 		radiusStep += 0.0005
 		angle += phi * 2 * math.Pi
 	}
-}
-
-func (s *Simulation) GiveVelocity(units []*Unit) {
-	for _, u := range units {
-		u.Velocity = *CalcolaVettoreVelocita(&s.InitialSpawnPosition, &s.FinalSpawnPosition, s.Config.Frametime)
-	}
-}
-
-func (s *Simulation) GiveRotationalVelocity(units []*Unit) {
-	for _, u := range units {
-		u.CalcolaVettoreVelocitaRotazione(&s.WorldCenter)
-	}
-}
-
-func CalcolaVettoreVelocita(p1, p2 *vector3.Vector[float64], dt float64) *vector3.Vector[float64] {
-	differenzaPosizione := p2.Sub(*p1)
-	vettoreVelocita := differenzaPosizione.Scale(0.01 / dt)
-	return &vettoreVelocita
-}
-
-func (u *Unit) CalcolaVettoreVelocitaRotazione(p *vector3.Vector[float64]) {
-	d := math.Sqrt(u.Position.X()*u.Position.X() + u.Position.Y()*u.Position.Y())
-	k := 0.5
-	v := k * d
-
-	v_x := v * u.Position.Y() / d
-	v_y := -v * u.Position.X() / d
-
-	u.Velocity = vector3.New(v_x, v_y, 0)
 }
