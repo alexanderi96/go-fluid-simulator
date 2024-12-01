@@ -101,13 +101,13 @@ func main() {
 	}
 
 	// Set background color to gray
-	s.App.Gls().ClearColor(bgColor.R, bgColor.G, bgColor.B, 1.0)
+	s.App.Gls().ClearColor(bgColor.R, bgColor.G, bgColor.B, 0.1)
 
 	// Create and add lights to the scene
-	s.Scene.Add(light.NewAmbient(ambientLight, 1))
-	// pointLight := light.NewPoint(pointLight, 1e10)
-	// pointLight.SetPosition(float32(s.Config.GameX), float32(s.Config.GameY), float32(s.Config.GameZ))
-	// s.Scene.Add(pointLight)
+	// s.Scene.Add(light.NewAmbient(ambientLight, 1))
+	pointLight := light.NewPoint(pointLight, 1e15)
+	pointLight.SetPosition(float32(s.Config.GameX), float32(s.Config.GameY), float32(s.Config.GameZ))
+	s.Scene.Add(pointLight)
 
 	// Handle mouse input
 	s.App.Subscribe(window.OnMouseDown, func(evname string, ev interface{}) {
@@ -146,7 +146,9 @@ func main() {
 	s.App.Subscribe(window.OnKeyDown, func(evname string, ev interface{}) {
 
 		kev := ev.(*window.KeyEvent)
-		s.SpaceShip.Keys[kev.Key] = true
+		if s.SpaceShip != nil {
+			s.SpaceShip.Keys[kev.Key] = true
+		}
 
 		if kev.Key == window.KeyF {
 			s.Fly = !s.Fly
@@ -186,7 +188,10 @@ func main() {
 
 	s.App.Subscribe(window.OnKeyUp, func(evname string, ev interface{}) {
 		kev := ev.(*window.KeyEvent)
-		s.SpaceShip.Keys[kev.Key] = false
+		if s.SpaceShip != nil {
+			s.SpaceShip.Keys[kev.Key] = false
+		}
+
 	})
 
 	s.AppStartTime = time.Now()
@@ -200,7 +205,7 @@ func main() {
 
 		draw.UpdateHUD(s, deltaTime)
 
-		if s.Fly {
+		if s.Fly && !s.IsPause && s.SpaceShip != nil {
 			spaceship.UpdateMovement(s.SpaceShip)
 			UpdateCamera(s)
 		}

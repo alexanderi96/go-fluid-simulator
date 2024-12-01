@@ -54,49 +54,62 @@ func (u *Unit) GetPosition() vector3.Vector[float64] {
 	return u.Position
 }
 
+func (u *Unit) GetVelocity() vector3.Vector[float64] {
+	return u.Velocity
+}
+
+func (u *Unit) GetElasticity() float64 {
+	return u.Elasticity
+}
+
+func (u *Unit) GetRadius() float64 {
+	return u.Radius
+}
+
+func (u *Unit) SetPosition(pos vector3.Vector[float64]) {
+	u.Position = pos
+}
+
+func (u *Unit) SetVelocity(vel vector3.Vector[float64]) {
+	u.Velocity = vel
+}
+
+func (u *Unit) AddHeat(heat float64) {
+	u.Heat += heat
+}
+
 func (u *Unit) NewPointLightMesh() {
-
-	// Calcola il colore in base alla dimensione del pianeta
-	// Definisci i valori minimi e massimi per la dimensione
-	minSize := 0e1 // Dimensione minima in metri
-	maxSize := 5e3 // Dimensione massima in metri
-
-	// Normalizza la dimensione del pianeta tra 0 e 1
+	// Base color based on size
+	minSize := 0e1
+	maxSize := 5e3
 	normalizedSize := (float64(u.Radius) - minSize) / (maxSize - minSize)
-	normalizedSize = float64(math32.Clamp(float32(normalizedSize), 0, 1)) // Limita il valore tra 0 e 1
+	normalizedSize = float64(math32.Clamp(float32(normalizedSize), 0, 1))
 
-	// Interpolazione dei colori
-	col := math32.Color{
-		R: float32(normalizedSize),       // Più grande = rosso
-		G: 0.0,                           // Verde fisso a 0
-		B: float32(1.0 - normalizedSize), // Più piccolo = blu
+	// Create base color from size
+	baseColor := math32.Color{
+		R: float32(normalizedSize),
+		G: 0.0,
+		B: float32(1.0 - normalizedSize),
 	}
 
+	// Create mesh
 	u.Mesh = new(PointLightMesh)
-
 	geom := geometry.NewSphere(float64(u.Radius), seg, seg)
-	mat := material.NewStandard(&col)
-	mat.SetUseLights(0)
-	mat.SetEmissiveColor(&col)
+	mat := material.NewStandard(&baseColor)
 	u.Mesh.Mesh = graphic.NewMesh(geom, mat)
 	u.Mesh.Mesh.SetVisible(true)
 
-	u.Mesh.Light = light.NewPoint(&col, 1e10)
-	u.Mesh.Light.SetPosition(0, 0, 0)
-	u.Mesh.Light.SetLinearDecay(1)
-	u.Mesh.Light.SetQuadraticDecay(1)
-	u.Mesh.Light.SetVisible(true)
-
-	u.Mesh.Add(u.Mesh.Light)
+	// Create point light
+	light := light.NewPoint(&math32.Color{R: 1, G: 0.7, B: 0.3}, 1.0)
+	u.Mesh.Light = light
+	u.Mesh.Add(light)
 }
 
 func (u *Unit) GetVolume() float64 {
-	// Calcola il volume della sfera (4/3 * π * r^3)
 	return (4.0 / 3.0) * math.Pi * math.Pow(u.Radius, 3)
 }
 
 func (u *Unit) GetMass() float64 {
-	// Calcola la massa utilizzando il volume e il MassMultiplier
 	return u.GetVolume() * u.MassMultiplier
 }
 
@@ -110,12 +123,53 @@ func (u *Unit) UpdatePosition(dt float64) {
 
 	u.Acceleration = vector3.Zero[float64]()
 
+	// Update mesh position
 	u.Mesh.SetPosition(u.Position.ToFloat32().X(), u.Position.ToFloat32().Y(), u.Position.ToFloat32().Z())
 
+	// Update light based on heat
 	if u.Heat > 0.0 {
+		// Calculate light intensity based on heat and mass
+		intensity := math.Min(5.0, u.Heat*u.Mass*0.001)
+
+		// Calculate color based on heat (blackbody radiation approximation)
+		// As heat increases: red -> orange -> yellow -> white
+		heatColor := &math32.Color{R: 1, G: 0, B: 0}
+		if u.Heat > 10 {
+			heatColor.G = float32(math.Min(1.0, (u.Heat-10)/20))
+		}
+		if u.Heat > 30 {
+			heatColor.B = float32(math.Min(1.0, (u.Heat-30)/20))
+		}
+
+		// Update light properties
+		u.Mesh.Light.SetColor(heatColor)
+		u.Mesh.Light.SetLinearDecay(1.0)
+		u.Mesh.Light.SetQuadraticDecay(1.0)
+		u.Mesh.Light.SetIntensity(float32(intensity))
+
+		// Update mesh material color
+		mat := u.Mesh.Mesh.GetMaterial(0).(*material.Standard)
+		mat.SetColor(heatColor)
+
+		// Decrease heat over time
 		u.Heat -= 1
 	} else {
 		u.Heat = 0.0
+		// Minimum light intensity when cold
+		u.Mesh.Light.SetIntensity(0.1)
+
+		// Reset to base color when cold
+		minSize := 0e1
+		maxSize := 5e3
+		normalizedSize := (float64(u.Radius) - minSize) / (maxSize - minSize)
+		normalizedSize = float64(math32.Clamp(float32(normalizedSize), 0, 1))
+		baseColor := &math32.Color{
+			R: float32(normalizedSize),
+			G: 0.0,
+			B: float32(1.0 - normalizedSize),
+		}
+		mat := u.Mesh.Mesh.GetMaterial(0).(*material.Standard)
+		mat.SetColor(baseColor)
 	}
 }
 
@@ -128,17 +182,13 @@ func (unit *Unit) CheckAndResolveWallCollision(wallBounds BoundingBox, wallElast
 	if unit.Position.X()-unit.Radius < wallBounds.Min.X() {
 		overlapX := wallBounds.Min.X() - (unit.Position.X() - unit.Radius)
 		xCorrection = unit.Position.X() + overlapX
-		// Applica la restituzione
 		vxCorrection = -unit.Velocity.X() * wallElasticity
-		//nVel.FlipX()
 		collided = true
 	}
 	if unit.Position.X()+unit.Radius > wallBounds.Max.X() {
 		overlapX := (unit.Position.X() + unit.Radius) - wallBounds.Max.X()
 		xCorrection = unit.Position.X() - overlapX
-		// Applica la restituzione
 		vxCorrection = -unit.Velocity.X() * wallElasticity
-		//nVel.FlipX()
 		collided = true
 	}
 
@@ -146,17 +196,13 @@ func (unit *Unit) CheckAndResolveWallCollision(wallBounds BoundingBox, wallElast
 	if unit.Position.Y()-unit.Radius < wallBounds.Min.Y() {
 		overlapY := wallBounds.Min.Y() - (unit.Position.Y() - unit.Radius)
 		yCorrection = unit.Position.Y() + overlapY
-		// Applica la restituzione
 		vyCorrection = -unit.Velocity.Y() * wallElasticity
-		//nVel.FlipY()
 		collided = true
 	}
 	if unit.Position.Y()+unit.Radius > wallBounds.Max.Y() {
 		overlapY := (unit.Position.Y() + unit.Radius) - wallBounds.Max.Y()
 		yCorrection = unit.Position.Y() - overlapY
-		// Applica la restituzione
 		vyCorrection = -unit.Velocity.Y() * wallElasticity
-		//nVel.FlipY()
 		collided = true
 	}
 
@@ -164,39 +210,29 @@ func (unit *Unit) CheckAndResolveWallCollision(wallBounds BoundingBox, wallElast
 	if unit.Position.Z()-unit.Radius < wallBounds.Min.Z() {
 		overlapZ := wallBounds.Min.Z() - (unit.Position.Z() - unit.Radius)
 		zCorrection = unit.Position.Z() + overlapZ
-		// Applica la restituzione
 		vzCorrection = -unit.Velocity.Z() * wallElasticity
-		//nVel.FlipZ()
 		collided = true
 	}
 	if unit.Position.Z()+unit.Radius > wallBounds.Max.Z() {
 		overlapZ := (unit.Position.Z() + unit.Radius) - wallBounds.Max.Z()
 		zCorrection = unit.Position.Z() - overlapZ
-		// Applica la restituzione
 		vzCorrection = -unit.Velocity.Z() * wallElasticity
-		//nVel.FlipZ()
 		collided = true
 	}
 
 	if collided {
-		//log.Print("\nvel:", unit.Velocity.X(), unit.Velocity.Y(), unit.Velocity.Z())
-		//log.Print("\nnVel: ", nVel.X(), nVel.Y(), nVel.Z())
 		unit.Position = vector3.New(xCorrection, yCorrection, zCorrection)
 		unit.Velocity = vector3.New(vxCorrection, vyCorrection, vzCorrection)
-
 		unit.Heat += 2
 	}
 
 	return collided
-
 }
 
-// Calcola la massa parziale e il centro di massa di una porzione di sfera all'interno di una BoundingBox
 func (u *Unit) GiveMassAndCenterOfMassForBounds(bounds BoundingBox) (vector3.Vector[float64], float64) {
-	// Discretizza la sfera in punti (questo è un esempio molto semplice e non ottimizzato)
 	points := make([]vector3.Vector[float64], 0)
-	for phi := 0.0; phi < 2*math.Pi; phi += math.Pi / 10 { // Incremento arbitrario
-		for theta := 0.0; theta < math.Pi; theta += math.Pi / 10 { // Incremento arbitrario
+	for phi := 0.0; phi < 2*math.Pi; phi += math.Pi / 10 {
+		for theta := 0.0; theta < math.Pi; theta += math.Pi / 10 {
 			x := u.Radius * math.Sin(theta) * math.Cos(phi)
 			y := u.Radius * math.Sin(theta) * math.Sin(phi)
 			z := u.Radius * math.Cos(theta)
@@ -205,14 +241,12 @@ func (u *Unit) GiveMassAndCenterOfMassForBounds(bounds BoundingBox) (vector3.Vec
 		}
 	}
 
-	// Calcola la massa parziale e il centro di massa
 	var totalMass float64
 	centerOfMass := vector3.Zero[float64]()
 	for _, point := range points {
 		if point.X() >= bounds.Min.X() && point.X() <= bounds.Max.X() &&
 			point.Y() >= bounds.Min.Y() && point.Y() <= bounds.Max.Y() &&
 			point.Z() >= bounds.Min.Z() && point.Z() <= bounds.Max.Z() {
-			// Assumi che ogni punto abbia una massa uguale (massa totale / numero di punti)
 			pointMass := u.Mass / float64(len(points))
 			totalMass += pointMass
 			centerOfMass = centerOfMass.Add(point.Scale(pointMass))

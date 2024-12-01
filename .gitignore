@@ -9,7 +9,7 @@ go-fluid-simulator
 *.so
 *.dylib
 simulation*.json
-
+.idea
 
 # Test binary, built with `go test -c`
 *.test

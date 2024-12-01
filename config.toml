@@ -1,16 +1,16 @@
 # simulation config
   target_fps = 144
   full_screen = false
-  window_width = 1600
-  window_height = 1280
+  window_width = 800
+  window_height = 600
   is_resizable = true
   should_be_profiled = true
   octree_max_level = 5
   max_unit_number_per_level = 1
   show_octree = false
   frametime = 0.001 # 0.01 s = 100 hz
-  generate_world = true
-  show_skybox = true
+  generate_world = false
+  show_skybox = false
 
 # world config
   game_x = 1e6
@@ -23,18 +23,18 @@
   #central_mass = 10000000
   
 # unit config
-  unit_number = 5
+  unit_number = 500
   unit_initial_spacing = 5
   units_emit_gravity = true
   unit_gravitational_multiplier = 1
 
   unit_radius = 1
-  unit_radius_multiplier = 10
+  unit_radius_multiplier = 1
   set_random_radius = true
   radius_min = 0.1
   radius_max = 10
   
-  unit_mass_multiplier = 1
+  unit_mass_multiplier = 10
   set_random_mass_multiplier = false
   mass_multiplier_min = 1
   mass_multiplier_max = 10

@@ -75,74 +75,76 @@ func UpdateHUD(s *physics.Simulation, deltaTime time.Duration) {
 	s.Hud.RealDurationLabel.SetText("Real duration: " + fmt.Sprintf("%.2f", -time.Until(s.AppStartTime).Seconds()))
 
 	// Aggiorna posizione
-	pos := s.SpaceShip.Ship.Position()
-	s.Hud.PositionLabel.SetText(fmt.Sprintf("Position: X: %.1f Y: %.1f Z: %.1f", pos.X, pos.Y, pos.Z))
+	if s.SpaceShip != nil {
+		pos := s.SpaceShip.Ship.Position()
+		s.Hud.PositionLabel.SetText(fmt.Sprintf("Position: X: %.1f Y: %.1f Z: %.1f", pos.X, pos.Y, pos.Z))
+		// Aggiorna velocità
+		s.Hud.SpeedLabel.SetText(fmt.Sprintf("Speed: %.1f units/s", s.SpaceShip.Speed))
 
-	// Aggiorna velocità
-	s.Hud.SpeedLabel.SetText(fmt.Sprintf("Speed: %.1f units/s", s.SpaceShip.Speed))
+		// Calcola e aggiorna la direzione
+		forward := math32.NewVector3(0, 0, 1)
+		matrix := s.SpaceShip.Ship.Matrix()
+		forward.ApplyMatrix4(&matrix)
+		forward.Normalize()
 
-	// Calcola e aggiorna la direzione
-	forward := math32.NewVector3(0, 0, 1)
-	matrix := s.SpaceShip.Ship.Matrix()
-	forward.ApplyMatrix4(&matrix)
-	forward.Normalize()
-
-	// Determina le direzioni cardinali
-	directions := []string{}
-	if forward.Z > 0.3 {
-		directions = append(directions, "North")
-	}
-	if forward.Z < -0.3 {
-		directions = append(directions, "South")
-	}
-	if forward.X > 0.3 {
-		directions = append(directions, "East")
-	}
-	if forward.X < -0.3 {
-		directions = append(directions, "West")
-	}
-	if forward.Y > 0.3 {
-		directions = append(directions, "Up")
-	}
-	if forward.Y < -0.3 {
-		directions = append(directions, "Down")
-	}
-	directionText := strings.Join(directions, "-")
-	if directionText == "" {
-		directionText = "Neutral"
-	}
-	s.Hud.DirectionLabel.SetText(fmt.Sprintf("Direction: %s", directionText))
-
-	// Calcola e aggiorna l'orientamento in gradi
-	rot := s.SpaceShip.Ship.Rotation()
-	s.Hud.OrientationLabel.SetText(fmt.Sprintf("Orientation - Pitch: %.1f° Roll: %.1f° Yaw: %.1f°",
-		math32.RadToDeg(rot.X),
-		math32.RadToDeg(rot.Z),
-		math32.RadToDeg(rot.Y)))
-
-	// Aggiornamento status
-	var status []string
-	if math.Abs(float64(s.SpaceShip.Speed)) < 0.001 {
-		status = append(status, "HOVERING")
-	} else if s.SpaceShip.Speed > 0 {
-		status = append(status, "FORWARD")
-	} else {
-		status = append(status, "REVERSE")
-	}
-	if math.Abs(float64(rot.Z)) > 0.1 {
-		if rot.Z > 0 {
-			status = append(status, "ROLLING RIGHT")
-		} else {
-			status = append(status, "ROLLING LEFT")
+		// Determina le direzioni cardinali
+		directions := []string{}
+		if forward.Z > 0.3 {
+			directions = append(directions, "North")
 		}
-	}
-	if math.Abs(float64(rot.X)) > 0.1 {
-		if rot.X > 0 {
-			status = append(status, "PITCHING UP")
-		} else {
-			status = append(status, "PITCHING DOWN")
+		if forward.Z < -0.3 {
+			directions = append(directions, "South")
 		}
+		if forward.X > 0.3 {
+			directions = append(directions, "East")
+		}
+		if forward.X < -0.3 {
+			directions = append(directions, "West")
+		}
+		if forward.Y > 0.3 {
+			directions = append(directions, "Up")
+		}
+		if forward.Y < -0.3 {
+			directions = append(directions, "Down")
+		}
+		directionText := strings.Join(directions, "-")
+		if directionText == "" {
+			directionText = "Neutral"
+		}
+		s.Hud.DirectionLabel.SetText(fmt.Sprintf("Direction: %s", directionText))
+
+		// Calcola e aggiorna l'orientamento in gradi
+		rot := s.SpaceShip.Ship.Rotation()
+		s.Hud.OrientationLabel.SetText(fmt.Sprintf("Orientation - Pitch: %.1f° Roll: %.1f° Yaw: %.1f°",
+			math32.RadToDeg(rot.X),
+			math32.RadToDeg(rot.Z),
+			math32.RadToDeg(rot.Y)))
+
+		// Aggiornamento status
+		var status []string
+		if math.Abs(float64(s.SpaceShip.Speed)) < 0.001 {
+			status = append(status, "HOVERING")
+		} else if s.SpaceShip.Speed > 0 {
+			status = append(status, "FORWARD")
+		} else {
+			status = append(status, "REVERSE")
+		}
+		if math.Abs(float64(rot.Z)) > 0.1 {
+			if rot.Z > 0 {
+				status = append(status, "ROLLING RIGHT")
+			} else {
+				status = append(status, "ROLLING LEFT")
+			}
+		}
+		if math.Abs(float64(rot.X)) > 0.1 {
+			if rot.X > 0 {
+				status = append(status, "PITCHING UP")
+			} else {
+				status = append(status, "PITCHING DOWN")
+			}
+		}
+		statusText := strings.Join(status, " | ")
+		s.Hud.StatusLabel.SetText(fmt.Sprintf("Status: %s", statusText))
 	}
-	statusText := strings.Join(status, " | ")
-	s.Hud.StatusLabel.SetText(fmt.Sprintf("Status: %s", statusText))
+
 }

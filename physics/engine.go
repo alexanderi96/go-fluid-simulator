@@ -12,6 +12,7 @@ import (
 	"github.com/EliCDavis/vector/vector3"
 	"github.com/alexanderi96/go-fluid-simulator/config"
 	"github.com/alexanderi96/go-fluid-simulator/metrics"
+	"github.com/alexanderi96/go-fluid-simulator/physics/gravity"
 	"github.com/alexanderi96/go-fluid-simulator/spaceship"
 	"github.com/alexanderi96/go-fluid-simulator/utils"
 	"github.com/google/uuid"
@@ -21,7 +22,6 @@ import (
 	"github.com/g3n/engine/core"
 	"github.com/g3n/engine/graphic"
 	"github.com/g3n/engine/gui"
-	"github.com/g3n/engine/math32"
 	"github.com/g3n/engine/window"
 )
 
@@ -59,7 +59,6 @@ type Simulation struct {
 	IsInputBeingHandled  bool            `json:"-"`
 	AppStartTime         time.Time
 
-	// variables added for the g3n branch
 	App   *app.Application `json:"-"`
 	Scene *core.Node       `json:"-"`
 	Cam   *camera.Camera   `json:"-"`
@@ -79,7 +78,6 @@ type Simulation struct {
 		StatusLabel      *gui.Label
 	}
 
-	// Velocità di rotazione
 	MovementSpeed float64 `json:"-"`
 
 	WorldBoundray BoundingBox
@@ -95,8 +93,6 @@ var (
 )
 
 func NewSimulation(config *config.Config) (*Simulation, error) {
-	// config.UpdateWindowSettings()
-
 	InitOctree(config)
 
 	WorldCenter := vector3.New(0.0, 0.0, 0.0)
@@ -115,17 +111,6 @@ func NewSimulation(config *config.Config) (*Simulation, error) {
 		App:   app.App(),
 		Scene: core.NewNode(),
 
-		SpaceShip: &spaceship.SpaceShip{
-			Speed:           0.0,
-			MaxSpeed:        1e1,
-			MaxEngineThrust: 1e5,
-			Thrust:          0.0,
-			RotationSpeed:   0.01,
-			BreakingPower:   1e10,
-			Keys:            make(map[window.Key]bool),
-			CameraOffset:    math32.NewVector3(0, 5, -10),
-		},
-
 		SpawnDistance:        0,
 		InitialSpawnPosition: WorldCenter,
 		FinalSpawnPosition:   WorldCenter,
@@ -140,17 +125,11 @@ func NewSimulation(config *config.Config) (*Simulation, error) {
 		sim.Fluid = append(sim.Fluid, sim.newUnitWithPropertiesAtPosition(WorldCenter, static, static, 0.01, config.CentralMass, 0, false, color.RGBA{uint8(255), uint8(1), uint8(1), 255}))
 	}
 
-	if config.GenerateWorld {
-		sim.generatePlanetarySystem(0.0000001)
+	if sim.SpaceShip != nil {
+		sim.SpaceShip.SetupShip()
+		sim.Scene.Add(sim.SpaceShip.Ship)
 	}
 
-	sim.SpaceShip.SetupShip()
-
-	sim.Scene.Add(sim.SpaceShip.Ship)
-	// planeAxes := helper.NewAxes(2.0)
-	// sim.Scene.Add(planeAxes)
-
-	// Create Skybox
 	if sim.Config.ShowSkybox {
 		skybox, err := graphic.NewSkybox(graphic.SkyboxData{
 			"./assets/img/space/dark-s_", "jpg",
@@ -172,7 +151,7 @@ func (sim *Simulation) SaveSimulation(filePath string) error {
 	defer file.Close()
 
 	encoder := json.NewEncoder(file)
-	encoder.SetIndent("", "    ") // Per un output formattato
+	encoder.SetIndent("", "    ")
 	return encoder.Encode(sim)
 }
 
@@ -195,35 +174,20 @@ func LoadSimulation(filePath string) (*Simulation, error) {
 
 func (s *Simulation) Update() error {
 	s.Metrics.Update(s.Config.Frametime)
-
 	return s.UpdateWithOctrees()
 }
 
 func (s *Simulation) UpdateCameraPosition() error {
-
-	// rl.UpdateCamera(&s.Camera, s.CameraMode)
-
 	return nil
 }
 
-// func updateSpawnPosition(position *math32.Vector3, spawnDistance *float64, camera *rl.Camera3D) {
-// 	mouseRay := rl.GetMouseRay(rl.GetMousePosition(), *camera)
-
-// 	// Calcola la distanza basata sulla rotazione della rotella del mouse
-// 	*spawnDistance += float64(rl.GetMouseWheelMove()) // Adatta questa formula secondo le tue necessità
-
-//		// Calcola la posizione del segnalino di anteprima lungo il raggio
-//		*position = utils.ToVector3FromRlVector3(rl.Vector3Add(mouseRay.Position, rl.Vector3Scale(mouseRay.Direction, float32(*spawnDistance))))
-//	}
 func (s *Simulation) IsSpawnInRange() bool {
-
 	return s.FinalSpawnPosition.X() >= s.WorldBoundray.Min.X() && s.FinalSpawnPosition.X() <= s.WorldBoundray.Max.X() &&
 		s.FinalSpawnPosition.Y() >= s.WorldBoundray.Min.Y() && s.FinalSpawnPosition.Y() <= s.WorldBoundray.Max.Y() &&
 		s.FinalSpawnPosition.Z() >= s.WorldBoundray.Min.Z() && s.FinalSpawnPosition.Z() <= s.WorldBoundray.Max.Z()
 }
 
 func (s *Simulation) newUnitWithPropertiesAtPosition(position, acceleration, velocity vector3.Vector[float64], radius, massMultiplier, elasticity float64, canBeAltered bool, color color.RGBA) *Unit {
-
 	unit := &Unit{
 		Id:       uuid.New(),
 		Position: position,
@@ -240,27 +204,18 @@ func (s *Simulation) newUnitWithPropertiesAtPosition(position, acceleration, vel
 	}
 
 	unit.NewPointLightMesh()
-
 	s.Scene.Add(unit.Mesh)
-	// s.Scene.Add(unit.Mesh.Light)
-
 	unit.Mass = unit.GetMass()
 
 	return unit
 }
 
 func (sim *Simulation) generatePlanetarySystem(sf float64) {
-	// Dimensione del mondo
 	worldSize := 1e5
-
-	// Fattori di scala adattati al mondo
 	maxSystemRadius := worldSize * 0.4
 	starRadius := worldSize * 0.05
-
-	// Massa della stella
 	const SOLAR_MASS = 1e5
 
-	// Creiamo la stella centrale
 	star := sim.newUnitWithPropertiesAtPosition(
 		vector3.New(0.0, 0.0, 0.0),
 		vector3.New(0.0, 0.0, 0.0),
@@ -273,64 +228,44 @@ func (sim *Simulation) generatePlanetarySystem(sf float64) {
 	)
 	sim.Fluid = append(sim.Fluid, star)
 
-	// Numero di pianeti (3-6)
 	numPlanets := rand.Intn(4) + 3
-
-	// Parametri per la distribuzione dei pianeti
 	minDistance := starRadius * 2.5
 	maxDistance := maxSystemRadius
 
 	planetSizeFactors := []float64{
-		0.15, // Mercurio
-		0.25, // Venere
-		0.3,  // Terra
-		0.2,  // Marte
-		0.45, // Giove
-		0.4,  // Saturno
-		0.35, // Urano
-		0.35, // Nettuno
+		0.15, 0.25, 0.3, 0.2, 0.45, 0.4, 0.35, 0.35,
 	}
 
 	for i := 0; i < numPlanets; i++ {
-		// Distanza con progressione più compatta
 		ratio := math.Pow(1.4, float64(i))
 		distance := minDistance * ratio
 		if distance > maxDistance {
 			distance = maxDistance
 		}
 
-		// Calcolo dell'accelerazione gravitazionale iniziale
-		// a = GM/r² * direzione
-		acceleration := G * SOLAR_MASS / (distance * distance) * 15.0 // Fattore di scala per accelerazione più forte
+		acceleration := gravity.UniversalGravitationalConstant * SOLAR_MASS / (distance * distance) * 15.0
 
-		// Raggio del pianeta
 		planetRadius := starRadius * planetSizeFactors[i%len(planetSizeFactors)]
-
-		// Angolo casuale per posizione iniziale
 		angle := rand.Float64() * 2 * math.Pi
 
-		// Posizione iniziale su un'orbita circolare
 		position := vector3.New(
 			distance*math.Cos(angle),
 			0.0,
 			distance*math.Sin(angle),
 		)
 
-		// Vettore accelerazione perpendicolare alla posizione
 		accelerationVector := vector3.New(
 			-acceleration*math.Sin(angle),
 			0.0,
 			acceleration*math.Cos(angle),
 		)
 
-		// Massa del pianeta
 		planetMass := 1.0
 
-		// Creazione del pianeta con velocità iniziale zero e accelerazione perpendicolare
 		planet := sim.newUnitWithPropertiesAtPosition(
 			position,
-			vector3.New(0.0, 0.0, 0.0), // Velocità iniziale zero
-			accelerationVector,         // Accelerazione perpendicolare
+			vector3.New(0.0, 0.0, 0.0),
+			accelerationVector,
 			planetRadius,
 			planetMass,
 			0.2,
@@ -344,14 +279,14 @@ func (sim *Simulation) generatePlanetarySystem(sf float64) {
 
 func generatePlanetColor(index int) color.RGBA {
 	planetColors := []color.RGBA{
-		{170, 150, 140, 255}, // Grigio-marrone (tipo Mercurio)
-		{255, 198, 73, 255},  // Giallo-crema (tipo Venere)
-		{100, 149, 237, 255}, // Blu (tipo Terra)
-		{193, 68, 14, 255},   // Rosso (tipo Marte)
-		{176, 127, 53, 255},  // Marrone chiaro (tipo Giove)
-		{238, 232, 205, 255}, // Beige (tipo Saturno)
-		{173, 216, 230, 255}, // Azzurro chiaro (tipo Urano)
-		{0, 0, 128, 255},     // Blu scuro (tipo Nettuno)
+		{170, 150, 140, 255},
+		{255, 198, 73, 255},
+		{100, 149, 237, 255},
+		{193, 68, 14, 255},
+		{176, 127, 53, 255},
+		{238, 232, 205, 255},
+		{173, 216, 230, 255},
+		{0, 0, 128, 255},
 	}
 	return planetColors[index%len(planetColors)]
 }
@@ -380,9 +315,6 @@ func (s *Simulation) GetUnits() []*Unit {
 
 		color := color.RGBA{uint8(255), uint8(255), uint8(255), 255}
 
-		// if s.Config.SetRandomColor {
-		// 	color = utils.RandomRaylibColor()
-		// }
 		unts = append(unts, s.newUnitWithPropertiesAtPosition(s.FinalSpawnPosition, static, static, currentRadius, currentMassMultiplier, currentElasticity, true, color))
 	}
 	return unts
@@ -399,7 +331,6 @@ func (s *Simulation) ResetSimulation() {
 		s.Scene.Remove(unit.Mesh)
 	}
 	s.Fluid = []*Unit{}
-
 }
 
 func positionUnitsCuboidally(units []*Unit, finalSpawnPosition vector3.Vector[float64], spacing float64) error {
@@ -407,33 +338,27 @@ func positionUnitsCuboidally(units []*Unit, finalSpawnPosition vector3.Vector[fl
 		return nil
 	}
 
-	// Calcoliamo le dimensioni ottimali del cubo
 	n := len(units)
 	sideLengthX, sideLengthY, sideLengthZ := optimalCuboidDimensions(n)
 
 	unitRadius := units[0].Radius
 
-	// Calcoliamo lo spazio totale richiesto per le unità
 	totalWidth := float64(sideLengthX)*(2*unitRadius+spacing) - spacing
 	totalHeight := float64(sideLengthY)*(2*unitRadius+spacing) - spacing
 	totalDepth := float64(sideLengthZ)*(2*unitRadius+spacing) - spacing
 
-	// Calcoliamo la posizione iniziale del cubo
 	startX := finalSpawnPosition.X() - totalWidth/2
 	startY := finalSpawnPosition.Y() - totalHeight/2
 	startZ := finalSpawnPosition.Z() - totalDepth/2
 
-	// Posizioniamo le unità nel cubo
 	index := 0
 	for x := 0; x < sideLengthX && index < n; x++ {
 		for y := 0; y < sideLengthY && index < n; y++ {
 			for z := 0; z < sideLengthZ && index < n; z++ {
-				// Calcoliamo la posizione per questa unità
 				unitX := startX + float64(x)*(2*unitRadius+spacing)
 				unitY := startY + float64(y)*(2*unitRadius+spacing)
 				unitZ := startZ + float64(z)*(2*unitRadius+spacing)
 
-				// Assegniamo la posizione alla unità corrente
 				units[index].Position = vector3.New(unitX, unitY, unitZ)
 				index++
 			}
@@ -443,7 +368,6 @@ func positionUnitsCuboidally(units []*Unit, finalSpawnPosition vector3.Vector[fl
 	return nil
 }
 
-// Funzione per calcolare le dimensioni ottimali del cubo
 func optimalCuboidDimensions(n int) (int, int, int) {
 	sideLength := int(math.Ceil(math.Pow(float64(n), 1.0/3.0)))
 	for x := sideLength; x > 0; x-- {
@@ -458,25 +382,19 @@ func optimalCuboidDimensions(n int) (int, int, int) {
 }
 
 func positionUnitsInFibonacciSpiral(units []*Unit, center *vector3.Vector[float64]) {
-	phi := math.Phi // Phi è il rapporto aureo (1.618...)
+	phi := math.Phi
 	angle := 0.0
-	radiusStep := 0.3 // Passo di incremento del raggio
+	radiusStep := 0.3
 
 	for i := 0; i < len(units); i++ {
-		// Calcola la posizione della prossima unità sulla spirale di Fibonacci
 		radius := math.Sqrt(float64(i)) * radiusStep
 		x := center.X() + radius*math.Cos(angle)
 		y := center.Y() + radius*math.Sin(angle)
 		z := center.Z()
 
-		// Assegna la posizione alla unità
 		units[i].Position = vector3.New(x, y, z)
-
-		// Aumenta il passo di incremento del raggio
-		radiusStep += 0.0005 // Modifica la velocità di aumento a tuo piacimento
-
-		// Aggiorna l'angolo per la prossima unità sulla spirale
-		angle += phi * 2 * math.Pi // Incremento dell'angolo utilizzando Phi
+		radiusStep += 0.0005
+		angle += phi * 2 * math.Pi
 	}
 }
 
@@ -493,27 +411,18 @@ func (s *Simulation) GiveRotationalVelocity(units []*Unit) {
 }
 
 func CalcolaVettoreVelocita(p1, p2 *vector3.Vector[float64], dt float64) *vector3.Vector[float64] {
-	// Calcola la differenza tra la posizione finale e quella iniziale
 	differenzaPosizione := p2.Sub(*p1)
-
-	// Dividi la differenza di posizione per l'intervallo di tempo per ottenere il vettore velocità
 	vettoreVelocita := differenzaPosizione.Scale(0.01 / dt)
-
 	return &vettoreVelocita
 }
 
 func (u *Unit) CalcolaVettoreVelocitaRotazione(p *vector3.Vector[float64]) {
-	// Calcola la distanza dall'origine
 	d := math.Sqrt(u.Position.X()*u.Position.X() + u.Position.Y()*u.Position.Y())
-
-	// Calcola la velocità di rotazione proporzionale alla distanza
-	k := 0.5 // Costante di proporzionalità (personalizzabile)
+	k := 0.5
 	v := k * d
 
-	// Calcola le componenti di velocità lungo gli assi x e y
 	v_x := v * u.Position.Y() / d
 	v_y := -v * u.Position.X() / d
 
-	// Crea un nuovo vettore velocità con le componenti calcolate
 	u.Velocity = vector3.New(v_x, v_y, 0)
 }
