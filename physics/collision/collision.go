@@ -86,8 +86,9 @@ func ResolveCollision(collData *CollisionData) {
 	collData.UnitA.SetPosition(newPosA)
 	collData.UnitB.SetPosition(newPosB)
 
-	// Handle heat transfer
-	heatTransfer := collData.RelVelNormal * collData.Distance * 0.5
+	// Handle heat transfer - reduced intensity and scaled by relative velocity
+	relativeSpeed := math.Abs(collData.RelVelNormal)
+	heatTransfer := relativeSpeed * 0.05 // Reduced heat generation factor
 	collData.UnitA.AddHeat(heatTransfer * (1.0 - collData.UnitA.GetElasticity()))
 	collData.UnitB.AddHeat(heatTransfer * (1.0 - collData.UnitB.GetElasticity()))
 }

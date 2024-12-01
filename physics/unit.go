@@ -14,7 +14,13 @@ import (
 )
 
 const (
-	seg = 10
+	seg                     = 10
+	stefanBoltzmannConstant = 5.67e-8 // Stefan-Boltzmann constant for radiation
+	specificHeatCapacity    = 4186.0  // Specific heat capacity (similar to water)
+	ambientTemperature      = 20.0    // Ambient temperature in Celsius
+	heatTransferCoefficient = 0.1     // Coefficient for heat transfer between units
+	maxHeatTransferDistance = 10.0    // Maximum distance for heat transfer between units
+	coolingRate             = 0.5     // Increased cooling rate for faster return to ambient temperature
 )
 
 var (
@@ -38,7 +44,8 @@ type Unit struct {
 	Color          color.RGBA
 	CanBeAltered   bool
 
-	Heat float64
+	Heat            float64
+	HeatTransferred float64 // Track heat transferred in current frame
 }
 
 type PointLightMesh struct {
@@ -78,35 +85,62 @@ func (u *Unit) AddHeat(heat float64) {
 	u.Heat += heat
 }
 
-func (u *Unit) NewPointLightMesh() {
-	// Base color based on size
-	minSize := 0e1
-	maxSize := 5e3
-	normalizedSize := (float64(u.Radius) - minSize) / (maxSize - minSize)
-	normalizedSize = float64(math32.Clamp(float32(normalizedSize), 0, 1))
-
-	// Create base color from size
-	baseColor := math32.Color{
-		R: float32(normalizedSize),
-		G: 0.0,
-		B: float32(1.0 - normalizedSize),
+func (u *Unit) TransferHeatTo(other *Unit, dt float64) {
+	if u.Heat <= ambientTemperature {
+		return
 	}
 
-	// Create mesh
+	distance := u.Position.Sub(other.Position).Length()
+	if distance > maxHeatTransferDistance {
+		return
+	}
+
+	distanceFactor := 1.0 / (1.0 + distance*distance)
+	tempDiff := u.Heat - other.Heat
+	if tempDiff <= 0 {
+		return
+	}
+
+	heatTransfer := heatTransferCoefficient * distanceFactor * tempDiff * dt
+	massRatio := math.Sqrt(other.Mass / u.Mass)
+	heatTransfer *= massRatio
+	heatTransfer = math.Min(heatTransfer, u.Heat-ambientTemperature)
+
+	u.HeatTransferred += heatTransfer
+	other.HeatTransferred += heatTransfer
+
+	u.Heat -= heatTransfer
+	other.Heat += heatTransfer
+}
+
+func (u *Unit) NewPointLightMesh() {
+	normalizedRadius := math32.Clamp(float32(u.Radius/5e3), 0, 1)
+	normalizedMass := math32.Clamp(float32(u.Mass/1e5), 0, 1)
+	normalizedElasticity := float32(u.Elasticity)
+
+	baseColor := math32.Color{
+		R: normalizedRadius*0.8 + normalizedMass*0.2,
+		G: normalizedElasticity*0.7 + normalizedRadius*0.3,
+		B: (1.0-normalizedMass)*0.6 + (1.0-normalizedElasticity)*0.4,
+	}
+
 	u.Mesh = new(PointLightMesh)
 	geom := geometry.NewSphere(float64(u.Radius), seg, seg)
 	mat := material.NewStandard(&baseColor)
 	u.Mesh.Mesh = graphic.NewMesh(geom, mat)
 	u.Mesh.Mesh.SetVisible(true)
 
-	// Create point light
-	light := light.NewPoint(&math32.Color{R: 1, G: 0.7, B: 0.3}, 1.0)
+	light := light.NewPoint(&baseColor, 1.0)
 	u.Mesh.Light = light
 	u.Mesh.Add(light)
 }
 
 func (u *Unit) GetVolume() float64 {
 	return (4.0 / 3.0) * math.Pi * math.Pow(u.Radius, 3)
+}
+
+func (u *Unit) GetSurfaceArea() float64 {
+	return 4.0 * math.Pi * math.Pow(u.Radius, 2)
 }
 
 func (u *Unit) GetMass() float64 {
@@ -120,56 +154,68 @@ func (u *Unit) ApplyForce(f vector3.Vector[float64]) {
 func (u *Unit) UpdatePosition(dt float64) {
 	u.Position = u.Position.Add(u.Velocity.Scale(dt))
 	u.Velocity = u.Velocity.Add(u.Acceleration.Scale(dt))
-
 	u.Acceleration = vector3.Zero[float64]()
+	u.HeatTransferred = 0
 
-	// Update mesh position
 	u.Mesh.SetPosition(u.Position.ToFloat32().X(), u.Position.ToFloat32().Y(), u.Position.ToFloat32().Z())
 
-	// Update light based on heat
-	if u.Heat > 0.0 {
-		// Calculate light intensity based on heat and mass
-		intensity := math.Min(5.0, u.Heat*u.Mass*0.001)
+	// Enhanced cooling calculation
+	if u.Heat > ambientTemperature {
+		// Faster cooling rate
+		cooldown := (u.Heat - ambientTemperature) * coolingRate * dt
+		u.Heat = math.Max(ambientTemperature, u.Heat-cooldown)
 
-		// Calculate color based on heat (blackbody radiation approximation)
-		// As heat increases: red -> orange -> yellow -> white
-		heatColor := &math32.Color{R: 1, G: 0, B: 0}
-		if u.Heat > 10 {
-			heatColor.G = float32(math.Min(1.0, (u.Heat-10)/20))
+		// Color transition based on temperature
+		normalizedTemp := math32.Clamp(float32((u.Heat-ambientTemperature)/50), 0, 1) // Reduced temperature range
+
+		// Get base color
+		normalizedRadius := math32.Clamp(float32(u.Radius/5e3), 0, 1)
+		normalizedMass := math32.Clamp(float32(u.Mass/1e5), 0, 1)
+		normalizedElasticity := float32(u.Elasticity)
+
+		baseColor := math32.Color{
+			R: normalizedRadius*0.8 + normalizedMass*0.2,
+			G: normalizedElasticity*0.7 + normalizedRadius*0.3,
+			B: (1.0-normalizedMass)*0.6 + (1.0-normalizedElasticity)*0.4,
 		}
-		if u.Heat > 30 {
-			heatColor.B = float32(math.Min(1.0, (u.Heat-30)/20))
+
+		// Blend between base color and heat color
+		heatColor := math32.Color{
+			R: 1.0,
+			G: math32.Clamp(normalizedTemp*0.6, 0, 0.6), // Reduced green component
+			B: math32.Clamp(normalizedTemp*0.3, 0, 0.3), // Reduced blue component
 		}
 
-		// Update light properties
-		u.Mesh.Light.SetColor(heatColor)
-		u.Mesh.Light.SetLinearDecay(1.0)
-		u.Mesh.Light.SetQuadraticDecay(1.0)
-		u.Mesh.Light.SetIntensity(float32(intensity))
+		finalColor := math32.Color{
+			R: baseColor.R*(1-normalizedTemp) + heatColor.R*normalizedTemp,
+			G: baseColor.G*(1-normalizedTemp) + heatColor.G*normalizedTemp,
+			B: baseColor.B*(1-normalizedTemp) + heatColor.B*normalizedTemp,
+		}
 
-		// Update mesh material color
 		mat := u.Mesh.Mesh.GetMaterial(0).(*material.Standard)
-		mat.SetColor(heatColor)
+		mat.SetColor(&finalColor)
 
-		// Decrease heat over time
-		u.Heat -= 1
+		// Adjust light intensity based on temperature
+		intensity := math32.Clamp(float32((u.Heat-ambientTemperature)/50), 0.1, 2.0) // Reduced intensity range
+		u.Mesh.Light.SetColor(&finalColor)
+		u.Mesh.Light.SetIntensity(intensity)
 	} else {
-		u.Heat = 0.0
-		// Minimum light intensity when cold
-		u.Mesh.Light.SetIntensity(0.1)
+		u.Heat = ambientTemperature
+		// Reset to base color
+		normalizedRadius := math32.Clamp(float32(u.Radius/5e3), 0, 1)
+		normalizedMass := math32.Clamp(float32(u.Mass/1e5), 0, 1)
+		normalizedElasticity := float32(u.Elasticity)
 
-		// Reset to base color when cold
-		minSize := 0e1
-		maxSize := 5e3
-		normalizedSize := (float64(u.Radius) - minSize) / (maxSize - minSize)
-		normalizedSize = float64(math32.Clamp(float32(normalizedSize), 0, 1))
 		baseColor := &math32.Color{
-			R: float32(normalizedSize),
-			G: 0.0,
-			B: float32(1.0 - normalizedSize),
+			R: normalizedRadius*0.8 + normalizedMass*0.2,
+			G: normalizedElasticity*0.7 + normalizedRadius*0.3,
+			B: (1.0-normalizedMass)*0.6 + (1.0-normalizedElasticity)*0.4,
 		}
+
 		mat := u.Mesh.Mesh.GetMaterial(0).(*material.Standard)
 		mat.SetColor(baseColor)
+		u.Mesh.Light.SetIntensity(0.1)
+		u.Mesh.Light.SetColor(baseColor)
 	}
 }
 
@@ -178,7 +224,6 @@ func (unit *Unit) CheckAndResolveWallCollision(wallBounds BoundingBox, wallElast
 	vxCorrection, vyCorrection, vzCorrection := unit.Velocity.X(), unit.Velocity.Y(), unit.Velocity.Z()
 	collided := false
 
-	// Correzione asse X
 	if unit.Position.X()-unit.Radius < wallBounds.Min.X() {
 		overlapX := wallBounds.Min.X() - (unit.Position.X() - unit.Radius)
 		xCorrection = unit.Position.X() + overlapX
@@ -192,7 +237,6 @@ func (unit *Unit) CheckAndResolveWallCollision(wallBounds BoundingBox, wallElast
 		collided = true
 	}
 
-	// Correzione asse Y
 	if unit.Position.Y()-unit.Radius < wallBounds.Min.Y() {
 		overlapY := wallBounds.Min.Y() - (unit.Position.Y() - unit.Radius)
 		yCorrection = unit.Position.Y() + overlapY
@@ -206,7 +250,6 @@ func (unit *Unit) CheckAndResolveWallCollision(wallBounds BoundingBox, wallElast
 		collided = true
 	}
 
-	// Correzione asse Z
 	if unit.Position.Z()-unit.Radius < wallBounds.Min.Z() {
 		overlapZ := wallBounds.Min.Z() - (unit.Position.Z() - unit.Radius)
 		zCorrection = unit.Position.Z() + overlapZ
@@ -223,7 +266,11 @@ func (unit *Unit) CheckAndResolveWallCollision(wallBounds BoundingBox, wallElast
 	if collided {
 		unit.Position = vector3.New(xCorrection, yCorrection, zCorrection)
 		unit.Velocity = vector3.New(vxCorrection, vyCorrection, vzCorrection)
-		unit.Heat += 2
+
+		// Reduced heat generation from wall collisions
+		velocityMagnitude := math.Sqrt(math.Pow(unit.Velocity.X(), 2) + math.Pow(unit.Velocity.Y(), 2) + math.Pow(unit.Velocity.Z(), 2))
+		heatGenerated := 0.5 * unit.Mass * velocityMagnitude * velocityMagnitude * (1 - wallElasticity)
+		unit.Heat += heatGenerated * 0.01 // Reduced heat generation factor
 	}
 
 	return collided

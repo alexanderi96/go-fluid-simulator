@@ -16,6 +16,7 @@ func (s *Simulation) UpdateWithOctrees() error {
 	s.updateOctree()
 	s.applyGravitationalForces()
 	s.handleCollisions()
+	s.handleHeatTransfer() // New step for heat transfer
 	s.updatePositions()
 
 	return nil
@@ -66,6 +67,27 @@ func (s *Simulation) handleCollisions() {
 	}
 }
 
+// New function to handle heat transfer between nearby units
+func (s *Simulation) handleHeatTransfer() {
+	for _, unitA := range s.Fluid {
+		if unitA == nil || !unitA.CanBeAltered {
+			continue
+		}
+
+		nearUnits := []*Unit{}
+		s.Octree.Retrieve(&nearUnits, unitA)
+
+		for _, unitB := range nearUnits {
+			if !isValidHeatTransferPair(unitA, unitB) {
+				continue
+			}
+
+			// Transfer heat between units
+			unitA.TransferHeatTo(unitB, s.Config.Frametime)
+		}
+	}
+}
+
 func (s *Simulation) updatePositions() {
 	for _, unit := range s.Fluid {
 		if unit != nil && unit.CanBeAltered {
@@ -78,6 +100,13 @@ func isValidCollisionPair(unitA, unitB *Unit) bool {
 	return unitB != nil &&
 		unitA.Id != unitB.Id &&
 		unitB.CanBeAltered
+}
+
+func isValidHeatTransferPair(unitA, unitB *Unit) bool {
+	return unitB != nil &&
+		unitA.Id != unitB.Id &&
+		unitB.CanBeAltered &&
+		unitA.Heat > unitB.Heat // Only transfer heat from hotter to colder units
 }
 
 func (ot *Octree) CalculateGravity(unit Gravitable, theta float64) vector3.Vector[float64] {
