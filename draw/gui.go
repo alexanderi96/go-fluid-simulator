@@ -14,11 +14,11 @@ import (
 func SetupHUD(s *physics.Simulation) {
 	// Create a panel for mode indicators (top right)
 	modePanel := gui.NewPanel(200, 80)
-	modePanel.SetPosition(float32(800-210), 10)
 	modePanel.SetBorders(1, 1, 1, 1)
 	modePanel.SetBordersColor(math32.NewColor("darkgray"))
 	modePanel.SetColor4(&math32.Color4{R: 0.2, G: 0.2, B: 0.2, A: 0.7})
 	s.Scene.Add(modePanel)
+	s.Hud.ModePanel = modePanel
 
 	// Navigation mode label
 	s.Hud.NavigationLabel = gui.NewLabel("MODE: CAMERA")
@@ -34,11 +34,11 @@ func SetupHUD(s *physics.Simulation) {
 
 	// Controls panel (top left)
 	controlsPanel := gui.NewPanel(180, 140)
-	controlsPanel.SetPosition(10, 10)
 	controlsPanel.SetBorders(1, 1, 1, 1)
 	controlsPanel.SetBordersColor(math32.NewColor("darkgray"))
 	controlsPanel.SetColor4(&math32.Color4{R: 0.2, G: 0.2, B: 0.2, A: 0.7})
 	s.Scene.Add(controlsPanel)
+	s.Hud.ControlsPanel = controlsPanel
 
 	// Debug info
 	s.Hud.FpsLabel = gui.NewLabel("FPS: 0")
@@ -68,11 +68,11 @@ func SetupHUD(s *physics.Simulation) {
 
 	// Key controls info (bottom left)
 	keysPanel := gui.NewPanel(200, 160)
-	keysPanel.SetPosition(10, float32(600-170))
 	keysPanel.SetBorders(1, 1, 1, 1)
 	keysPanel.SetBordersColor(math32.NewColor("darkgray"))
 	keysPanel.SetColor4(&math32.Color4{R: 0.2, G: 0.2, B: 0.2, A: 0.7})
 	s.Scene.Add(keysPanel)
+	s.Hud.KeysPanel = keysPanel
 
 	keyTitle := gui.NewLabel("CONTROLS")
 	keyTitle.SetPosition(10, 10)
@@ -97,11 +97,11 @@ func SetupHUD(s *physics.Simulation) {
 
 	// Ship info panel (bottom center)
 	shipPanel := gui.NewPanel(300, 140)
-	shipPanel.SetPosition(float32(800/2-150), float32(600-150))
 	shipPanel.SetBorders(1, 1, 1, 1)
 	shipPanel.SetBordersColor(math32.NewColor("darkgray"))
 	shipPanel.SetColor4(&math32.Color4{R: 0.2, G: 0.2, B: 0.2, A: 0.7})
 	s.Scene.Add(shipPanel)
+	s.Hud.ShipPanel = shipPanel
 
 	s.Hud.PositionLabel = gui.NewLabel("")
 	s.Hud.PositionLabel.SetPosition(10, 10)
@@ -130,6 +130,16 @@ func SetupHUD(s *physics.Simulation) {
 }
 
 func UpdateHUD(s *physics.Simulation, deltaTime time.Duration) {
+	// Update panel positions based on current window size
+	w, h := s.App.GetSize()
+	width, height := float32(w), float32(h)
+
+	// Update panel positions
+	s.Hud.ModePanel.SetPosition(width-210, 10)
+	s.Hud.ControlsPanel.SetPosition(10, 10)
+	s.Hud.KeysPanel.SetPosition(10, height-170)
+	s.Hud.ShipPanel.SetPosition(width/2-150, height-150)
+
 	fps := 1.0 / float64(deltaTime.Seconds())
 	s.Hud.FpsLabel.SetText(fmt.Sprintf("FPS: %.0f", fps))
 	s.Hud.FtLabel.SetText(fmt.Sprintf("FrameTime: %.2f", s.Config.Frametime))

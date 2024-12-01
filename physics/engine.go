@@ -76,6 +76,11 @@ type Simulation struct {
 		DirectionLabel    *gui.Label
 		OrientationLabel  *gui.Label
 		StatusLabel       *gui.Label
+		// Add panel fields for responsive UI
+		ModePanel     *gui.Panel `json:"-"`
+		ControlsPanel *gui.Panel `json:"-"`
+		KeysPanel     *gui.Panel `json:"-"`
+		ShipPanel     *gui.Panel `json:"-"`
 	}
 
 	MovementSpeed float64 `json:"-"`
@@ -255,7 +260,6 @@ func (u *Unit) CalcolaVettoreVelocitaRotazione(p *vector3.Vector[float64]) {
 	u.Velocity = vector3.New(v_x, v_y, 0)
 }
 
-// Helper functions remain unchanged
 func positionUnitsCuboidally(units []*Unit, finalSpawnPosition vector3.Vector[float64], spacing float64) error {
 	if len(units) == 0 {
 		return nil
