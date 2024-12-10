@@ -3,6 +3,7 @@ package physics
 import (
 	"image/color"
 	"math"
+	"sync"
 
 	"github.com/EliCDavis/vector/vector3"
 	"github.com/g3n/engine/geometry"
@@ -15,17 +16,23 @@ import (
 
 const (
 	seg                     = 10
-	stefanBoltzmannConstant = 5.67e-8 // Stefan-Boltzmann constant for radiation
-	specificHeatCapacity    = 4186.0  // Specific heat capacity (similar to water)
-	ambientTemperature      = 20.0    // Ambient temperature in Celsius
-	heatTransferCoefficient = 0.1     // Coefficient for heat transfer between units
-	maxHeatTransferDistance = 10.0    // Maximum distance for heat transfer between units
-	coolingRate             = 0.5     // Increased cooling rate for faster return to ambient temperature
+	stefanBoltzmannConstant = 5.67e-8
+	specificHeatCapacity    = 4186.0
+	ambientTemperature      = 20.0
+	heatTransferCoefficient = 0.1
+	maxHeatTransferDistance = 10.0
+	coolingRate             = 0.5
 )
 
 var (
 	mat        = material.NewStandard(math32.NewColor("white"))
 	overlapMat = material.NewStandard(math32.NewColor("red"))
+	// Object pool for vector calculations
+	vectorPool = sync.Pool{
+		New: func() interface{} {
+			return make([]float64, 3)
+		},
+	}
 )
 
 type Unit struct {
@@ -45,7 +52,11 @@ type Unit struct {
 	CanBeAltered   bool
 
 	Heat            float64
-	HeatTransferred float64 // Track heat transferred in current frame
+	HeatTransferred float64
+
+	// Cache frequently used values
+	volume      float64
+	surfaceArea float64
 }
 
 type PointLightMesh struct {
@@ -90,12 +101,21 @@ func (u *Unit) TransferHeatTo(other *Unit, dt float64) {
 		return
 	}
 
-	distance := u.Position.Sub(other.Position).Length()
-	if distance > maxHeatTransferDistance {
+	// Use vectorPool for distance calculation
+	vec := vectorPool.Get().([]float64)
+	defer vectorPool.Put(vec)
+
+	vec[0] = u.Position.X() - other.Position.X()
+	vec[1] = u.Position.Y() - other.Position.Y()
+	vec[2] = u.Position.Z() - other.Position.Z()
+
+	distanceSquared := vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2]
+	if distanceSquared > maxHeatTransferDistance*maxHeatTransferDistance {
 		return
 	}
 
-	distanceFactor := 1.0 / (1.0 + distance*distance)
+	distance := math.Sqrt(distanceSquared)
+	distanceFactor := 1.0 / (1.0 + distance)
 	tempDiff := u.Heat - other.Heat
 	if tempDiff <= 0 {
 		return
@@ -105,9 +125,6 @@ func (u *Unit) TransferHeatTo(other *Unit, dt float64) {
 	massRatio := math.Sqrt(other.Mass / u.Mass)
 	heatTransfer *= massRatio
 	heatTransfer = math.Min(heatTransfer, u.Heat-ambientTemperature)
-
-	u.HeatTransferred += heatTransfer
-	other.HeatTransferred += heatTransfer
 
 	u.Heat -= heatTransfer
 	other.Heat += heatTransfer
@@ -133,42 +150,47 @@ func (u *Unit) NewPointLightMesh() {
 	light := light.NewPoint(&baseColor, 1.0)
 	u.Mesh.Light = light
 	u.Mesh.Add(light)
+
+	// Initialize cached values
+	u.volume = (4.0 / 3.0) * math.Pi * math.Pow(u.Radius, 3)
+	u.surfaceArea = 4.0 * math.Pi * math.Pow(u.Radius, 2)
+	u.Mass = u.volume * u.MassMultiplier
 }
 
 func (u *Unit) GetVolume() float64 {
-	return (4.0 / 3.0) * math.Pi * math.Pow(u.Radius, 3)
+	return u.volume
 }
 
 func (u *Unit) GetSurfaceArea() float64 {
-	return 4.0 * math.Pi * math.Pow(u.Radius, 2)
+	return u.surfaceArea
 }
 
 func (u *Unit) GetMass() float64 {
-	return u.GetVolume() * u.MassMultiplier
+	return u.Mass
 }
 
 func (u *Unit) ApplyForce(f vector3.Vector[float64]) {
-	u.Acceleration = u.Acceleration.Add(f.Scale(1 / u.Mass))
+	invMass := 1.0 / u.Mass
+	u.Acceleration = u.Acceleration.Add(f.Scale(invMass))
 }
 
 func (u *Unit) UpdatePosition(dt float64) {
-	u.Position = u.Position.Add(u.Velocity.Scale(dt))
-	u.Velocity = u.Velocity.Add(u.Acceleration.Scale(dt))
+	// Update position and velocity using Verlet integration
+	halfDtSq := 0.5 * dt * dt
+	newPos := u.Position.Add(u.Velocity.Scale(dt)).Add(u.Acceleration.Scale(halfDtSq))
+	newVel := u.Velocity.Add(u.Acceleration.Scale(dt))
+
+	u.Position = newPos
+	u.Velocity = newVel
 	u.Acceleration = vector3.Zero[float64]()
-	u.HeatTransferred = 0
 
-	u.Mesh.SetPosition(u.Position.ToFloat32().X(), u.Position.ToFloat32().Y(), u.Position.ToFloat32().Z())
+	u.Mesh.SetPosition(float32(u.Position.X()), float32(u.Position.Y()), float32(u.Position.Z()))
 
-	// Enhanced cooling calculation
 	if u.Heat > ambientTemperature {
-		// Faster cooling rate
 		cooldown := (u.Heat - ambientTemperature) * coolingRate * dt
 		u.Heat = math.Max(ambientTemperature, u.Heat-cooldown)
 
-		// Color transition based on temperature
-		normalizedTemp := math32.Clamp(float32((u.Heat-ambientTemperature)/50), 0, 1) // Reduced temperature range
-
-		// Get base color
+		normalizedTemp := math32.Clamp(float32((u.Heat-ambientTemperature)/50), 0, 1)
 		normalizedRadius := math32.Clamp(float32(u.Radius/5e3), 0, 1)
 		normalizedMass := math32.Clamp(float32(u.Mass/1e5), 0, 1)
 		normalizedElasticity := float32(u.Elasticity)
@@ -179,11 +201,10 @@ func (u *Unit) UpdatePosition(dt float64) {
 			B: (1.0-normalizedMass)*0.6 + (1.0-normalizedElasticity)*0.4,
 		}
 
-		// Blend between base color and heat color
 		heatColor := math32.Color{
 			R: 1.0,
-			G: math32.Clamp(normalizedTemp*0.6, 0, 0.6), // Reduced green component
-			B: math32.Clamp(normalizedTemp*0.3, 0, 0.3), // Reduced blue component
+			G: math32.Clamp(normalizedTemp*0.6, 0, 0.6),
+			B: math32.Clamp(normalizedTemp*0.3, 0, 0.3),
 		}
 
 		finalColor := math32.Color{
@@ -195,13 +216,11 @@ func (u *Unit) UpdatePosition(dt float64) {
 		mat := u.Mesh.Mesh.GetMaterial(0).(*material.Standard)
 		mat.SetColor(&finalColor)
 
-		// Adjust light intensity based on temperature
-		intensity := math32.Clamp(float32((u.Heat-ambientTemperature)/50), 0.1, 2.0) // Reduced intensity range
+		intensity := math32.Clamp(float32((u.Heat-ambientTemperature)/50), 0.1, 2.0)
 		u.Mesh.Light.SetColor(&finalColor)
 		u.Mesh.Light.SetIntensity(intensity)
 	} else {
 		u.Heat = ambientTemperature
-		// Reset to base color
 		normalizedRadius := math32.Clamp(float32(u.Radius/5e3), 0, 1)
 		normalizedMass := math32.Clamp(float32(u.Mass/1e5), 0, 1)
 		normalizedElasticity := float32(u.Elasticity)
@@ -220,89 +239,92 @@ func (u *Unit) UpdatePosition(dt float64) {
 }
 
 func (unit *Unit) CheckAndResolveWallCollision(wallBounds BoundingBox, wallElasticity float64) bool {
-	xCorrection, yCorrection, zCorrection := unit.Position.X(), unit.Position.Y(), unit.Position.Z()
-	vxCorrection, vyCorrection, vzCorrection := unit.Velocity.X(), unit.Velocity.Y(), unit.Velocity.Z()
-	collided := false
+	var collided bool
+	vec := vectorPool.Get().([]float64)
+	defer vectorPool.Put(vec)
 
-	if unit.Position.X()-unit.Radius < wallBounds.Min.X() {
-		overlapX := wallBounds.Min.X() - (unit.Position.X() - unit.Radius)
-		xCorrection = unit.Position.X() + overlapX
-		vxCorrection = -unit.Velocity.X() * wallElasticity
-		collided = true
-	}
-	if unit.Position.X()+unit.Radius > wallBounds.Max.X() {
-		overlapX := (unit.Position.X() + unit.Radius) - wallBounds.Max.X()
-		xCorrection = unit.Position.X() - overlapX
-		vxCorrection = -unit.Velocity.X() * wallElasticity
-		collided = true
-	}
+	vec[0] = unit.Position.X()
+	vec[1] = unit.Position.Y()
+	vec[2] = unit.Position.Z()
 
-	if unit.Position.Y()-unit.Radius < wallBounds.Min.Y() {
-		overlapY := wallBounds.Min.Y() - (unit.Position.Y() - unit.Radius)
-		yCorrection = unit.Position.Y() + overlapY
-		vyCorrection = -unit.Velocity.Y() * wallElasticity
+	vx, vy, vz := unit.Velocity.X(), unit.Velocity.Y(), unit.Velocity.Z()
+
+	// X-axis collision
+	if vec[0]-unit.Radius < wallBounds.Min.X() {
+		vec[0] = wallBounds.Min.X() + unit.Radius
+		vx = -vx * wallElasticity
 		collided = true
-	}
-	if unit.Position.Y()+unit.Radius > wallBounds.Max.Y() {
-		overlapY := (unit.Position.Y() + unit.Radius) - wallBounds.Max.Y()
-		yCorrection = unit.Position.Y() - overlapY
-		vyCorrection = -unit.Velocity.Y() * wallElasticity
+	} else if vec[0]+unit.Radius > wallBounds.Max.X() {
+		vec[0] = wallBounds.Max.X() - unit.Radius
+		vx = -vx * wallElasticity
 		collided = true
 	}
 
-	if unit.Position.Z()-unit.Radius < wallBounds.Min.Z() {
-		overlapZ := wallBounds.Min.Z() - (unit.Position.Z() - unit.Radius)
-		zCorrection = unit.Position.Z() + overlapZ
-		vzCorrection = -unit.Velocity.Z() * wallElasticity
+	// Y-axis collision
+	if vec[1]-unit.Radius < wallBounds.Min.Y() {
+		vec[1] = wallBounds.Min.Y() + unit.Radius
+		vy = -vy * wallElasticity
+		collided = true
+	} else if vec[1]+unit.Radius > wallBounds.Max.Y() {
+		vec[1] = wallBounds.Max.Y() - unit.Radius
+		vy = -vy * wallElasticity
 		collided = true
 	}
-	if unit.Position.Z()+unit.Radius > wallBounds.Max.Z() {
-		overlapZ := (unit.Position.Z() + unit.Radius) - wallBounds.Max.Z()
-		zCorrection = unit.Position.Z() - overlapZ
-		vzCorrection = -unit.Velocity.Z() * wallElasticity
+
+	// Z-axis collision
+	if vec[2]-unit.Radius < wallBounds.Min.Z() {
+		vec[2] = wallBounds.Min.Z() + unit.Radius
+		vz = -vz * wallElasticity
+		collided = true
+	} else if vec[2]+unit.Radius > wallBounds.Max.Z() {
+		vec[2] = wallBounds.Max.Z() - unit.Radius
+		vz = -vz * wallElasticity
 		collided = true
 	}
 
 	if collided {
-		unit.Position = vector3.New(xCorrection, yCorrection, zCorrection)
-		unit.Velocity = vector3.New(vxCorrection, vyCorrection, vzCorrection)
+		unit.Position = vector3.New(vec[0], vec[1], vec[2])
+		unit.Velocity = vector3.New(vx, vy, vz)
 
-		// Reduced heat generation from wall collisions
-		velocityMagnitude := math.Sqrt(math.Pow(unit.Velocity.X(), 2) + math.Pow(unit.Velocity.Y(), 2) + math.Pow(unit.Velocity.Z(), 2))
-		heatGenerated := 0.5 * unit.Mass * velocityMagnitude * velocityMagnitude * (1 - wallElasticity)
-		unit.Heat += heatGenerated * 0.01 // Reduced heat generation factor
+		speed := math.Sqrt(vx*vx + vy*vy + vz*vz)
+		heatGenerated := 0.5 * unit.Mass * speed * speed * (1 - wallElasticity) * 0.01
+		unit.Heat += heatGenerated
 	}
 
 	return collided
 }
 
 func (u *Unit) GiveMassAndCenterOfMassForBounds(bounds BoundingBox) (vector3.Vector[float64], float64) {
-	points := make([]vector3.Vector[float64], 0)
-	for phi := 0.0; phi < 2*math.Pi; phi += math.Pi / 10 {
-		for theta := 0.0; theta < math.Pi; theta += math.Pi / 10 {
-			x := u.Radius * math.Sin(theta) * math.Cos(phi)
-			y := u.Radius * math.Sin(theta) * math.Sin(phi)
-			z := u.Radius * math.Cos(theta)
-			point := vector3.New(x, y, z).Add(u.Position)
-			points = append(points, point)
-		}
+	// Simplified calculation using bounding box intersection
+	minX := math.Max(bounds.Min.X(), u.Position.X()-u.Radius)
+	maxX := math.Min(bounds.Max.X(), u.Position.X()+u.Radius)
+	minY := math.Max(bounds.Min.Y(), u.Position.Y()-u.Radius)
+	maxY := math.Min(bounds.Max.Y(), u.Position.Y()+u.Radius)
+	minZ := math.Max(bounds.Min.Z(), u.Position.Z()-u.Radius)
+	maxZ := math.Min(bounds.Max.Z(), u.Position.Z()+u.Radius)
+
+	// Calculate volume of intersection
+	dx := maxX - minX
+	dy := maxY - minY
+	dz := maxZ - minZ
+
+	if dx <= 0 || dy <= 0 || dz <= 0 {
+		return vector3.Zero[float64](), 0
 	}
 
-	var totalMass float64
-	centerOfMass := vector3.Zero[float64]()
-	for _, point := range points {
-		if point.X() >= bounds.Min.X() && point.X() <= bounds.Max.X() &&
-			point.Y() >= bounds.Min.Y() && point.Y() <= bounds.Max.Y() &&
-			point.Z() >= bounds.Min.Z() && point.Z() <= bounds.Max.Z() {
-			pointMass := u.Mass / float64(len(points))
-			totalMass += pointMass
-			centerOfMass = centerOfMass.Add(point.Scale(pointMass))
-		}
+	volume := dx * dy * dz
+	totalVolume := u.GetVolume()
+
+	if volume > totalVolume {
+		volume = totalVolume
 	}
 
-	if totalMass > 0 {
-		centerOfMass = centerOfMass.Scale(1 / totalMass)
-	}
+	massRatio := volume / totalVolume
+	mass := u.Mass * massRatio
 
-	return centerOfMass, totalMass
+	centerX := (minX + maxX) / 2
+	centerY := (minY + maxY) / 2
+	centerZ := (minZ + maxZ) / 2
+
+	return vector3.New(centerX, centerY, centerZ), mass
 }

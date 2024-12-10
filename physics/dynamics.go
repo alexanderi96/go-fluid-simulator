@@ -16,7 +16,7 @@ func (s *Simulation) UpdateWithOctrees() error {
 	s.updateOctree()
 	s.applyGravitationalForces()
 	s.handleCollisions()
-	s.handleHeatTransfer() // New step for heat transfer
+	s.handleHeatTransfer()
 	s.updatePositions()
 
 	return nil
@@ -51,7 +51,7 @@ func (s *Simulation) handleCollisions() {
 
 		unitA.CheckAndResolveWallCollision(s.WorldBoundray, s.Config.WallElasticity)
 
-		nearUnits := []*Unit{}
+		nearUnits := make([]*Unit, 0, 8) // Pre-allocate with typical capacity
 		s.Octree.Retrieve(&nearUnits, unitA)
 
 		for _, unitB := range nearUnits {
@@ -67,14 +67,13 @@ func (s *Simulation) handleCollisions() {
 	}
 }
 
-// New function to handle heat transfer between nearby units
 func (s *Simulation) handleHeatTransfer() {
 	for _, unitA := range s.Fluid {
 		if unitA == nil || !unitA.CanBeAltered {
 			continue
 		}
 
-		nearUnits := []*Unit{}
+		nearUnits := make([]*Unit, 0, 8) // Pre-allocate with typical capacity
 		s.Octree.Retrieve(&nearUnits, unitA)
 
 		for _, unitB := range nearUnits {
@@ -82,7 +81,6 @@ func (s *Simulation) handleHeatTransfer() {
 				continue
 			}
 
-			// Transfer heat between units
 			unitA.TransferHeatTo(unitB, s.Config.Frametime)
 		}
 	}
@@ -106,11 +104,11 @@ func isValidHeatTransferPair(unitA, unitB *Unit) bool {
 	return unitB != nil &&
 		unitA.Id != unitB.Id &&
 		unitB.CanBeAltered &&
-		unitA.Heat > unitB.Heat // Only transfer heat from hotter to colder units
+		unitA.Heat > unitB.Heat
 }
 
 func (ot *Octree) CalculateGravity(unit Gravitable, theta float64) vector3.Vector[float64] {
-	var force = vector3.Zero[float64]()
+	force := vector3.Zero[float64]()
 	ot.calculateGravityRecursive(unit, theta, &force)
 	return force
 }
@@ -121,10 +119,13 @@ func (ot *Octree) calculateGravityRecursive(g Gravitable, theta float64, force *
 		return
 	}
 
+	// Calculate width and distance squared directly
 	width := ot.Bounds.Max.X() - ot.Bounds.Min.X()
-	distance := g.GetPosition().Distance(ot.CenterOfMass)
+	deltaPos := g.GetPosition().Sub(ot.CenterOfMass)
+	distanceSquared := deltaPos.X()*deltaPos.X() + deltaPos.Y()*deltaPos.Y() + deltaPos.Z()*deltaPos.Z()
 
-	if (width / distance) < theta {
+	// Avoid sqrt by comparing squares
+	if (width * width) < (theta * theta * distanceSquared) {
 		ot.approximateGravityWithCenterOfMass(g, force)
 		return
 	}
@@ -133,22 +134,45 @@ func (ot *Octree) calculateGravityRecursive(g Gravitable, theta float64, force *
 }
 
 func (ot *Octree) calculateLeafNodeGravity(g Gravitable, force *vector3.Vector[float64]) {
+	gMass := g.GetMass()    // Cache mass value
+	gPos := g.GetPosition() // Cache position
+
 	for _, obj := range ot.objects {
 		if obj != g.GetUnit() {
-			forceToAdd := gravity.CalculateForce(g, obj)
-			*force = force.Add(forceToAdd)
+			deltaPos := obj.GetPosition().Sub(gPos)
+			distanceSquared := deltaPos.X()*deltaPos.X() + deltaPos.Y()*deltaPos.Y() + deltaPos.Z()*deltaPos.Z()
+
+			if distanceSquared > 0 {
+				// Pre-calculate common factors
+				forceMagnitude := gravity.UniversalGravitationalConstant * gMass * obj.GetMass() / distanceSquared
+				invDistance := 1.0 / distanceSquared
+
+				// Calculate force components directly
+				fx := deltaPos.X() * forceMagnitude * invDistance
+				fy := deltaPos.Y() * forceMagnitude * invDistance
+				fz := deltaPos.Z() * forceMagnitude * invDistance
+
+				*force = force.Add(vector3.New(fx, fy, fz))
+			}
 		}
 	}
 }
 
 func (ot *Octree) approximateGravityWithCenterOfMass(g Gravitable, force *vector3.Vector[float64]) {
 	deltaPos := ot.CenterOfMass.Sub(g.GetPosition())
-	distance := deltaPos.Length()
+	distanceSquared := deltaPos.X()*deltaPos.X() + deltaPos.Y()*deltaPos.Y() + deltaPos.Z()*deltaPos.Z()
 
-	if distance > 0 {
-		magnitude := gravity.UniversalGravitationalConstant * g.GetMass() * ot.TotalMass / (distance * distance)
-		direction := deltaPos.Normalized()
-		*force = force.Add(direction.Scale(magnitude))
+	if distanceSquared > 0 {
+		// Pre-calculate force magnitude
+		forceMagnitude := gravity.UniversalGravitationalConstant * g.GetMass() * ot.TotalMass / distanceSquared
+		invDistance := 1.0 / distanceSquared
+
+		// Calculate force components directly
+		fx := deltaPos.X() * forceMagnitude * invDistance
+		fy := deltaPos.Y() * forceMagnitude * invDistance
+		fz := deltaPos.Z() * forceMagnitude * invDistance
+
+		*force = force.Add(vector3.New(fx, fy, fz))
 	}
 }
 

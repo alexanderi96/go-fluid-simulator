@@ -28,12 +28,23 @@ func NewCalculator(theta float64) *Calculator {
 // CalculateForce calculates gravitational force between two objects
 func CalculateForce(a, b Gravitable) vector3.Vector[float64] {
 	deltaPos := b.GetPosition().Sub(a.GetPosition())
-	distance := deltaPos.Length()
 
-	if distance <= 0 {
+	// Calculate squared distance directly to avoid sqrt
+	distanceSquared := deltaPos.X()*deltaPos.X() + deltaPos.Y()*deltaPos.Y() + deltaPos.Z()*deltaPos.Z()
+
+	if distanceSquared <= 0 {
 		return vector3.Zero[float64]()
 	}
 
-	magnitude := UniversalGravitationalConstant * a.GetMass() * b.GetMass() / (distance * distance)
-	return deltaPos.Normalized().Scale(magnitude)
+	// Pre-calculate mass product and constant
+	massProduct := a.GetMass() * b.GetMass()
+	forceMagnitude := UniversalGravitationalConstant * massProduct / distanceSquared
+
+	// Avoid normalization by dividing by distance directly
+	invDistance := 1.0 / distanceSquared
+	return vector3.New(
+		deltaPos.X()*forceMagnitude*invDistance,
+		deltaPos.Y()*forceMagnitude*invDistance,
+		deltaPos.Z()*forceMagnitude*invDistance,
+	)
 }
