@@ -102,7 +102,7 @@ func NewSimulation(config *config.Config) (*Simulation, error) {
 		Metrics: &metrics.Metrics{},
 		Config:  config,
 		IsPause: false,
-		Fly:     true,
+		Fly:     false,
 		WorldBoundray: BoundingBox{
 			Min: vector3.New(-config.GameX/2, -config.GameY/2, -config.GameZ/2),
 			Max: vector3.New(config.GameX/2, config.GameY/2, config.GameZ/2),
@@ -126,10 +126,10 @@ func NewSimulation(config *config.Config) (*Simulation, error) {
 		sim.Fluid = append(sim.Fluid, sim.newUnitWithPropertiesAtPosition(WorldCenter, static, static, 0.01, config.CentralMass, 0, false, color.RGBA{uint8(255), uint8(1), uint8(1), 255}))
 	}
 
-	if sim.SpaceShip != nil {
-		sim.SpaceShip.SetupShip()
-		sim.Scene.Add(sim.SpaceShip.Ship)
-	}
+	// if sim.SpaceShip != nil {
+	// 	sim.SpaceShip.SetupShip()
+	// 	sim.Scene.Add(sim.SpaceShip.Ship)
+	// }
 
 	if sim.Config.ShowSkybox {
 		skybox, err := graphic.NewSkybox(graphic.SkyboxData{

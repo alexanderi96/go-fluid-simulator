@@ -10,7 +10,7 @@
   show_octree = false
   frametime = 0.001 # 0.01 s = 100 hz
   generate_world = false
-  show_skybox = true
+  show_skybox = false
 
 # world config
   game_x = 1e6
@@ -20,7 +20,7 @@
   apply_gravity = false
   gravity = -9.81
 
-  #central_mass = 10000000
+  central_mass = 100000000
   
 # unit config
   unit_number = 500
@@ -30,7 +30,7 @@
 
   unit_radius = 1
   unit_radius_multiplier = 1
-  set_random_radius = true
+  set_random_radius = false
   radius_min = 0.1
   radius_max = 10
   
