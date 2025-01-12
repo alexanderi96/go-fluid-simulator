@@ -20,7 +20,7 @@
   apply_gravity = false
   gravity = -9.81
 
-  central_mass = 100000000
+  central_mass = 1000000
   
 # unit config
   unit_number = 500
@@ -34,7 +34,7 @@
   radius_min = 0.1
   radius_max = 10
   
-  unit_mass_multiplier = 10
+  unit_mass_multiplier = 100
   set_random_mass_multiplier = false
   mass_multiplier_min = 1
   mass_multiplier_max = 10

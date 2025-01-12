@@ -251,7 +251,7 @@ func (s *Simulation) GiveRotationalVelocity(units []*Unit) {
 
 func (u *Unit) CalcolaVettoreVelocitaRotazione(p *vector3.Vector[float64]) {
 	d := math.Sqrt(u.Position.X()*u.Position.X() + u.Position.Y()*u.Position.Y())
-	k := 0.5
+	k := 0.2
 	v := k * d
 
 	v_x := v * u.Position.Y() / d
