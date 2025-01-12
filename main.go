@@ -148,6 +148,30 @@ func main() {
 
 		if kev.Key == window.KeyF {
 			s.Fly = !s.Fly
+			if s.Fly {
+				// Create spaceship if not present
+				if s.SpaceShip == nil {
+					s.SpaceShip = &spaceship.SpaceShip{
+						Speed:           0,
+						MaxSpeed:        1,
+						MaxEngineThrust: 0.5,
+						Thrust:          0,
+						RotationSpeed:   0.02,
+						BreakingPower:   0.1,
+						Mass:            10,
+						Keys:            make(map[window.Key]bool),
+						CameraOffset:    math32.NewVector3(0, 2, -8),
+					}
+					s.SpaceShip.LoadShip()
+					s.Scene.Add(s.SpaceShip.Ship)
+				}
+			} else {
+				// Remove spaceship when exiting flight mode
+				if s.SpaceShip != nil {
+					s.Scene.Remove(s.SpaceShip.Ship)
+					s.SpaceShip = nil
+				}
+			}
 		}
 
 		if !s.Fly {
