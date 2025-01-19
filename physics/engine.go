@@ -2,7 +2,6 @@ package physics
 
 import (
 	"encoding/json"
-	"image/color"
 	"math"
 	"math/rand"
 	"os"
@@ -12,6 +11,7 @@ import (
 	"github.com/EliCDavis/vector/vector3"
 	"github.com/alexanderi96/go-fluid-simulator/config"
 	"github.com/alexanderi96/go-fluid-simulator/metrics"
+	"github.com/alexanderi96/go-fluid-simulator/physics/material"
 	"github.com/alexanderi96/go-fluid-simulator/spaceship"
 	"github.com/alexanderi96/go-fluid-simulator/utils"
 	"github.com/google/uuid"
@@ -123,7 +123,7 @@ func NewSimulation(config *config.Config) (*Simulation, error) {
 	sim.Octree = NewOctree(0, sim.WorldBoundray, sim.Scene, config.ShowOctree)
 
 	if config.CentralMass > 0 {
-		sim.Fluid = append(sim.Fluid, sim.newUnitWithPropertiesAtPosition(WorldCenter, static, static, 0.01, config.CentralMass, 0, false, color.RGBA{uint8(255), uint8(1), uint8(1), 255}))
+		sim.Fluid = append(sim.Fluid, sim.newUnitWithPropertiesAtPosition(WorldCenter, static, static, 0.01, config.CentralMass, 0, false))
 	}
 
 	// if sim.SpaceShip != nil {
@@ -178,33 +178,35 @@ func (s *Simulation) Update() error {
 	return s.UpdateWithOctrees()
 }
 
-func (s *Simulation) newUnitWithPropertiesAtPosition(position, acceleration, velocity vector3.Vector[float64], radius, massMultiplier, elasticity float64, canBeAltered bool, color color.RGBA) *Unit {
-	unit := &Unit{
-		Id:       uuid.New(),
-		Position: position,
+func (s *Simulation) newUnitWithPropertiesAtPosition(position, acceleration, velocity vector3.Vector[float64], radius float64, density float64, elasticity float64, canBeAltered bool) *Unit {
+	// Create a composition with Iron for the central mass
+	comp := material.NewComposition(map[*material.Material]float64{
+		&material.Iron: 1.0,
+	})
 
+	unit := &Unit{
+		Id:             uuid.New(),
+		Position:       position,
 		Velocity:       velocity,
 		Acceleration:   acceleration,
 		Radius:         radius,
-		MassMultiplier: massMultiplier,
-		Elasticity:     elasticity,
-		Color:          color,
+		Composition:    comp,
 		Heat:           0.0,
-
-		CanBeAltered: canBeAltered,
+		canBeAltered:   canBeAltered,
+		MassMultiplier: s.Config.UnitMassMultiplier,
 	}
 
 	unit.NewPointLightMesh()
 	s.Scene.Add(unit.Mesh)
-	unit.Mass = unit.GetMass()
 
 	return unit
 }
 
 func (s *Simulation) GetUnits() []*Unit {
 	currentRadius := s.Config.UnitRadius * s.Config.UnitRadiusMultiplier
-	currentMassMultiplier := s.Config.UnitMassMultiplier
-	currentElasticity := s.Config.UnitElasticity
+
+	// Array of available materials
+	materials := []*material.Material{&material.Iron, &material.Copper, &material.Ice}
 
 	unts := make([]*Unit, 0)
 
@@ -212,16 +214,31 @@ func (s *Simulation) GetUnits() []*Unit {
 		if s.Config.SetRandomRadius {
 			currentRadius = (s.Config.RadiusMin + rand.Float64()*(s.Config.RadiusMax-s.Config.RadiusMin)) * s.Config.UnitRadiusMultiplier
 		}
-		if s.Config.SetRandomMassMultiplier {
-			currentMassMultiplier = s.Config.MassMultiplierMin + rand.Float64()*(s.Config.MassMultiplierMax-s.Config.MassMultiplierMin)
-		}
-		if s.Config.SetRandomElasticity {
-			currentElasticity = s.Config.ElasticityMin + rand.Float64()*(s.Config.ElasticityMax-s.Config.ElasticityMin)
+
+		// Select a random material
+		randomMaterial := materials[rand.Intn(len(materials))]
+
+		// Create composition with the random material
+		comp := material.NewComposition(map[*material.Material]float64{
+			randomMaterial: 1.0,
+		})
+
+		// Create unit with the random material composition
+		unit := &Unit{
+			Id:             uuid.New(),
+			Position:       s.FinalSpawnPosition,
+			Velocity:       static,
+			Acceleration:   static,
+			Radius:         currentRadius,
+			Composition:    comp,
+			Heat:           0.0,
+			canBeAltered:   true,
+			MassMultiplier: s.Config.UnitMassMultiplier,
 		}
 
-		color := color.RGBA{uint8(255), uint8(255), uint8(255), 255}
-
-		unts = append(unts, s.newUnitWithPropertiesAtPosition(s.FinalSpawnPosition, static, static, currentRadius, currentMassMultiplier, currentElasticity, true, color))
+		unit.NewPointLightMesh()
+		s.Scene.Add(unit.Mesh)
+		unts = append(unts, unit)
 	}
 	return unts
 }

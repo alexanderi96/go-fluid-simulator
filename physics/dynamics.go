@@ -45,7 +45,7 @@ func (s *Simulation) applyGravitationalForces() {
 
 func (s *Simulation) handleCollisions() {
 	for _, unitA := range s.Fluid {
-		if unitA == nil || !unitA.CanBeAltered {
+		if unitA == nil || !unitA.CanBeAltered() {
 			continue
 		}
 
@@ -69,7 +69,7 @@ func (s *Simulation) handleCollisions() {
 
 func (s *Simulation) handleHeatTransfer() {
 	for _, unitA := range s.Fluid {
-		if unitA == nil || !unitA.CanBeAltered {
+		if unitA == nil || !unitA.CanBeAltered() {
 			continue
 		}
 
@@ -88,7 +88,7 @@ func (s *Simulation) handleHeatTransfer() {
 
 func (s *Simulation) updatePositions() {
 	for _, unit := range s.Fluid {
-		if unit != nil && unit.CanBeAltered {
+		if unit != nil && unit.CanBeAltered() {
 			unit.UpdatePosition(s.Config.Frametime)
 		}
 	}
@@ -97,13 +97,13 @@ func (s *Simulation) updatePositions() {
 func isValidCollisionPair(unitA, unitB *Unit) bool {
 	return unitB != nil &&
 		unitA.Id != unitB.Id &&
-		unitB.CanBeAltered
+		unitB.CanBeAltered()
 }
 
 func isValidHeatTransferPair(unitA, unitB *Unit) bool {
 	return unitB != nil &&
 		unitA.Id != unitB.Id &&
-		unitB.CanBeAltered &&
+		unitB.CanBeAltered() &&
 		unitA.Heat > unitB.Heat
 }
 

@@ -6,10 +6,12 @@ import (
 	"sync"
 
 	"github.com/EliCDavis/vector/vector3"
+	"github.com/alexanderi96/go-fluid-simulator/physics/collision"
+	"github.com/alexanderi96/go-fluid-simulator/physics/material"
 	"github.com/g3n/engine/geometry"
 	"github.com/g3n/engine/graphic"
 	"github.com/g3n/engine/light"
-	"github.com/g3n/engine/material"
+	g3nmat "github.com/g3n/engine/material"
 	"github.com/g3n/engine/math32"
 	"github.com/google/uuid"
 )
@@ -17,16 +19,14 @@ import (
 const (
 	seg                     = 10
 	stefanBoltzmannConstant = 5.67e-8
-	specificHeatCapacity    = 4186.0
 	ambientTemperature      = 20.0
-	heatTransferCoefficient = 0.1
 	maxHeatTransferDistance = 10.0
-	coolingRate             = 0.5
+	coolingRate             = 0.01 // Further reduced for more gradual cooling
 )
 
 var (
-	mat        = material.NewStandard(math32.NewColor("white"))
-	overlapMat = material.NewStandard(math32.NewColor("red"))
+	mat        = g3nmat.NewStandard(math32.NewColor("white"))
+	overlapMat = g3nmat.NewStandard(math32.NewColor("red"))
 	// Object pool for vector calculations
 	vectorPool = sync.Pool{
 		New: func() interface{} {
@@ -44,19 +44,24 @@ type Unit struct {
 	Velocity     vector3.Vector[float64]
 	Acceleration vector3.Vector[float64]
 
-	Elasticity     float64
+	Composition    *material.Composition
 	Radius         float64
-	MassMultiplier float64
 	Mass           float64
+	MassMultiplier float64
 	Color          color.RGBA
-	CanBeAltered   bool
+	canBeAltered   bool
+	isMerged       bool // Track if this unit has been merged into another
 
 	Heat            float64
 	HeatTransferred float64
 
 	// Cache frequently used values
-	volume      float64
-	surfaceArea float64
+	volume               float64
+	surfaceArea          float64
+	elasticity           float64
+	emissivity           float64
+	thermalConductivity  float64
+	specificHeatCapacity float64
 }
 
 type PointLightMesh struct {
@@ -68,6 +73,96 @@ func (u *Unit) GetUnit() *Unit {
 	return u
 }
 
+func (u *Unit) CanBeAltered() bool {
+	return u.canBeAltered && !u.isMerged
+}
+
+// Merge combines this unit with another unit, absorbing its mass and properties
+func (u *Unit) Merge(other collision.Collidable) {
+	// Get the actual volume of the other unit
+	var otherVolume float64
+	if otherUnit, ok := other.(*Unit); ok {
+		otherVolume = otherUnit.GetVolume()
+	} else {
+		// Fallback to sphere volume calculation if not a Unit
+		r := other.GetRadius()
+		otherVolume = (4.0 / 3.0) * math.Pi * r * r * r
+	}
+
+	// Calculate new mass and total volume
+	newMass := u.Mass + other.GetMass()
+	newVolume := u.GetVolume() + otherVolume
+
+	// Calculate new radius based on total volume
+	newRadius := math.Pow((3.0*newVolume)/(4.0*math.Pi), 1.0/3.0)
+
+	// Keep the position of the absorbing unit instead of calculating average
+	newPosition := u.Position
+
+	// Calculate resultant velocity based on conservation of momentum
+	// p = mv, total momentum = m1v1 + m2v2 = (m1+m2)v_final
+	newVelocity := u.Velocity.Scale(u.Mass).Add(other.GetVelocity().Scale(other.GetMass())).Scale(1.0 / newMass)
+
+	// Calculate combined heat based on mass-weighted average
+	totalHeat := u.Heat*u.Mass + 0.0
+	if otherUnit, ok := other.(*Unit); ok {
+		totalHeat += otherUnit.Heat * otherUnit.Mass
+	}
+	combinedHeat := totalHeat / newMass
+
+	// Update properties
+	u.Mass = newMass
+	u.Radius = newRadius
+	u.Position = newPosition
+	u.Velocity = newVelocity
+	u.volume = newVolume  // Update cached volume
+	u.Heat = combinedHeat // Set combined heat
+
+	// Update mesh geometry with new radius
+	if u.Mesh != nil {
+		// Create new sphere geometry with updated radius
+		geom := geometry.NewSphere(float64(u.Radius), seg, seg)
+		// Get color from composition
+		baseColorRGB := u.Composition.GetColor()
+		baseColor := &math32.Color{
+			R: float32(baseColorRGB[0]),
+			G: float32(baseColorRGB[1]),
+			B: float32(baseColorRGB[2]),
+		}
+
+		// Create new mesh with updated geometry
+		newMat := g3nmat.NewStandard(baseColor)
+		u.Mesh.Mesh = graphic.NewMesh(geom, newMat)
+		u.Mesh.Mesh.SetVisible(true)
+
+		// Keep the same light but update its position and color
+		if u.Mesh.Light != nil {
+			u.Mesh.Light.SetColor(baseColor)
+			u.Mesh.Add(u.Mesh.Light)
+		}
+	} else {
+		// If no mesh exists, create a new one
+		u.NewPointLightMesh()
+	}
+
+	// Completely remove the other unit if it's a Unit type
+	if otherUnit, ok := other.(*Unit); ok {
+		if otherUnit.Mesh != nil {
+			otherUnit.Mesh.SetVisible(false)
+			otherUnit.Mesh.Light = nil
+			otherUnit.Mesh = nil
+		}
+		// Mark as merged and disable the unit
+		otherUnit.isMerged = true
+		otherUnit.canBeAltered = false
+		otherUnit.Mass = 0
+		otherUnit.volume = 0
+		otherUnit.Velocity = vector3.Zero[float64]()
+		otherUnit.Acceleration = vector3.Zero[float64]()
+		otherUnit.Position = vector3.Zero[float64]()
+	}
+}
+
 func (u *Unit) GetPosition() vector3.Vector[float64] {
 	return u.Position
 }
@@ -77,7 +172,7 @@ func (u *Unit) GetVelocity() vector3.Vector[float64] {
 }
 
 func (u *Unit) GetElasticity() float64 {
-	return u.Elasticity
+	return u.elasticity
 }
 
 func (u *Unit) GetRadius() float64 {
@@ -121,7 +216,9 @@ func (u *Unit) TransferHeatTo(other *Unit, dt float64) {
 		return
 	}
 
-	heatTransfer := heatTransferCoefficient * distanceFactor * tempDiff * dt
+	// Use material properties for heat transfer
+	conductivity := (u.thermalConductivity + other.thermalConductivity) / 2
+	heatTransfer := conductivity * distanceFactor * tempDiff * dt
 	massRatio := math.Sqrt(other.Mass / u.Mass)
 	heatTransfer *= massRatio
 	heatTransfer = math.Min(heatTransfer, u.Heat-ambientTemperature)
@@ -131,19 +228,17 @@ func (u *Unit) TransferHeatTo(other *Unit, dt float64) {
 }
 
 func (u *Unit) NewPointLightMesh() {
-	normalizedRadius := math32.Clamp(float32(u.Radius/5e3), 0, 1)
-	normalizedMass := math32.Clamp(float32(u.Mass/1e5), 0, 1)
-	normalizedElasticity := float32(u.Elasticity)
-
+	// Get base color from composition
+	baseColorRGB := u.Composition.GetColor()
 	baseColor := math32.Color{
-		R: normalizedRadius*0.8 + normalizedMass*0.2,
-		G: normalizedElasticity*0.7 + normalizedRadius*0.3,
-		B: (1.0-normalizedMass)*0.6 + (1.0-normalizedElasticity)*0.4,
+		R: float32(baseColorRGB[0]),
+		G: float32(baseColorRGB[1]),
+		B: float32(baseColorRGB[2]),
 	}
 
 	u.Mesh = new(PointLightMesh)
 	geom := geometry.NewSphere(float64(u.Radius), seg, seg)
-	mat := material.NewStandard(&baseColor)
+	mat := g3nmat.NewStandard(&baseColor)
 	u.Mesh.Mesh = graphic.NewMesh(geom, mat)
 	u.Mesh.Mesh.SetVisible(true)
 
@@ -154,7 +249,17 @@ func (u *Unit) NewPointLightMesh() {
 	// Initialize cached values
 	u.volume = (4.0 / 3.0) * math.Pi * math.Pow(u.Radius, 3)
 	u.surfaceArea = 4.0 * math.Pi * math.Pow(u.Radius, 2)
-	u.Mass = u.volume * u.MassMultiplier
+
+	// Get material properties
+	density, specificHeat, thermalConductivity, emissivity, elasticity := u.Composition.GetEffectiveProperties()
+	// Only calculate mass if it hasn't been set (i.e., not during merge)
+	if u.Mass == 0 {
+		u.Mass = u.volume * density * u.MassMultiplier
+	}
+	u.specificHeatCapacity = specificHeat
+	u.thermalConductivity = thermalConductivity
+	u.emissivity = emissivity
+	u.elasticity = elasticity
 }
 
 func (u *Unit) GetVolume() float64 {
@@ -191,14 +296,11 @@ func (u *Unit) UpdatePosition(dt float64) {
 		u.Heat = math.Max(ambientTemperature, u.Heat-cooldown)
 
 		normalizedTemp := math32.Clamp(float32((u.Heat-ambientTemperature)/50), 0, 1)
-		normalizedRadius := math32.Clamp(float32(u.Radius/5e3), 0, 1)
-		normalizedMass := math32.Clamp(float32(u.Mass/1e5), 0, 1)
-		normalizedElasticity := float32(u.Elasticity)
-
+		baseColorRGB := u.Composition.GetColor()
 		baseColor := math32.Color{
-			R: normalizedRadius*0.8 + normalizedMass*0.2,
-			G: normalizedElasticity*0.7 + normalizedRadius*0.3,
-			B: (1.0-normalizedMass)*0.6 + (1.0-normalizedElasticity)*0.4,
+			R: float32(baseColorRGB[0]),
+			G: float32(baseColorRGB[1]),
+			B: float32(baseColorRGB[2]),
 		}
 
 		heatColor := math32.Color{
@@ -213,7 +315,7 @@ func (u *Unit) UpdatePosition(dt float64) {
 			B: baseColor.B*(1-normalizedTemp) + heatColor.B*normalizedTemp,
 		}
 
-		mat := u.Mesh.Mesh.GetMaterial(0).(*material.Standard)
+		mat := u.Mesh.Mesh.GetMaterial(0).(*g3nmat.Standard)
 		mat.SetColor(&finalColor)
 
 		intensity := math32.Clamp(float32((u.Heat-ambientTemperature)/50), 0.1, 2.0)
@@ -223,7 +325,7 @@ func (u *Unit) UpdatePosition(dt float64) {
 		u.Heat = ambientTemperature
 		normalizedRadius := math32.Clamp(float32(u.Radius/5e3), 0, 1)
 		normalizedMass := math32.Clamp(float32(u.Mass/1e5), 0, 1)
-		normalizedElasticity := float32(u.Elasticity)
+		normalizedElasticity := float32(u.elasticity)
 
 		baseColor := &math32.Color{
 			R: normalizedRadius*0.8 + normalizedMass*0.2,
@@ -231,9 +333,13 @@ func (u *Unit) UpdatePosition(dt float64) {
 			B: (1.0-normalizedMass)*0.6 + (1.0-normalizedElasticity)*0.4,
 		}
 
-		mat := u.Mesh.Mesh.GetMaterial(0).(*material.Standard)
+		mat := u.Mesh.Mesh.GetMaterial(0).(*g3nmat.Standard)
 		mat.SetColor(baseColor)
-		u.Mesh.Light.SetIntensity(0.1)
+
+		// Calculate light intensity based on mass and radius
+		// Using both mass and radius ensures larger, more massive objects emit more light
+		baseIntensity := math32.Clamp(float32(u.Mass/1e5)*float32(u.Radius/5e3), 0.1, 2.0)
+		u.Mesh.Light.SetIntensity(baseIntensity)
 		u.Mesh.Light.SetColor(baseColor)
 	}
 }
@@ -287,8 +393,13 @@ func (unit *Unit) CheckAndResolveWallCollision(wallBounds BoundingBox, wallElast
 		unit.Velocity = vector3.New(vx, vy, vz)
 
 		speed := math.Sqrt(vx*vx + vy*vy + vz*vz)
-		heatGenerated := 0.5 * unit.Mass * speed * speed * (1 - wallElasticity) * 0.01
-		unit.Heat += heatGenerated
+		// Reduced heat generation from collisions and scaled by mass
+		heatGenerated := 0.5 * unit.Mass * speed * speed * (1 - wallElasticity) * 0.001
+		// Scale heat increase based on current temperature to avoid spikes
+		heatIncrease := heatGenerated * (1.0 - (unit.Heat-ambientTemperature)/100.0)
+		if heatIncrease > 0 {
+			unit.Heat += heatIncrease
+		}
 	}
 
 	return collided

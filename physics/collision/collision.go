@@ -40,6 +40,8 @@ type Collidable interface {
 	SetPosition(pos vector3.Vector[float64])
 	SetVelocity(vel vector3.Vector[float64])
 	AddHeat(heat float64)
+	CanBeAltered() bool
+	Merge(other Collidable)
 }
 
 // GatherCollisionData collects all necessary data for collision resolution
@@ -100,6 +102,21 @@ func GatherCollisionData(uA, uB Collidable) *CollisionData {
 func ResolveCollision(collData *CollisionData) {
 	defer collisionDataPool.Put(collData)
 
+	// Check if units can merge
+	if collData.UnitA.CanBeAltered() && collData.UnitB.CanBeAltered() {
+		massA := collData.UnitA.GetMass()
+		massB := collData.UnitB.GetMass()
+
+		if massA > massB {
+			collData.UnitA.Merge(collData.UnitB)
+			return
+		} else if massB > massA {
+			collData.UnitB.Merge(collData.UnitA)
+			return
+		}
+	}
+
+	// If units cannot merge or have equal mass, proceed with normal collision
 	// Calculate impulse magnitude
 	impulseMag := -(1 + collData.Elasticity) * collData.RelVelNormal
 	impulseMag /= (1/collData.UnitA.GetMass() + 1/collData.UnitB.GetMass())
