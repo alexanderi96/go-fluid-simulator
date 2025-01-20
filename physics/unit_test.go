@@ -1,6 +1,7 @@
 package physics
 
 import (
+	"math"
 	"testing"
 
 	"github.com/EliCDavis/vector/vector3"
@@ -28,9 +29,7 @@ func TestUnitMerge(t *testing.T) {
 				BaseColor:            [3]float64{0.6, 0.6, 0.6},
 				Elasticity:           0.7,
 			}: 1.0}),
-			canBeAltered: true,
-			volume:       (4.0 / 3.0) * 3.14159 * 1.0, // Pre-calcola il volume
-			Mesh:         new(PointLightMesh),
+			Mesh: new(PointLightMesh),
 		}
 		unit1.NewPointLightMesh() // Initialize mesh properly
 
@@ -50,9 +49,7 @@ func TestUnitMerge(t *testing.T) {
 				BaseColor:            [3]float64{0.6, 0.6, 0.6},
 				Elasticity:           0.7,
 			}: 1.0}),
-			canBeAltered: true,
-			volume:       (4.0 / 3.0) * 3.14159 * 1.0, // Pre-calcola il volume
-			Mesh:         new(PointLightMesh),
+			Mesh: new(PointLightMesh),
 		}
 		unit2.NewPointLightMesh() // Initialize mesh properly
 
@@ -72,7 +69,17 @@ func TestUnitMerge(t *testing.T) {
 		assert.Equal(t, expectedVelocity.X(), unit1.Velocity.X(), "La velocità X dovrebbe essere la media pesata")
 		assert.Equal(t, expectedVelocity.Y(), unit1.Velocity.Y(), "La velocità Y dovrebbe essere la media pesata")
 		assert.Equal(t, expectedVelocity.Z(), unit1.Velocity.Z(), "La velocità Z dovrebbe essere la media pesata")
+
+		// Verifica del volume e raggio
+		expectedVolume := unit1.GetVolume() + unit2.GetVolume()
+		expectedRadius := math.Pow((3.0*expectedVolume)/(4.0*math.Pi), 1.0/3.0)
+		assert.InDelta(t, expectedVolume, unit1.GetVolume(), 1e-10, "Il volume dovrebbe essere la somma dei volumi")
+		assert.InDelta(t, expectedRadius, unit1.GetRadius(), 1e-10, "Il raggio dovrebbe essere calcolato correttamente dal volume")
+
+		// Verifica dello stato dell'unità assorbita
 		assert.False(t, unit2.CanBeAltered(), "La seconda unità non dovrebbe essere alterabile dopo il merge")
+		assert.Equal(t, 0.0, unit2.GetMass(), "La massa della seconda unità dovrebbe essere azzerata")
+		assert.Equal(t, 0.0, unit2.GetVolume(), "Il volume della seconda unità dovrebbe essere azzerato")
 	})
 
 	// Test case 2: Merge con masse diverse
@@ -93,9 +100,7 @@ func TestUnitMerge(t *testing.T) {
 				BaseColor:            [3]float64{0.6, 0.6, 0.6},
 				Elasticity:           0.7,
 			}: 1.0}),
-			canBeAltered: true,
-			volume:       (4.0 / 3.0) * 3.14159 * 1.0, // Pre-calcola il volume
-			Mesh:         new(PointLightMesh),
+			Mesh: new(PointLightMesh),
 		}
 		unit1.NewPointLightMesh() // Initialize mesh properly
 
@@ -115,9 +120,7 @@ func TestUnitMerge(t *testing.T) {
 				BaseColor:            [3]float64{0.6, 0.6, 0.6},
 				Elasticity:           0.7,
 			}: 1.0}),
-			canBeAltered: true,
-			volume:       (4.0 / 3.0) * 3.14159 * 1.0, // Pre-calcola il volume
-			Mesh:         new(PointLightMesh),
+			Mesh: new(PointLightMesh),
 		}
 		unit2.NewPointLightMesh() // Initialize mesh properly
 
@@ -141,5 +144,96 @@ func TestUnitMerge(t *testing.T) {
 		assert.Equal(t, expectedVelocity.Y(), unit1.Velocity.Y(), "La velocità Y dovrebbe essere influenzata maggiormente dall'unità più pesante")
 		assert.Equal(t, expectedVelocity.Z(), unit1.Velocity.Z(), "La velocità Z dovrebbe essere influenzata maggiormente dall'unità più pesante")
 		assert.False(t, unit2.CanBeAltered(), "La seconda unità non dovrebbe essere alterabile dopo il merge")
+	})
+}
+
+func TestGravitationalAcceleration(t *testing.T) {
+	t.Run("Accelerazione vicino alla superficie terrestre", func(t *testing.T) {
+		// Parametri "Terra"
+		massEarth := EarthMass
+		radiusEarth := EarthRadius
+
+		// Crea "Terra"
+		earth := NewEarth(vector3.Zero[float64]())
+
+		// Crea "Sfera" di test
+		sphere := NewTestSphere(vector3.New(radiusEarth+100.0, 0.0, 0.0)) // 100 m sopra la superficie
+
+		// Simulazione semplificata: 10 step di 1 secondo
+		dt := 1.0
+		steps := 10
+
+		var finalAccel float64
+		for i := 0; i < steps; i++ {
+			// Calcola distanza e direzione
+			d := sphere.Position.Sub(earth.Position)
+			r := d.Length()
+			dir := d.Normalized()
+
+			// Forza gravitazionale
+			F := G * earth.Mass * sphere.Mass / (r * r)
+
+			// Accelerazione sulla sfera (F = m * a => a = F / m)
+			a := F / sphere.Mass
+			finalAccel = a // memorizziamo l'ultima accelerazione
+
+			// Log conciso dei valori principali
+			t.Logf("Step %d: dist=%.2f m, a=%.2f m/s², v=%.2f m/s",
+				i+1, r, a, sphere.Velocity.Length())
+
+			// Aggiorna velocità e posizione della sfera
+			// v(t+dt) = v(t) + a*dt
+			sphere.Velocity = sphere.Velocity.Add(dir.Scale(a * dt))
+			// x(t+dt) = x(t) + v(t+dt)*dt
+			sphere.Position = sphere.Position.Add(sphere.Velocity.Scale(dt))
+		}
+
+		// Calcolo dell'accelerazione teorica a r = (R_terra + 100 m)
+		expectedAccel := G * massEarth / math.Pow(radiusEarth+100.0, 2.0)
+		// Tolleranza relativa (es. 1%)
+		delta := 0.01 * expectedAccel
+
+		assert.InDelta(t, expectedAccel, finalAccel, delta,
+			"L'accelerazione dovrebbe essere vicina a G*M / (r^2)")
+	})
+
+	t.Run("Verifica 1/r^2 a distanza maggiore", func(t *testing.T) {
+		// Parametri "Terra"
+		massEarth := EarthMass
+		radiusEarth := EarthRadius
+
+		// Crea "Terra"
+		earth := NewEarth(vector3.Zero[float64]())
+
+		// Crea "Sfera" di test
+		startDistance := radiusEarth * 10.0 // 10 raggi terrestri di distanza
+		sphere := NewTestSphere(vector3.New(startDistance, 0.0, 0.0))
+
+		dt := 1.0
+		steps := 10
+		var finalAccel float64
+		for i := 0; i < steps; i++ {
+			d := sphere.Position.Sub(earth.Position)
+			r := d.Length()
+			dir := d.Normalized()
+
+			F := G * earth.Mass * sphere.Mass / (r * r)
+			a := F / sphere.Mass
+			finalAccel = a
+
+			// Log conciso dei valori principali
+			t.Logf("Step %d: dist=%.2f m, a=%.2f m/s², v=%.2f m/s",
+				i+1, r, a, sphere.Velocity.Length())
+
+			sphere.Velocity = sphere.Velocity.Add(dir.Scale(a * dt))
+			sphere.Position = sphere.Position.Add(sphere.Velocity.Scale(dt))
+		}
+
+		// Valore atteso a r = startDistance
+		expectedAccel := G * massEarth / math.Pow(startDistance, 2)
+		delta := 0.01 * expectedAccel
+
+		assert.InDelta(t, expectedAccel, finalAccel, delta,
+			"L'accelerazione dovrebbe seguire la legge ~1/r^2 anche a distanza maggiore")
 	})
 }

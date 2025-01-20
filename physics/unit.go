@@ -96,8 +96,8 @@ func (u *Unit) Merge(other collision.Collidable) {
 	// Calculate new radius based on total volume
 	newRadius := math.Pow((3.0*newVolume)/(4.0*math.Pi), 1.0/3.0)
 
-	// Keep the position of the absorbing unit instead of calculating average
-	newPosition := u.Position
+	// Calculate new position as mass-weighted average
+	newPosition := u.Position.Scale(u.Mass).Add(other.GetPosition().Scale(other.GetMass())).Scale(1.0 / newMass)
 
 	// Calculate resultant velocity based on conservation of momentum
 	// p = mv, total momentum = m1v1 + m2v2 = (m1+m2)v_final
