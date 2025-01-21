@@ -5,13 +5,16 @@ import (
 
 	"github.com/EliCDavis/vector/vector3"
 	"github.com/alexanderi96/go-fluid-simulator/physics/collision"
-	"github.com/alexanderi96/go-fluid-simulator/physics/gravity"
+	"github.com/alexanderi96/go-fluid-simulator/physics/constants"
 )
 
 func (s *Simulation) UpdateWithOctrees() error {
 	if len(s.Fluid) == 0 {
 		return nil
 	}
+
+	// Clean up merged units
+	s.cleanupMergedUnits()
 
 	s.updateOctree()
 	s.applyGravitationalForces()
@@ -20,6 +23,28 @@ func (s *Simulation) UpdateWithOctrees() error {
 	s.updatePositions()
 
 	return nil
+}
+
+// cleanupMergedUnits removes units that have been merged from the simulation
+func (s *Simulation) cleanupMergedUnits() {
+	// Create a new slice with the same capacity
+	newFluid := make([]*Unit, 0, len(s.Fluid))
+
+	// Only keep units that haven't been merged
+	for _, unit := range s.Fluid {
+		if unit != nil && !unit.isMerged {
+			newFluid = append(newFluid, unit)
+		} else if unit != nil && unit.isMerged {
+			// Clean up merged unit's resources
+			if unit.Mesh != nil {
+				s.Scene.Remove(unit.Mesh)
+				unit.Mesh = nil
+			}
+		}
+	}
+
+	// Update the Fluid slice
+	s.Fluid = newFluid
 }
 
 func (s *Simulation) updateOctree() {
@@ -68,6 +93,7 @@ func (s *Simulation) handleCollisions() {
 }
 
 func (s *Simulation) handleHeatTransfer() {
+	deltaTime := s.GetDeltaTime()
 	for _, unitA := range s.Fluid {
 		if unitA == nil || !unitA.CanBeAltered() {
 			continue
@@ -81,15 +107,16 @@ func (s *Simulation) handleHeatTransfer() {
 				continue
 			}
 
-			unitA.TransferHeatTo(unitB, s.Config.Frametime)
+			unitA.TransferHeatTo(unitB, deltaTime)
 		}
 	}
 }
 
 func (s *Simulation) updatePositions() {
+	deltaTime := s.GetDeltaTime()
 	for _, unit := range s.Fluid {
 		if unit != nil && unit.CanBeAltered() {
-			unit.UpdatePosition(s.Config.Frametime)
+			unit.UpdatePosition(deltaTime)
 		}
 	}
 }
@@ -144,7 +171,7 @@ func (ot *Octree) calculateLeafNodeGravity(g Gravitable, force *vector3.Vector[f
 
 			if distanceSquared > 0 {
 				// Pre-calculate common factors
-				forceMagnitude := gravity.UniversalGravitationalConstant * gMass * obj.GetMass() / distanceSquared
+				forceMagnitude := constants.G * gMass * obj.GetMass() / distanceSquared
 				invDistance := 1.0 / distanceSquared
 
 				// Calculate force components directly
@@ -164,7 +191,7 @@ func (ot *Octree) approximateGravityWithCenterOfMass(g Gravitable, force *vector
 
 	if distanceSquared > 0 {
 		// Pre-calculate force magnitude
-		forceMagnitude := gravity.UniversalGravitationalConstant * g.GetMass() * ot.TotalMass / distanceSquared
+		forceMagnitude := constants.G * g.GetMass() * ot.TotalMass / distanceSquared
 		invDistance := 1.0 / distanceSquared
 
 		// Calculate force components directly

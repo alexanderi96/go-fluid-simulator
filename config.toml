@@ -7,8 +7,6 @@
   should_be_profiled = true
   octree_max_level = 5
   max_unit_number_per_level = 1
-  show_octree = false
-  frametime = 0.001 # 0.01 s = 100 hz
   generate_world = false
   show_skybox = true
 
@@ -20,15 +18,15 @@
   apply_gravity = false
   gravity = -9.81
 
-  #central_mass = 100000000000
+  central_mass = 1e10
   
 # unit config
   unit_number = 500
-  unit_initial_spacing = 5
+  unit_initial_spacing = 0.2
   units_emit_gravity = true
   unit_gravitational_multiplier = 1
 
-  unit_radius = 1
+  unit_radius = 0.1
   set_random_radius = false
   radius_min = 0.1
   radius_max = 10

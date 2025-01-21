@@ -66,9 +66,14 @@ func TestUnitMerge(t *testing.T) {
 		assert.Equal(t, expectedPosition.X(), unit1.Position.X(), "La posizione X dovrebbe essere la media pesata")
 		assert.Equal(t, expectedPosition.Y(), unit1.Position.Y(), "La posizione Y dovrebbe essere la media pesata")
 		assert.Equal(t, expectedPosition.Z(), unit1.Position.Z(), "La posizione Z dovrebbe essere la media pesata")
-		assert.Equal(t, expectedVelocity.X(), unit1.Velocity.X(), "La velocità X dovrebbe essere la media pesata")
-		assert.Equal(t, expectedVelocity.Y(), unit1.Velocity.Y(), "La velocità Y dovrebbe essere la media pesata")
-		assert.Equal(t, expectedVelocity.Z(), unit1.Velocity.Z(), "La velocità Z dovrebbe essere la media pesata")
+		// Verify momentum conservation
+		initialMomentum := unit1.Mass*1.0 + unit2.Mass*(-1.0) // 10 - 10 = 0
+		finalMomentum := unit1.Mass * unit1.Velocity.X()      // 20 * 0 = 0
+		assert.InDelta(t, initialMomentum, finalMomentum, 1e-10, "Il momento dovrebbe essere conservato")
+
+		assert.Equal(t, expectedVelocity.X(), unit1.Velocity.X(), "La velocità finale dovrebbe conservare il momento")
+		assert.Equal(t, expectedVelocity.Y(), unit1.Velocity.Y(), "La velocità Y dovrebbe essere zero")
+		assert.Equal(t, expectedVelocity.Z(), unit1.Velocity.Z(), "La velocità Z dovrebbe essere zero")
 
 		// Verifica del volume e raggio
 		expectedVolume := unit1.GetVolume() + unit2.GetVolume()
@@ -132,7 +137,10 @@ func TestUnitMerge(t *testing.T) {
 		// La posizione dovrebbe essere più vicina all'unità più pesante
 		// (15 * 0 + 5 * 3) / 20 = 0.75
 		expectedPosition := vector3.New(0.75, 0.0, 0.0)
-		// (15 * 1 + 5 * -1) / 20 = 0.5
+		// Conservation of momentum: p1 + p2 = p_final
+		// (15 * 1) + (5 * -1) = 20 * v_final
+		// 15 - 5 = 20 * v_final
+		// v_final = 10/20 = 0.5
 		expectedVelocity := vector3.New(0.5, 0.0, 0.0)
 
 		// Verifica risultati
@@ -140,9 +148,14 @@ func TestUnitMerge(t *testing.T) {
 		assert.Equal(t, expectedPosition.X(), unit1.Position.X(), "La posizione X dovrebbe essere più vicina all'unità più pesante")
 		assert.Equal(t, expectedPosition.Y(), unit1.Position.Y(), "La posizione Y dovrebbe essere più vicina all'unità più pesante")
 		assert.Equal(t, expectedPosition.Z(), unit1.Position.Z(), "La posizione Z dovrebbe essere più vicina all'unità più pesante")
-		assert.Equal(t, expectedVelocity.X(), unit1.Velocity.X(), "La velocità X dovrebbe essere influenzata maggiormente dall'unità più pesante")
-		assert.Equal(t, expectedVelocity.Y(), unit1.Velocity.Y(), "La velocità Y dovrebbe essere influenzata maggiormente dall'unità più pesante")
-		assert.Equal(t, expectedVelocity.Z(), unit1.Velocity.Z(), "La velocità Z dovrebbe essere influenzata maggiormente dall'unità più pesante")
+		// Verify momentum conservation
+		initialMomentum := unit1.Mass*1.0 + unit2.Mass*(-1.0) // 15 - 5 = 10
+		finalMomentum := unit1.Mass * unit1.Velocity.X()      // 20 * 0.5 = 10
+		assert.InDelta(t, initialMomentum, finalMomentum, 1e-10, "Il momento dovrebbe essere conservato")
+
+		assert.Equal(t, expectedVelocity.X(), unit1.Velocity.X(), "La velocità finale dovrebbe conservare il momento")
+		assert.Equal(t, expectedVelocity.Y(), unit1.Velocity.Y(), "La velocità Y dovrebbe essere zero")
+		assert.Equal(t, expectedVelocity.Z(), unit1.Velocity.Z(), "La velocità Z dovrebbe essere zero")
 		assert.False(t, unit2.CanBeAltered(), "La seconda unità non dovrebbe essere alterabile dopo il merge")
 	})
 }

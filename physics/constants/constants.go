@@ -1,4 +1,4 @@
-package physics
+package constants
 
 // Costanti fisiche universali
 const (

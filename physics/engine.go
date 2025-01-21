@@ -5,8 +5,6 @@ import (
 	"math"
 	"math/rand"
 	"os"
-	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/EliCDavis/vector/vector2"
@@ -52,6 +50,7 @@ type Simulation struct {
 	Config  *config.Config
 	Octree  *Octree `json:"-"`
 
+	TimeScale            float64
 	IsPause              bool
 	Fly                  bool
 	InitialMousePosition vector2.Float64 `json:"-"`
@@ -71,6 +70,7 @@ type Simulation struct {
 		UnitLabel         *gui.Label
 		SimDurationLabel  *gui.Label
 		RealDurationLabel *gui.Label
+		TimeScaleLabel    *gui.Label
 		NavigationLabel   *gui.Label
 		ShipStatusLabel   *gui.Label
 		PositionLabel     *gui.Label
@@ -97,14 +97,16 @@ type Simulation struct {
 
 func NewSimulation(config *config.Config) (*Simulation, error) {
 	InitOctree(config)
+	InitOctree(config)
 
 	WorldCenter := vector3.New(0.0, 0.0, 0.0)
 	sim := &Simulation{
-		Fluid:   make([]*Unit, 0, config.UnitNumber),
-		Metrics: &metrics.Metrics{},
-		Config:  config,
-		IsPause: false,
-		Fly:     false,
+		Fluid:     make([]*Unit, 0, config.UnitNumber),
+		Metrics:   &metrics.Metrics{},
+		Config:    config,
+		TimeScale: 1.0,
+		IsPause:   false,
+		Fly:       false,
 		WorldBoundray: BoundingBox{
 			Min: vector3.New(-config.GameX/2, -config.GameY/2, -config.GameZ/2),
 			Max: vector3.New(config.GameX/2, config.GameY/2, config.GameZ/2),
@@ -122,7 +124,7 @@ func NewSimulation(config *config.Config) (*Simulation, error) {
 	sim.App.IWindow.(*window.GlfwWindow).SetTitle("Go Fluid Simulator")
 	sim.App.IWindow.(*window.GlfwWindow).SetSize(int(config.WindowWidth), int(config.WindowHeight))
 
-	sim.Octree = NewOctree(0, sim.WorldBoundray, sim.Scene, config.ShowOctree)
+	sim.Octree = NewOctree(0, sim.WorldBoundray, sim.Scene)
 
 	if config.CentralMass > 0 {
 		sim.Fluid = append(sim.Fluid, sim.newUnitWithPropertiesAtPosition(WorldCenter, static, static, 0.01, config.CentralMass, 0, false))
@@ -159,32 +161,6 @@ func (sim *Simulation) SaveSimulation(filePath string) error {
 }
 
 func LoadSimulation(filePath string) (*Simulation, error) {
-	// Check file extension
-	ext := strings.ToLower(filepath.Ext(filePath))
-	if ext == ".fss" {
-		// Create a new simulation with empty config
-		cfg := &config.Config{}
-		sim, err := NewSimulation(cfg)
-		if err != nil {
-			return nil, err
-		}
-
-		// Load FSS file
-		file, err := os.Open(filePath)
-		if err != nil {
-			return nil, err
-		}
-		defer file.Close()
-
-		// Parse and execute FSS file
-		err = sim.LoadFSSScene(file)
-		if err != nil {
-			return nil, err
-		}
-
-		return sim, nil
-	}
-
 	// Load JSON simulation file
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -203,8 +179,13 @@ func LoadSimulation(filePath string) (*Simulation, error) {
 }
 
 func (s *Simulation) Update() error {
-	s.Metrics.Update(s.Config.Frametime)
+	deltaTime := float64(time.Since(s.AppStartTime).Seconds()) - s.Metrics.SimDuration
+	s.Metrics.Update(deltaTime)
 	return s.UpdateWithOctrees()
+}
+
+func (s *Simulation) GetDeltaTime() float64 {
+	return (float64(time.Since(s.AppStartTime).Seconds()) - s.Metrics.SimDuration) * s.TimeScale
 }
 
 func (s *Simulation) newUnitWithPropertiesAtPosition(position, acceleration, velocity vector3.Vector[float64], radius float64, density float64, elasticity float64, canBeAltered bool) *Unit {
@@ -285,6 +266,26 @@ func (s *Simulation) ResetSimulation() {
 		s.Scene.Remove(unit.Mesh)
 	}
 	s.Fluid = []*Unit{}
+}
+
+// RemoveUnit removes a unit from the simulation and cleans up its resources
+func (s *Simulation) RemoveUnit(unit *Unit) {
+	// Remove from scene
+	if unit.Mesh != nil {
+		s.Scene.Remove(unit.Mesh)
+		unit.Mesh = nil
+	}
+
+	// Remove from Fluid array
+	for i, u := range s.Fluid {
+		if u.Id == unit.Id {
+			// Remove by swapping with last element and truncating
+			lastIdx := len(s.Fluid) - 1
+			s.Fluid[i] = s.Fluid[lastIdx]
+			s.Fluid = s.Fluid[:lastIdx]
+			break
+		}
+	}
 }
 
 func (s *Simulation) GiveRotationalVelocity(units []*Unit) {

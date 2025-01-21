@@ -9,7 +9,7 @@ import (
 
 	"github.com/EliCDavis/vector/vector3"
 	"github.com/alexanderi96/go-fluid-simulator/physics/collision"
-	"github.com/alexanderi96/go-fluid-simulator/physics/gravity"
+	"github.com/alexanderi96/go-fluid-simulator/physics/constants"
 	"github.com/alexanderi96/go-fluid-simulator/physics/material"
 	"github.com/g3n/engine/geometry"
 	"github.com/g3n/engine/graphic"
@@ -17,14 +17,6 @@ import (
 	g3nmat "github.com/g3n/engine/material"
 	"github.com/g3n/engine/math32"
 	"github.com/google/uuid"
-)
-
-const (
-	seg                     = 10
-	stefanBoltzmannConstant = 5.67e-8
-	ambientTemperature      = 20.0
-	maxHeatTransferDistance = 10.0
-	coolingRate             = 0.01 // Further reduced for more gradual cooling
 )
 
 var (
@@ -123,7 +115,7 @@ func (u *Unit) Merge(other collision.Collidable) {
 	// Update mesh geometry with new radius
 	if u.Mesh != nil {
 		// Create new sphere geometry with updated radius
-		geom := geometry.NewSphere(float64(u.Radius), seg, seg)
+		geom := geometry.NewSphere(float64(u.Radius), Segments, Segments)
 		// Get color from composition
 		baseColorRGB := u.Composition.GetColor()
 		baseColor := &math32.Color{
@@ -147,21 +139,14 @@ func (u *Unit) Merge(other collision.Collidable) {
 		u.NewPointLightMesh()
 	}
 
-	// Completely remove the other unit if it's a Unit type
+	// Mark the other unit as merged and clean up its visual representation
 	if otherUnit, ok := other.(*Unit); ok {
 		if otherUnit.Mesh != nil {
 			otherUnit.Mesh.SetVisible(false)
 			otherUnit.Mesh.Light = nil
-			otherUnit.Mesh = nil
 		}
-		// Mark as merged and disable the unit
 		otherUnit.isMerged = true
 		otherUnit.canBeAltered = false
-		otherUnit.Mass = 0
-		otherUnit.volume = 0
-		otherUnit.Velocity = vector3.Zero[float64]()
-		otherUnit.Acceleration = vector3.Zero[float64]()
-		otherUnit.Position = vector3.Zero[float64]()
 	}
 }
 
@@ -194,7 +179,7 @@ func (u *Unit) AddHeat(heat float64) {
 }
 
 func (u *Unit) TransferHeatTo(other *Unit, dt float64) {
-	if u.Heat <= ambientTemperature {
+	if u.Heat <= AmbientTemperature {
 		return
 	}
 
@@ -207,7 +192,7 @@ func (u *Unit) TransferHeatTo(other *Unit, dt float64) {
 	vec[2] = u.Position.Z() - other.Position.Z()
 
 	distanceSquared := vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2]
-	if distanceSquared > maxHeatTransferDistance*maxHeatTransferDistance {
+	if distanceSquared > MaxHeatTransferDistance*MaxHeatTransferDistance {
 		return
 	}
 
@@ -223,7 +208,7 @@ func (u *Unit) TransferHeatTo(other *Unit, dt float64) {
 	heatTransfer := conductivity * distanceFactor * tempDiff * dt
 	massRatio := math.Sqrt(other.Mass / u.Mass)
 	heatTransfer *= massRatio
-	heatTransfer = math.Min(heatTransfer, u.Heat-ambientTemperature)
+	heatTransfer = math.Min(heatTransfer, u.Heat-AmbientTemperature)
 
 	u.Heat -= heatTransfer
 	other.Heat += heatTransfer
@@ -239,7 +224,7 @@ func (u *Unit) NewPointLightMesh() {
 	}
 
 	u.Mesh = new(PointLightMesh)
-	geom := geometry.NewSphere(float64(u.Radius), seg, seg)
+	geom := geometry.NewSphere(float64(u.Radius), Segments, Segments)
 	mat := g3nmat.NewStandard(&baseColor)
 	u.Mesh.Mesh = graphic.NewMesh(geom, mat)
 	u.Mesh.Mesh.SetVisible(true)
@@ -294,11 +279,11 @@ func (u *Unit) UpdatePosition(dt float64) {
 
 	u.Mesh.SetPosition(float32(u.Position.X()), float32(u.Position.Y()), float32(u.Position.Z()))
 
-	if u.Heat > ambientTemperature {
-		cooldown := (u.Heat - ambientTemperature) * coolingRate * dt
-		u.Heat = math.Max(ambientTemperature, u.Heat-cooldown)
+	if u.Heat > AmbientTemperature {
+		cooldown := (u.Heat - AmbientTemperature) * CoolingRate * dt
+		u.Heat = math.Max(AmbientTemperature, u.Heat-cooldown)
 
-		normalizedTemp := math32.Clamp(float32((u.Heat-ambientTemperature)/50), 0, 1)
+		normalizedTemp := math32.Clamp(float32((u.Heat-AmbientTemperature)/50), 0, 1)
 		baseColorRGB := u.Composition.GetColor()
 		baseColor := math32.Color{
 			R: float32(baseColorRGB[0]),
@@ -321,11 +306,11 @@ func (u *Unit) UpdatePosition(dt float64) {
 		mat := u.Mesh.Mesh.GetMaterial(0).(*g3nmat.Standard)
 		mat.SetColor(&finalColor)
 
-		intensity := math32.Clamp(float32((u.Heat-ambientTemperature)/50), 0.1, 2.0)
+		intensity := math32.Clamp(float32((u.Heat-AmbientTemperature)/50), 0.1, 2.0)
 		u.Mesh.Light.SetColor(&finalColor)
 		u.Mesh.Light.SetIntensity(intensity)
 	} else {
-		u.Heat = ambientTemperature
+		u.Heat = AmbientTemperature
 		normalizedRadius := math32.Clamp(float32(u.Radius/5e3), 0, 1)
 		normalizedMass := math32.Clamp(float32(u.Mass/1e5), 0, 1)
 		normalizedElasticity := float32(u.elasticity)
@@ -399,7 +384,7 @@ func (unit *Unit) CheckAndResolveWallCollision(wallBounds BoundingBox, wallElast
 		// Reduced heat generation from collisions and scaled by mass
 		heatGenerated := 0.5 * unit.Mass * speed * speed * (1 - wallElasticity) * 0.001
 		// Scale heat increase based on current temperature to avoid spikes
-		heatIncrease := heatGenerated * (1.0 - (unit.Heat-ambientTemperature)/100.0)
+		heatIncrease := heatGenerated * (1.0 - (unit.Heat-AmbientTemperature)/100.0)
 		if heatIncrease > 0 {
 			unit.Heat += heatIncrease
 		}
@@ -425,12 +410,12 @@ func (u *Unit) orbit(target *Unit) error {
 	// Calculate actual distance between bodies
 	currentDistance := math.Sqrt(dir.X()*dir.X() + dir.Y()*dir.Y() + dir.Z()*dir.Z())
 
-	// Calculate orbital velocity using vis-viva equation
-	// v = sqrt(GM/r) where:
+	// Calculate orbital velocity for circular orbit
+	// v = sqrt(GM/(2r)) where:
 	// G = gravitational constant
 	// M = mass of the central body
 	// r = orbital radius
-	v := math.Sqrt((gravity.UniversalGravitationalConstant * target.Mass) / currentDistance)
+	v := math.Sqrt((constants.G * target.Mass) / (2 * currentDistance))
 
 	// For a circular orbit in the XZ plane, the velocity should be perpendicular to the radius vector
 	// and parallel to the XZ plane. Since the radius vector points from the Sun to Earth,

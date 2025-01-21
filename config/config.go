@@ -24,7 +24,6 @@ type Config struct {
 	WallElasticity        float64
 	ApplyGravity          bool
 	Gravity               float64
-	ShowOctree            bool
 	ShowTrail             bool
 	ShouldBeProfiled      bool
 	SetRandomRadius       bool
@@ -73,7 +72,6 @@ func ReadConfig(filepath string) (*Config, error) {
 		WallElasticity:        viper.GetFloat64("wall_elasticity"),
 		ApplyGravity:          viper.GetBool("apply_gravity"),
 		Gravity:               viper.GetFloat64("gravity"),
-		ShowOctree:            viper.GetBool("show_octree"),
 		ShowTrail:             viper.GetBool("show_trail"),
 		ShouldBeProfiled:      viper.GetBool("should_be_profiled"),
 		SetRandomRadius:       viper.GetBool("set_random_radius"),

@@ -3,10 +3,8 @@ package physics
 import (
 	"github.com/EliCDavis/vector/vector3"
 	"github.com/alexanderi96/go-fluid-simulator/config"
-	"github.com/alexanderi96/go-fluid-simulator/utils"
 
 	"github.com/g3n/engine/core"
-	"github.com/g3n/engine/geometry"
 	"github.com/g3n/engine/graphic"
 )
 
@@ -25,27 +23,17 @@ type Octree struct {
 	objects      []*Unit
 	Children     [8]*Octree
 	divided      bool
-	wf           *graphic.Lines
 	com          *graphic.Mesh
-	showWf       bool
 	CenterOfMass vector3.Vector[float64]
 	TotalMass    float64
 }
 
 // Octree crea un nuovo Octree.
-func NewOctree(level int8, bounds BoundingBox, scene *core.Node, showWf bool) *Octree {
-	wireframe := &graphic.Lines{}
-	if showWf {
-		wireframe = utils.GetBoundsLine(bounds.Min, bounds.Max)
-		wireframe.SetVisible(true)
-		scene.Add(wireframe)
-	}
+func NewOctree(level int8, bounds BoundingBox, scene *core.Node) *Octree {
 	return &Octree{
 		level:        level,
 		Bounds:       bounds,
 		divided:      false,
-		wf:           wireframe,
-		showWf:       showWf,
 		CenterOfMass: vector3.Zero[float64](),
 		TotalMass:    0,
 	}
@@ -56,10 +44,6 @@ func (ot *Octree) Clear(scene *core.Node) {
 	ot.objects = ot.objects[:0]
 	ot.TotalMass = 0
 	ot.CenterOfMass = vector3.Zero[float64]()
-	if ot.wf != nil {
-		scene.Remove(ot.wf)
-		ot.wf = nil
-	}
 	if ot.com != nil {
 		scene.Remove(ot.com)
 		ot.com = nil
@@ -104,7 +88,7 @@ func (ot *Octree) Split(scene *core.Node) {
 	}
 
 	for i := 0; i < 8; i++ {
-		ot.Children[i] = NewOctree(level, childrenBounds[i], scene, ot.showWf)
+		ot.Children[i] = NewOctree(level, childrenBounds[i], scene)
 	}
 
 	ot.divided = true
@@ -154,15 +138,6 @@ func (ot *Octree) updateMassAndCenterOfMass(obj *Unit, scene *core.Node) {
 		ot.CenterOfMass = ot.CenterOfMass.Scale(oldTotalMass).Add(massPosition.Scale(mass)).Scale(1 / ot.TotalMass)
 	}
 
-	if ot.showWf {
-		com := graphic.NewMesh(geometry.NewSphere(ot.TotalMass, seg, seg), overlapMat)
-		com.SetPosition(ot.CenterOfMass.ToFloat32().X(), ot.CenterOfMass.ToFloat32().Y(), ot.CenterOfMass.ToFloat32().Z())
-		scene.Add(com)
-		if ot.com != nil {
-			scene.Remove(ot.com)
-		}
-		ot.com = com
-	}
 }
 
 // getIndex determina in quale sotto-Octree un oggetto appartiene.

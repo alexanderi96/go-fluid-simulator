@@ -66,6 +66,11 @@ func SetupHUD(s *physics.Simulation) {
 	s.Hud.RealDurationLabel.SetColor(math32.NewColor("white"))
 	controlsPanel.Add(s.Hud.RealDurationLabel)
 
+	s.Hud.TimeScaleLabel = gui.NewLabel("Time Scale: 1x")
+	s.Hud.TimeScaleLabel.SetPosition(10, 110)
+	s.Hud.TimeScaleLabel.SetColor(math32.NewColor("white"))
+	controlsPanel.Add(s.Hud.TimeScaleLabel)
+
 	// Key controls info (bottom left)
 	keysPanel := gui.NewPanel(200, 160)
 	keysPanel.SetBorders(1, 1, 1, 1)
@@ -146,6 +151,7 @@ func UpdateHUD(s *physics.Simulation, deltaTime time.Duration) {
 	s.Hud.UnitLabel.SetText(fmt.Sprintf("Units: %d", len(s.Fluid)))
 	s.Hud.SimDurationLabel.SetText(fmt.Sprintf("Sim duration: %.1f", s.Metrics.SimDuration))
 	s.Hud.RealDurationLabel.SetText(fmt.Sprintf("Real duration: %.1f", -time.Until(s.AppStartTime).Seconds()))
+	s.Hud.TimeScaleLabel.SetText(fmt.Sprintf("Time Scale: %.0fx", s.TimeScale))
 
 	// Update navigation mode and ship status
 	if s.Fly {

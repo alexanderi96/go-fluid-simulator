@@ -199,6 +199,15 @@ func main() {
 			if kev.Key == window.KeySpace {
 				s.IsPause = !s.IsPause
 			}
+			if kev.Key == window.KeyEqual && kev.Mods == window.ModShift { // + key
+				s.TimeScale *= 10
+			}
+			if kev.Key == window.KeyMinus { // - key
+				s.TimeScale /= 10
+				if s.TimeScale < 1 {
+					s.TimeScale = 1
+				}
+			}
 			if kev.Key == window.KeyS {
 				s.SaveSimulation("simulation" + time.Now().Format("2006-01-02 15:04:05") + ".json")
 			}

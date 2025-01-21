@@ -9,6 +9,7 @@ import (
 
 	"github.com/EliCDavis/vector/vector3"
 	"github.com/alexanderi96/go-fluid-simulator/physics/material"
+	"github.com/google/uuid"
 )
 
 // FSS represents a Fluid Simulator Scene file
@@ -71,6 +72,9 @@ func (s *Simulation) LoadFSSScene(reader io.Reader) error {
 			return fmt.Errorf("error executing command: %v", err)
 		}
 	}
+
+	// Initialize octree with loaded units
+	s.updateOctree()
 
 	return nil
 }
@@ -205,6 +209,7 @@ func (s *Simulation) createFSSUnit(def *UnitDefinition) *Unit {
 	})
 
 	unit := &Unit{
+		Id:           uuid.New(),
 		Position:     pos,
 		Velocity:     vel,
 		Acceleration: acc,
@@ -212,6 +217,7 @@ func (s *Simulation) createFSSUnit(def *UnitDefinition) *Unit {
 		Mass:         def.Mass,
 		Composition:  comp,
 		Heat:         0.0,
+		canBeAltered: true,
 	}
 
 	unit.NewPointLightMesh()

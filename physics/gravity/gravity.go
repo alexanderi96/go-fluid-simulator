@@ -2,10 +2,8 @@ package gravity
 
 import (
 	"github.com/EliCDavis/vector/vector3"
+	"github.com/alexanderi96/go-fluid-simulator/physics/constants"
 )
-
-// UniversalGravitationalConstant is G in m^3 kg^-1 s^-2
-const UniversalGravitationalConstant = 6.67430e-1
 
 // Gravitable defines objects affected by gravity
 type Gravitable interface {
@@ -38,7 +36,7 @@ func CalculateForce(a, b Gravitable) vector3.Vector[float64] {
 
 	// Pre-calculate mass product and constant
 	massProduct := a.GetMass() * b.GetMass()
-	forceMagnitude := UniversalGravitationalConstant * massProduct / distanceSquared
+	forceMagnitude := constants.G * massProduct / distanceSquared
 
 	// Avoid normalization by dividing by distance directly
 	invDistance := 1.0 / distanceSquared
