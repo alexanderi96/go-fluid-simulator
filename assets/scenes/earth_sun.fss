@@ -15,4 +15,4 @@ Earth {
 }
 
 # Setup Earth's orbit around the Sun
-Earth.orbit(Sun, 20)
+Earth.orbit(Sun)

@@ -14,14 +14,13 @@ func NewTestSphere(position vector3.Vector[float64]) *Unit {
 	radius := math.Pow((3.0 / (4.0 * math.Pi)), 1.0/3.0)
 
 	sphere := &Unit{
-		Id:             uuid.New(),
-		Position:       position,
-		Velocity:       vector3.Zero[float64](),
-		Mass:           1.0, // 1 kg
-		Radius:         radius,
-		MassMultiplier: 1.0,
-		Acceleration:   vector3.Zero[float64](),
-		Heat:           20.0, // Temperatura ambiente di default
+		Id:           uuid.New(),
+		Position:     position,
+		Velocity:     vector3.Zero[float64](),
+		Mass:         1.0, // 1 kg
+		Radius:       radius,
+		Acceleration: vector3.Zero[float64](),
+		Heat:         20.0, // Temperatura ambiente di default
 		Composition: material.NewComposition(map[*material.Material]float64{
 			&material.Material{
 				Name:                 "Test Material",
@@ -42,14 +41,13 @@ func NewTestSphere(position vector3.Vector[float64]) *Unit {
 // NewEarth crea una nuova istanza della Terra con le proprietà standard
 func NewEarth(position vector3.Vector[float64]) *Unit {
 	earth := &Unit{
-		Id:             uuid.New(),
-		Position:       position,
-		Velocity:       vector3.Zero[float64](),
-		Mass:           EarthMass,
-		Radius:         EarthRadius,
-		MassMultiplier: 1.0,
-		Acceleration:   vector3.Zero[float64](),
-		Heat:           20.0, // Temperatura ambiente di default
+		Id:           uuid.New(),
+		Position:     position,
+		Velocity:     vector3.Zero[float64](),
+		Mass:         EarthMass,
+		Radius:       EarthRadius,
+		Acceleration: vector3.Zero[float64](),
+		Heat:         20.0, // Temperatura ambiente di default
 		Composition: material.NewComposition(map[*material.Material]float64{
 			&material.Material{
 				Name:                 "Earth",
@@ -70,14 +68,13 @@ func NewEarth(position vector3.Vector[float64]) *Unit {
 // NewMoon crea una nuova istanza della Luna con le proprietà standard
 func NewMoon(position vector3.Vector[float64]) *Unit {
 	moon := &Unit{
-		Id:             uuid.New(),
-		Position:       position,
-		Velocity:       vector3.Zero[float64](),
-		Mass:           MoonMass,
-		Radius:         MoonRadius,
-		MassMultiplier: 1.0,
-		Acceleration:   vector3.Zero[float64](),
-		Heat:           20.0, // Temperatura ambiente di default
+		Id:           uuid.New(),
+		Position:     position,
+		Velocity:     vector3.Zero[float64](),
+		Mass:         MoonMass,
+		Radius:       MoonRadius,
+		Acceleration: vector3.Zero[float64](),
+		Heat:         20.0, // Temperatura ambiente di default
 		Composition: material.NewComposition(map[*material.Material]float64{
 			&material.Material{
 				Name:                 "Moon",
@@ -98,14 +95,13 @@ func NewMoon(position vector3.Vector[float64]) *Unit {
 // NewSun crea una nuova istanza del Sole con le proprietà standard
 func NewSun(position vector3.Vector[float64]) *Unit {
 	sun := &Unit{
-		Id:             uuid.New(),
-		Position:       position,
-		Velocity:       vector3.Zero[float64](),
-		Mass:           SunMass,
-		Radius:         SunRadius,
-		MassMultiplier: 1.0,
-		Acceleration:   vector3.Zero[float64](),
-		Heat:           20.0, // Temperatura ambiente di default
+		Id:           uuid.New(),
+		Position:     position,
+		Velocity:     vector3.Zero[float64](),
+		Mass:         SunMass,
+		Radius:       SunRadius,
+		Acceleration: vector3.Zero[float64](),
+		Heat:         20.0, // Temperatura ambiente di default
 		Composition: material.NewComposition(map[*material.Material]float64{
 			&material.Material{
 				Name:                 "Sun",

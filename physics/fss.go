@@ -4,11 +4,10 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"math"
+	"log"
 	"strings"
 
 	"github.com/EliCDavis/vector/vector3"
-	"github.com/alexanderi96/go-fluid-simulator/physics/gravity"
 	"github.com/alexanderi96/go-fluid-simulator/physics/material"
 )
 
@@ -199,21 +198,20 @@ func (s *Simulation) createFSSUnit(def *UnitDefinition) *Unit {
 	pos := vector3.New(def.Position[0], def.Position[1], def.Position[2])
 	vel := vector3.New(def.Velocity[0], def.Velocity[1], def.Velocity[2])
 	acc := vector3.Zero[float64]()
-
+	log.Print("unit at position: ", pos)
 	// Create unit with Iron as default material
 	comp := material.NewComposition(map[*material.Material]float64{
 		&material.Iron: 1.0,
 	})
 
 	unit := &Unit{
-		Position:       pos,
-		Velocity:       vel,
-		Acceleration:   acc,
-		Radius:         def.Radius,
-		Mass:           def.Mass,
-		Composition:    comp,
-		MassMultiplier: s.Config.UnitMassMultiplier,
-		Heat:           0.0,
+		Position:     pos,
+		Velocity:     vel,
+		Acceleration: acc,
+		Radius:       def.Radius,
+		Mass:         def.Mass,
+		Composition:  comp,
+		Heat:         0.0,
 	}
 
 	unit.NewPointLightMesh()
@@ -224,64 +222,8 @@ func (s *Simulation) createFSSUnit(def *UnitDefinition) *Unit {
 func (s *Simulation) executeFSSCommand(unit *Unit, target *Unit, cmd Command) error {
 	switch cmd.Action {
 	case "orbit":
-		if len(cmd.Params) != 1 {
-			return fmt.Errorf("orbit command requires 1 parameter (distance)")
-		}
-		return s.setupOrbit(unit, target, cmd.Params[0])
+		return unit.orbit(target)
 	default:
 		return fmt.Errorf("unknown command: %s", cmd.Action)
 	}
-}
-
-// setupOrbit calculates and sets the velocity needed for orbit
-func (s *Simulation) setupOrbit(unit *Unit, target *Unit, distance float64) error {
-	// Get current position vectors
-	pos1 := unit.Position
-	pos2 := target.Position
-
-	// Calculate direction vector from target to unit
-	dir := pos1.Sub(pos2)
-
-	// Check if units are at the same position
-	if dir.X() == 0 && dir.Y() == 0 && dir.Z() == 0 {
-		return fmt.Errorf("units cannot be at the same position for orbit")
-	}
-
-	// Calculate direction length
-	dirLength := math.Sqrt(dir.X()*dir.X() + dir.Y()*dir.Y() + dir.Z()*dir.Z())
-
-	// Normalize and scale to desired distance
-	dir = vector3.New(
-		dir.X()*distance/dirLength,
-		dir.Y()*distance/dirLength,
-		dir.Z()*distance/dirLength,
-	)
-
-	// Move unit to correct distance
-	unit.SetPosition(pos2.Add(dir))
-
-	// Calculate orbital velocity using vis-viva equation
-	// v = sqrt(GM/r) where:
-	// G = gravitational constant
-	// M = mass of the central body
-	// r = orbital radius (distance)
-	v := math.Sqrt((gravity.UniversalGravitationalConstant * target.Mass) / distance)
-
-	// Calculate normalized direction vector
-	dirLength = math.Sqrt(dir.X()*dir.X() + dir.Y()*dir.Y() + dir.Z()*dir.Z())
-	normalizedDir := vector3.New(
-		dir.X()/dirLength,
-		dir.Y()/dirLength,
-		dir.Z()/dirLength,
-	)
-
-	// Calculate orbital velocity vector (perpendicular to radius vector)
-	// For a circular orbit in the XZ plane, we can use cross product with Y axis
-	up := vector3.New(0.0, 1.0, 0.0)
-	velDir := normalizedDir.Cross(up)
-
-	// Set the orbital velocity
-	unit.SetVelocity(velDir.Scale(v))
-
-	return nil
 }

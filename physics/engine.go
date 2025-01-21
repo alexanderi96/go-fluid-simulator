@@ -214,15 +214,14 @@ func (s *Simulation) newUnitWithPropertiesAtPosition(position, acceleration, vel
 	})
 
 	unit := &Unit{
-		Id:             uuid.New(),
-		Position:       position,
-		Velocity:       velocity,
-		Acceleration:   acceleration,
-		Radius:         radius,
-		Composition:    comp,
-		Heat:           0.0,
-		canBeAltered:   canBeAltered,
-		MassMultiplier: s.Config.UnitMassMultiplier,
+		Id:           uuid.New(),
+		Position:     position,
+		Velocity:     velocity,
+		Acceleration: acceleration,
+		Radius:       radius,
+		Composition:  comp,
+		Heat:         0.0,
+		canBeAltered: canBeAltered,
 	}
 
 	unit.NewPointLightMesh()
@@ -232,7 +231,7 @@ func (s *Simulation) newUnitWithPropertiesAtPosition(position, acceleration, vel
 }
 
 func (s *Simulation) GetUnits() []*Unit {
-	currentRadius := s.Config.UnitRadius * s.Config.UnitRadiusMultiplier
+	currentRadius := s.Config.UnitRadius
 
 	// Array of available materials
 	materials := []*material.Material{&material.Iron, &material.Copper, &material.Ice}
@@ -241,7 +240,7 @@ func (s *Simulation) GetUnits() []*Unit {
 
 	for i := 0; i < int(s.Config.UnitNumber); i++ {
 		if s.Config.SetRandomRadius {
-			currentRadius = (s.Config.RadiusMin + rand.Float64()*(s.Config.RadiusMax-s.Config.RadiusMin)) * s.Config.UnitRadiusMultiplier
+			currentRadius = s.Config.RadiusMin + rand.Float64()*(s.Config.RadiusMax-s.Config.RadiusMin)
 		}
 
 		// Select a random material
@@ -254,15 +253,14 @@ func (s *Simulation) GetUnits() []*Unit {
 
 		// Create unit with the random material composition
 		unit := &Unit{
-			Id:             uuid.New(),
-			Position:       s.FinalSpawnPosition,
-			Velocity:       static,
-			Acceleration:   static,
-			Radius:         currentRadius,
-			Composition:    comp,
-			Heat:           0.0,
-			canBeAltered:   true,
-			MassMultiplier: s.Config.UnitMassMultiplier,
+			Id:           uuid.New(),
+			Position:     s.FinalSpawnPosition,
+			Velocity:     static,
+			Acceleration: static,
+			Radius:       currentRadius,
+			Composition:  comp,
+			Heat:         0.0,
+			canBeAltered: true,
 		}
 
 		unit.NewPointLightMesh()
@@ -273,7 +271,7 @@ func (s *Simulation) GetUnits() []*Unit {
 }
 
 func (s *Simulation) PositionNewUnitsCube(units []*Unit) {
-	positionUnitsCuboidally(units, s.InitialSpawnPosition, s.Config.UnitInitialSpacing*s.Config.UnitRadiusMultiplier)
+	positionUnitsCuboidally(units, s.InitialSpawnPosition, s.Config.UnitInitialSpacing)
 }
 
 func (s *Simulation) PositionNewUnitsFibonacci(units []*Unit) {

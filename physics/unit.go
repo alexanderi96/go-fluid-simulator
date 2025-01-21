@@ -1,12 +1,15 @@
 package physics
 
 import (
+	"fmt"
 	"image/color"
+	"log"
 	"math"
 	"sync"
 
 	"github.com/EliCDavis/vector/vector3"
 	"github.com/alexanderi96/go-fluid-simulator/physics/collision"
+	"github.com/alexanderi96/go-fluid-simulator/physics/gravity"
 	"github.com/alexanderi96/go-fluid-simulator/physics/material"
 	"github.com/g3n/engine/geometry"
 	"github.com/g3n/engine/graphic"
@@ -44,13 +47,12 @@ type Unit struct {
 	Velocity     vector3.Vector[float64]
 	Acceleration vector3.Vector[float64]
 
-	Composition    *material.Composition
-	Radius         float64
-	Mass           float64
-	MassMultiplier float64
-	Color          color.RGBA
-	canBeAltered   bool
-	isMerged       bool // Track if this unit has been merged into another
+	Composition  *material.Composition
+	Radius       float64
+	Mass         float64
+	Color        color.RGBA
+	canBeAltered bool
+	isMerged     bool // Track if this unit has been merged into another
 
 	Heat            float64
 	HeatTransferred float64
@@ -254,7 +256,7 @@ func (u *Unit) NewPointLightMesh() {
 	density, specificHeat, thermalConductivity, emissivity, elasticity := u.Composition.GetEffectiveProperties()
 	// Only calculate mass if it hasn't been set (i.e., not during merge)
 	if u.Mass == 0 {
-		u.Mass = u.volume * density * u.MassMultiplier
+		u.Mass = u.volume * density
 	}
 	u.specificHeatCapacity = specificHeat
 	u.thermalConductivity = thermalConductivity
@@ -280,6 +282,7 @@ func (u *Unit) ApplyForce(f vector3.Vector[float64]) {
 }
 
 func (u *Unit) UpdatePosition(dt float64) {
+	log.Print("unit mass:", u.Mass, " position: ", u.Position)
 	// Update position and velocity using Verlet integration
 	halfDtSq := 0.5 * dt * dt
 	newPos := u.Position.Add(u.Velocity.Scale(dt)).Add(u.Acceleration.Scale(halfDtSq))
@@ -403,6 +406,46 @@ func (unit *Unit) CheckAndResolveWallCollision(wallBounds BoundingBox, wallElast
 	}
 
 	return collided
+}
+
+// orbit calculates and sets the velocity needed for orbit around another unit
+func (u *Unit) orbit(target *Unit) error {
+	// Get current position vectors
+	pos1 := u.Position
+	pos2 := target.Position
+
+	// Calculate direction vector from target to unit
+	dir := pos1.Sub(pos2)
+
+	// Check if units are at the same position
+	if dir.X() == 0 && dir.Y() == 0 && dir.Z() == 0 {
+		return fmt.Errorf("units cannot be at the same position for orbit")
+	}
+
+	// Calculate actual distance between bodies
+	currentDistance := math.Sqrt(dir.X()*dir.X() + dir.Y()*dir.Y() + dir.Z()*dir.Z())
+
+	// Calculate orbital velocity using vis-viva equation
+	// v = sqrt(GM/r) where:
+	// G = gravitational constant
+	// M = mass of the central body
+	// r = orbital radius
+	v := math.Sqrt((gravity.UniversalGravitationalConstant * target.Mass) / currentDistance)
+
+	// For a circular orbit in the XZ plane, the velocity should be perpendicular to the radius vector
+	// and parallel to the XZ plane. Since the radius vector points from the Sun to Earth,
+	// we want the velocity vector to be perpendicular to it in the XZ plane.
+
+	// The velocity vector should be perpendicular to the radius vector in the XZ plane
+	// If radius vector is (x,0,z), then velocity should be (-z,0,x) normalized
+	velDir := vector3.New(-dir.Z(), 0, dir.X())
+	velMag := math.Sqrt(velDir.X()*velDir.X() + velDir.Z()*velDir.Z())
+	velDir = velDir.Scale(1.0 / velMag)
+
+	// Set the orbital velocity
+	u.SetVelocity(velDir.Scale(v))
+
+	return nil
 }
 
 func (u *Unit) GiveMassAndCenterOfMassForBounds(bounds BoundingBox) (vector3.Vector[float64], float64) {

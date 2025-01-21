@@ -24,6 +24,7 @@ import (
 
 var (
 	s            *physics.Simulation
+	fileSelector *draw.FileSelect
 	ambientLight = &math32.Color{R: 0.3, G: 0.3, B: 0.4} // Adjusted for medium galaxy intensity with slight blue tint
 	bgColor      = &math32.Color{R: 0.01, G: 0.01, B: 0.01}
 )
@@ -53,7 +54,7 @@ func init() {
 	camera.NewOrbitControl(s.Cam)
 
 	// Create and add an axis helper to the scene
-	s.Scene.Add(helper.NewAxes(10 * float32(s.Config.UnitRadiusMultiplier)))
+	s.Scene.Add(helper.NewAxes(10))
 
 	// Set up callback to update viewport and camera aspect ratio when the window is resized
 	onResize := func(evname string, ev interface{}) {
@@ -64,6 +65,23 @@ func init() {
 		s.Cam.SetAspect(float32(width) / float32(height))
 	}
 	s.App.Subscribe(window.OnWindowSize, onResize)
+
+	// Create file selector
+	fileSelector, err = draw.NewFileSelect(400, 300, func(path string) error {
+		s.ResetSimulation()
+		file, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+
+		return s.LoadFSSScene(file)
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	s.Scene.Add(fileSelector)
+	fileSelector.SetPath("assets/scenes")
 
 	draw.SetupHUD(s)
 	onResize("", nil)
@@ -185,23 +203,7 @@ func main() {
 				s.SaveSimulation("simulation" + time.Now().Format("2006-01-02 15:04:05") + ".json")
 			}
 			if kev.Key == window.KeyL {
-
-				sim, err := physics.LoadSimulation("simulation.json")
-				if err != nil {
-					log.Fatal(err)
-				}
-				s.ResetSimulation()
-
-				s.Fluid = sim.Fluid
-
-				for _, unit := range s.Fluid {
-					unit.NewPointLightMesh()
-					s.Scene.Add(unit.Mesh)
-				}
-				s.Config = sim.Config
-				s.IsPause = sim.IsPause
-				s.WorldBoundray = sim.WorldBoundray
-				s.WorldCenter = sim.WorldCenter
+				fileSelector.Show(true)
 			}
 		}
 	})
