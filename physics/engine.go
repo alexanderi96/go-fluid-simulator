@@ -5,6 +5,8 @@ import (
 	"math"
 	"math/rand"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/EliCDavis/vector/vector2"
@@ -157,6 +159,33 @@ func (sim *Simulation) SaveSimulation(filePath string) error {
 }
 
 func LoadSimulation(filePath string) (*Simulation, error) {
+	// Check file extension
+	ext := strings.ToLower(filepath.Ext(filePath))
+	if ext == ".fss" {
+		// Create a new simulation with empty config
+		cfg := &config.Config{}
+		sim, err := NewSimulation(cfg)
+		if err != nil {
+			return nil, err
+		}
+
+		// Load FSS file
+		file, err := os.Open(filePath)
+		if err != nil {
+			return nil, err
+		}
+		defer file.Close()
+
+		// Parse and execute FSS file
+		err = sim.LoadFSSScene(file)
+		if err != nil {
+			return nil, err
+		}
+
+		return sim, nil
+	}
+
+	// Load JSON simulation file
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, err

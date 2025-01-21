@@ -1,0 +1,18 @@
+# Simple Earth-Sun system
+
+Sun {
+  Position: 0.0, 0.0, 0.0
+  Velocity: 0.0, 0.0, 0.0
+  Mass: 1000.0
+  Radius: 5.0
+}
+
+Earth {
+  Position: 20.0, 0.0, 0.0
+  Velocity: 0.0, 0.0, 0.0
+  Mass: 1.0
+  Radius: 1.0
+}
+
+# Setup Earth's orbit around the Sun
+Earth.orbit(Sun, 20)
