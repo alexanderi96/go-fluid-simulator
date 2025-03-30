@@ -114,7 +114,7 @@ func (ot *Octree) Insert(obj *Unit, scene *core.Node) {
 }
 
 func (ot *Octree) insertUnitIntoChildren(obj *Unit, scene *core.Node) {
-	indices := ot.getIndices(obj.Position, obj.Radius)
+	indices := ot.getIndices(obj.Position(), obj.Radius())
 	inserted := false
 	for _, index := range indices {
 		if index != -1 {
@@ -129,8 +129,9 @@ func (ot *Octree) insertUnitIntoChildren(obj *Unit, scene *core.Node) {
 
 func (ot *Octree) updateMassAndCenterOfMass(obj *Unit, scene *core.Node) {
 	oldTotalMass := ot.TotalMass
-	ot.TotalMass += obj.Mass
-	massPosition, mass := obj.Position, obj.Mass
+	mass := obj.Mass()
+	ot.TotalMass += mass
+	massPosition := obj.Position()
 
 	if oldTotalMass == 0 {
 		ot.CenterOfMass = massPosition
@@ -165,7 +166,7 @@ func (ot *Octree) getIndices(position vector3.Vector[float64], radius float64) [
 
 // Retrieve restituisce tutti gli oggetti che potrebbero collidere con l'oggetto dato.
 func (ot *Octree) Retrieve(returnObjects *[]*Unit, obj *Unit) {
-	indices := ot.getIndices(obj.Position, obj.Radius)
+	indices := ot.getIndices(obj.Position(), obj.Radius())
 	for _, index := range indices {
 		if index != -1 && ot.Children[index] != nil {
 			ot.Children[index].Retrieve(returnObjects, obj)

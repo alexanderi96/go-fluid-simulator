@@ -32,11 +32,14 @@ type CollisionData struct {
 
 // Collidable defines the interface for objects that can collide
 type Collidable interface {
-	GetPosition() vector3.Vector[float64]
-	GetVelocity() vector3.Vector[float64]
-	GetRadius() float64
-	GetMass() float64
-	GetElasticity() float64
+	// Campi pubblici accessibili direttamente
+	Position() vector3.Vector[float64]
+	Velocity() vector3.Vector[float64]
+	Radius() float64
+	Mass() float64
+	Elasticity() float64
+
+	// Metodi che contengono logica
 	SetPosition(pos vector3.Vector[float64])
 	SetVelocity(vel vector3.Vector[float64])
 	AddHeat(heat float64)
@@ -52,8 +55,8 @@ func GatherCollisionData(uA, uB Collidable) *CollisionData {
 	defer vectorPool.Put(vec)
 
 	// Calculate distance using components to avoid vector allocation
-	posA := uA.GetPosition()
-	posB := uB.GetPosition()
+	posA := uA.Position()
+	posB := uB.Position()
 	vec[0] = posA.X() - posB.X()
 	vec[1] = posA.Y() - posB.Y()
 	vec[2] = posA.Z() - posB.Z()
@@ -61,17 +64,17 @@ func GatherCollisionData(uA, uB Collidable) *CollisionData {
 	distanceSquared := vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2]
 	distance := math.Sqrt(distanceSquared)
 
-	totalRadius := uA.GetRadius() + uB.GetRadius()
+	totalRadius := uA.Radius() + uB.Radius()
 
 	collData.UnitA = uA
 	collData.UnitB = uB
 	collData.Distance = distance
 	collData.TotalRadius = totalRadius
-	collData.TotalMass = uA.GetMass() + uB.GetMass()
+	collData.TotalMass = uA.Mass() + uB.Mass()
 	collData.Collided = distance < totalRadius
 
 	if collData.Collided {
-		collData.Elasticity = math.Min(uA.GetElasticity(), uB.GetElasticity())
+		collData.Elasticity = math.Min(uA.Elasticity(), uB.Elasticity())
 
 		// Calculate impulse direction without vector allocation
 		invDistance := 1.0 / distance
@@ -82,8 +85,8 @@ func GatherCollisionData(uA, uB Collidable) *CollisionData {
 		)
 
 		// Calculate relative velocity components directly
-		velA := uA.GetVelocity()
-		velB := uB.GetVelocity()
+		velA := uA.Velocity()
+		velB := uB.Velocity()
 		vec[0] = velA.X() - velB.X()
 		vec[1] = velA.Y() - velB.Y()
 		vec[2] = velA.Z() - velB.Z()
@@ -104,8 +107,8 @@ func ResolveCollision(collData *CollisionData) {
 
 	// Check if units can merge
 	if collData.UnitA.CanBeAltered() && collData.UnitB.CanBeAltered() {
-		massA := collData.UnitA.GetMass()
-		massB := collData.UnitB.GetMass()
+		massA := collData.UnitA.Mass()
+		massB := collData.UnitB.Mass()
 
 		if massA > massB {
 			collData.UnitA.Merge(collData.UnitB)
@@ -119,7 +122,7 @@ func ResolveCollision(collData *CollisionData) {
 	// If units cannot merge or have equal mass, proceed with normal collision
 	// Calculate impulse magnitude
 	impulseMag := -(1 + collData.Elasticity) * collData.RelVelNormal
-	impulseMag /= (1/collData.UnitA.GetMass() + 1/collData.UnitB.GetMass())
+	impulseMag /= (1/collData.UnitA.Mass() + 1/collData.UnitB.Mass())
 
 	// Get impulse components
 	vec := vectorPool.Get().([]float64)
@@ -130,11 +133,11 @@ func ResolveCollision(collData *CollisionData) {
 	vec[2] = collData.ImpulseDirection.Z() * impulseMag
 
 	// Calculate new velocities directly
-	massInvA := 1 / collData.UnitA.GetMass()
-	massInvB := 1 / collData.UnitB.GetMass()
+	massInvA := 1 / collData.UnitA.Mass()
+	massInvB := 1 / collData.UnitB.Mass()
 
-	velA := collData.UnitA.GetVelocity()
-	velB := collData.UnitB.GetVelocity()
+	velA := collData.UnitA.Velocity()
+	velB := collData.UnitB.Velocity()
 
 	newVelA := vector3.New(
 		velA.X()+vec[0]*massInvA,
@@ -154,12 +157,12 @@ func ResolveCollision(collData *CollisionData) {
 	// Resolve position overlap
 	overlap := collData.TotalRadius - collData.Distance
 	if overlap > 0 {
-		moveRatioA := collData.UnitB.GetMass() / collData.TotalMass
-		moveRatioB := collData.UnitA.GetMass() / collData.TotalMass
+		moveRatioA := collData.UnitB.Mass() / collData.TotalMass
+		moveRatioB := collData.UnitA.Mass() / collData.TotalMass
 
 		// Calculate position corrections directly
-		posA := collData.UnitA.GetPosition()
-		posB := collData.UnitB.GetPosition()
+		posA := collData.UnitA.Position()
+		posB := collData.UnitB.Position()
 
 		moveA := overlap * moveRatioA
 		moveB := overlap * moveRatioB
@@ -184,8 +187,8 @@ func ResolveCollision(collData *CollisionData) {
 		heatTransfer := relativeSpeed * relativeSpeed * 0.01 // Reduced heat generation factor
 
 		if heatTransfer > 0.01 {
-			elasticityLossA := 1.0 - collData.UnitA.GetElasticity()
-			elasticityLossB := 1.0 - collData.UnitB.GetElasticity()
+			elasticityLossA := 1.0 - collData.UnitA.Elasticity()
+			elasticityLossB := 1.0 - collData.UnitB.Elasticity()
 
 			if elasticityLossA > 0.01 {
 				collData.UnitA.AddHeat(heatTransfer * elasticityLossA)

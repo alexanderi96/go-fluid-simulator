@@ -15,11 +15,11 @@ func TestUnitMerge(t *testing.T) {
 	t.Run("Merge con unità di uguale massa", func(t *testing.T) {
 		// Crea prima unità
 		unit1 := &Unit{
-			Id:       uuid.New(),
-			Position: vector3.New(0.0, 0.0, 0.0),
-			Velocity: vector3.New(1.0, 0.0, 0.0),
-			Mass:     10.0,
-			Radius:   1.0,
+			Id:        uuid.New(),
+			_position: vector3.New(0.0, 0.0, 0.0),
+			_velocity: vector3.New(1.0, 0.0, 0.0),
+			_mass:     10.0,
+			_radius:   1.0,
 			Composition: material.NewComposition(map[*material.Material]float64{&material.Material{
 				Name:                 "Test Iron",
 				Density:              7874,
@@ -35,11 +35,11 @@ func TestUnitMerge(t *testing.T) {
 
 		// Crea seconda unità
 		unit2 := &Unit{
-			Id:       uuid.New(),
-			Position: vector3.New(2.0, 0.0, 0.0),
-			Velocity: vector3.New(-1.0, 0.0, 0.0),
-			Mass:     10.0,
-			Radius:   1.0,
+			Id:        uuid.New(),
+			_position: vector3.New(2.0, 0.0, 0.0),
+			_velocity: vector3.New(-1.0, 0.0, 0.0),
+			_mass:     10.0,
+			_radius:   1.0,
 			Composition: material.NewComposition(map[*material.Material]float64{&material.Material{
 				Name:                 "Test Iron",
 				Density:              7874,
@@ -62,28 +62,31 @@ func TestUnitMerge(t *testing.T) {
 		expectedVelocity := vector3.New(0.0, 0.0, 0.0) // Media pesata delle velocità (masse uguali)
 
 		// Verifica risultati
-		assert.Equal(t, expectedMass, unit1.Mass, "La massa dovrebbe essere la somma delle due unità")
-		assert.Equal(t, expectedPosition.X(), unit1.Position.X(), "La posizione X dovrebbe essere la media pesata")
-		assert.Equal(t, expectedPosition.Y(), unit1.Position.Y(), "La posizione Y dovrebbe essere la media pesata")
-		assert.Equal(t, expectedPosition.Z(), unit1.Position.Z(), "La posizione Z dovrebbe essere la media pesata")
+		assert.Equal(t, expectedMass, unit1.Mass(), "La massa dovrebbe essere la somma delle due unità")
+		pos := unit1.Position()
+		assert.Equal(t, expectedPosition.X(), pos.X(), "La posizione X dovrebbe essere la media pesata")
+		assert.Equal(t, expectedPosition.Y(), pos.Y(), "La posizione Y dovrebbe essere la media pesata")
+		assert.Equal(t, expectedPosition.Z(), pos.Z(), "La posizione Z dovrebbe essere la media pesata")
+
 		// Verify momentum conservation
-		initialMomentum := unit1.Mass*1.0 + unit2.Mass*(-1.0) // 10 - 10 = 0
-		finalMomentum := unit1.Mass * unit1.Velocity.X()      // 20 * 0 = 0
+		initialMomentum := unit1.Mass()*1.0 + unit2.Mass()*(-1.0) // 10 - 10 = 0
+		finalMomentum := unit1.Mass() * unit1.Velocity().X()      // 20 * 0 = 0
 		assert.InDelta(t, initialMomentum, finalMomentum, 1e-10, "Il momento dovrebbe essere conservato")
 
-		assert.Equal(t, expectedVelocity.X(), unit1.Velocity.X(), "La velocità finale dovrebbe conservare il momento")
-		assert.Equal(t, expectedVelocity.Y(), unit1.Velocity.Y(), "La velocità Y dovrebbe essere zero")
-		assert.Equal(t, expectedVelocity.Z(), unit1.Velocity.Z(), "La velocità Z dovrebbe essere zero")
+		vel := unit1.Velocity()
+		assert.Equal(t, expectedVelocity.X(), vel.X(), "La velocità finale dovrebbe conservare il momento")
+		assert.Equal(t, expectedVelocity.Y(), vel.Y(), "La velocità Y dovrebbe essere zero")
+		assert.Equal(t, expectedVelocity.Z(), vel.Z(), "La velocità Z dovrebbe essere zero")
 
 		// Verifica del volume e raggio
 		expectedVolume := unit1.GetVolume() + unit2.GetVolume()
 		expectedRadius := math.Pow((3.0*expectedVolume)/(4.0*math.Pi), 1.0/3.0)
 		assert.InDelta(t, expectedVolume, unit1.GetVolume(), 1e-10, "Il volume dovrebbe essere la somma dei volumi")
-		assert.InDelta(t, expectedRadius, unit1.GetRadius(), 1e-10, "Il raggio dovrebbe essere calcolato correttamente dal volume")
+		assert.InDelta(t, expectedRadius, unit1.Radius(), 1e-10, "Il raggio dovrebbe essere calcolato correttamente dal volume")
 
 		// Verifica dello stato dell'unità assorbita
 		assert.False(t, unit2.CanBeAltered(), "La seconda unità non dovrebbe essere alterabile dopo il merge")
-		assert.Equal(t, 0.0, unit2.GetMass(), "La massa della seconda unità dovrebbe essere azzerata")
+		assert.Equal(t, 0.0, unit2.Mass(), "La massa della seconda unità dovrebbe essere azzerata")
 		assert.Equal(t, 0.0, unit2.GetVolume(), "Il volume della seconda unità dovrebbe essere azzerato")
 	})
 
@@ -91,11 +94,11 @@ func TestUnitMerge(t *testing.T) {
 	t.Run("Merge con masse diverse", func(t *testing.T) {
 		// Crea prima unità (più pesante)
 		unit1 := &Unit{
-			Id:       uuid.New(),
-			Position: vector3.New(0.0, 0.0, 0.0),
-			Velocity: vector3.New(1.0, 0.0, 0.0),
-			Mass:     15.0,
-			Radius:   1.0,
+			Id:        uuid.New(),
+			_position: vector3.New(0.0, 0.0, 0.0),
+			_velocity: vector3.New(1.0, 0.0, 0.0),
+			_mass:     15.0,
+			_radius:   1.0,
 			Composition: material.NewComposition(map[*material.Material]float64{&material.Material{
 				Name:                 "Test Iron",
 				Density:              7874,
@@ -111,11 +114,11 @@ func TestUnitMerge(t *testing.T) {
 
 		// Crea seconda unità (più leggera)
 		unit2 := &Unit{
-			Id:       uuid.New(),
-			Position: vector3.New(3.0, 0.0, 0.0),
-			Velocity: vector3.New(-1.0, 0.0, 0.0),
-			Mass:     5.0,
-			Radius:   1.0,
+			Id:        uuid.New(),
+			_position: vector3.New(3.0, 0.0, 0.0),
+			_velocity: vector3.New(-1.0, 0.0, 0.0),
+			_mass:     5.0,
+			_radius:   1.0,
 			Composition: material.NewComposition(map[*material.Material]float64{&material.Material{
 				Name:                 "Test Iron",
 				Density:              7874,
@@ -144,18 +147,21 @@ func TestUnitMerge(t *testing.T) {
 		expectedVelocity := vector3.New(0.5, 0.0, 0.0)
 
 		// Verifica risultati
-		assert.Equal(t, expectedMass, unit1.Mass, "La massa dovrebbe essere la somma delle due unità")
-		assert.Equal(t, expectedPosition.X(), unit1.Position.X(), "La posizione X dovrebbe essere più vicina all'unità più pesante")
-		assert.Equal(t, expectedPosition.Y(), unit1.Position.Y(), "La posizione Y dovrebbe essere più vicina all'unità più pesante")
-		assert.Equal(t, expectedPosition.Z(), unit1.Position.Z(), "La posizione Z dovrebbe essere più vicina all'unità più pesante")
+		assert.Equal(t, expectedMass, unit1.Mass(), "La massa dovrebbe essere la somma delle due unità")
+		pos := unit1.Position()
+		assert.Equal(t, expectedPosition.X(), pos.X(), "La posizione X dovrebbe essere più vicina all'unità più pesante")
+		assert.Equal(t, expectedPosition.Y(), pos.Y(), "La posizione Y dovrebbe essere più vicina all'unità più pesante")
+		assert.Equal(t, expectedPosition.Z(), pos.Z(), "La posizione Z dovrebbe essere più vicina all'unità più pesante")
+
 		// Verify momentum conservation
-		initialMomentum := unit1.Mass*1.0 + unit2.Mass*(-1.0) // 15 - 5 = 10
-		finalMomentum := unit1.Mass * unit1.Velocity.X()      // 20 * 0.5 = 10
+		initialMomentum := unit1.Mass()*1.0 + unit2.Mass()*(-1.0) // 15 - 5 = 10
+		finalMomentum := unit1.Mass() * unit1.Velocity().X()      // 20 * 0.5 = 10
 		assert.InDelta(t, initialMomentum, finalMomentum, 1e-10, "Il momento dovrebbe essere conservato")
 
-		assert.Equal(t, expectedVelocity.X(), unit1.Velocity.X(), "La velocità finale dovrebbe conservare il momento")
-		assert.Equal(t, expectedVelocity.Y(), unit1.Velocity.Y(), "La velocità Y dovrebbe essere zero")
-		assert.Equal(t, expectedVelocity.Z(), unit1.Velocity.Z(), "La velocità Z dovrebbe essere zero")
+		vel := unit1.Velocity()
+		assert.Equal(t, expectedVelocity.X(), vel.X(), "La velocità finale dovrebbe conservare il momento")
+		assert.Equal(t, expectedVelocity.Y(), vel.Y(), "La velocità Y dovrebbe essere zero")
+		assert.Equal(t, expectedVelocity.Z(), vel.Z(), "La velocità Z dovrebbe essere zero")
 		assert.False(t, unit2.CanBeAltered(), "La seconda unità non dovrebbe essere alterabile dopo il merge")
 	})
 }
@@ -179,26 +185,26 @@ func TestGravitationalAcceleration(t *testing.T) {
 		var finalAccel float64
 		for i := 0; i < steps; i++ {
 			// Calcola distanza e direzione
-			d := sphere.Position.Sub(earth.Position)
+			d := sphere.Position().Sub(earth.Position())
 			r := d.Length()
 			dir := d.Normalized()
 
 			// Forza gravitazionale
-			F := G * earth.Mass * sphere.Mass / (r * r)
+			F := G * earth.Mass() * sphere.Mass() / (r * r)
 
 			// Accelerazione sulla sfera (F = m * a => a = F / m)
-			a := F / sphere.Mass
+			a := F / sphere.Mass()
 			finalAccel = a // memorizziamo l'ultima accelerazione
 
 			// Log conciso dei valori principali
 			t.Logf("Step %d: dist=%.2f m, a=%.2f m/s², v=%.2f m/s",
-				i+1, r, a, sphere.Velocity.Length())
+				i+1, r, a, sphere.Velocity().Length())
 
 			// Aggiorna velocità e posizione della sfera
 			// v(t+dt) = v(t) + a*dt
-			sphere.Velocity = sphere.Velocity.Add(dir.Scale(a * dt))
+			sphere.SetVelocity(sphere.Velocity().Add(dir.Scale(a * dt)))
 			// x(t+dt) = x(t) + v(t+dt)*dt
-			sphere.Position = sphere.Position.Add(sphere.Velocity.Scale(dt))
+			sphere.SetPosition(sphere.Position().Add(sphere.Velocity().Scale(dt)))
 		}
 
 		// Calcolo dell'accelerazione teorica a r = (R_terra + 100 m)
@@ -226,20 +232,20 @@ func TestGravitationalAcceleration(t *testing.T) {
 		steps := 10
 		var finalAccel float64
 		for i := 0; i < steps; i++ {
-			d := sphere.Position.Sub(earth.Position)
+			d := sphere.Position().Sub(earth.Position())
 			r := d.Length()
 			dir := d.Normalized()
 
-			F := G * earth.Mass * sphere.Mass / (r * r)
-			a := F / sphere.Mass
+			F := G * earth.Mass() * sphere.Mass() / (r * r)
+			a := F / sphere.Mass()
 			finalAccel = a
 
 			// Log conciso dei valori principali
 			t.Logf("Step %d: dist=%.2f m, a=%.2f m/s², v=%.2f m/s",
-				i+1, r, a, sphere.Velocity.Length())
+				i+1, r, a, sphere.Velocity().Length())
 
-			sphere.Velocity = sphere.Velocity.Add(dir.Scale(a * dt))
-			sphere.Position = sphere.Position.Add(sphere.Velocity.Scale(dt))
+			sphere.SetVelocity(sphere.Velocity().Add(dir.Scale(a * dt)))
+			sphere.SetPosition(sphere.Position().Add(sphere.Velocity().Scale(dt)))
 		}
 
 		// Valore atteso a r = startDistance

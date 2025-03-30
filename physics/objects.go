@@ -15,10 +15,10 @@ func NewTestSphere(position vector3.Vector[float64]) *Unit {
 
 	sphere := &Unit{
 		Id:           uuid.New(),
-		Position:     position,
-		Velocity:     vector3.Zero[float64](),
-		Mass:         1.0, // 1 kg
-		Radius:       radius,
+		_position:    position,
+		_velocity:    vector3.Zero[float64](),
+		_mass:        1.0, // 1 kg
+		_radius:      radius,
 		Acceleration: vector3.Zero[float64](),
 		Heat:         20.0, // Temperatura ambiente di default
 		Composition: material.NewComposition(map[*material.Material]float64{
@@ -42,10 +42,10 @@ func NewTestSphere(position vector3.Vector[float64]) *Unit {
 func NewEarth(position vector3.Vector[float64]) *Unit {
 	earth := &Unit{
 		Id:           uuid.New(),
-		Position:     position,
-		Velocity:     vector3.Zero[float64](),
-		Mass:         EarthMass,
-		Radius:       EarthRadius,
+		_position:    position,
+		_velocity:    vector3.Zero[float64](),
+		_mass:        EarthMass,
+		_radius:      EarthRadius,
 		Acceleration: vector3.Zero[float64](),
 		Heat:         20.0, // Temperatura ambiente di default
 		Composition: material.NewComposition(map[*material.Material]float64{
@@ -69,10 +69,10 @@ func NewEarth(position vector3.Vector[float64]) *Unit {
 func NewMoon(position vector3.Vector[float64]) *Unit {
 	moon := &Unit{
 		Id:           uuid.New(),
-		Position:     position,
-		Velocity:     vector3.Zero[float64](),
-		Mass:         MoonMass,
-		Radius:       MoonRadius,
+		_position:    position,
+		_velocity:    vector3.Zero[float64](),
+		_mass:        MoonMass,
+		_radius:      MoonRadius,
 		Acceleration: vector3.Zero[float64](),
 		Heat:         20.0, // Temperatura ambiente di default
 		Composition: material.NewComposition(map[*material.Material]float64{
@@ -96,10 +96,10 @@ func NewMoon(position vector3.Vector[float64]) *Unit {
 func NewSun(position vector3.Vector[float64]) *Unit {
 	sun := &Unit{
 		Id:           uuid.New(),
-		Position:     position,
-		Velocity:     vector3.Zero[float64](),
-		Mass:         SunMass,
-		Radius:       SunRadius,
+		_position:    position,
+		_velocity:    vector3.Zero[float64](),
+		_mass:        SunMass,
+		_radius:      SunRadius,
 		Acceleration: vector3.Zero[float64](),
 		Heat:         20.0, // Temperatura ambiente di default
 		Composition: material.NewComposition(map[*material.Material]float64{

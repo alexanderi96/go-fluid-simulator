@@ -97,7 +97,6 @@ type Simulation struct {
 
 func NewSimulation(config *config.Config) (*Simulation, error) {
 	InitOctree(config)
-	InitOctree(config)
 
 	WorldCenter := vector3.New(0.0, 0.0, 0.0)
 	sim := &Simulation{
@@ -196,10 +195,10 @@ func (s *Simulation) newUnitWithPropertiesAtPosition(position, acceleration, vel
 
 	unit := &Unit{
 		Id:           uuid.New(),
-		Position:     position,
-		Velocity:     velocity,
+		_position:    position,
+		_velocity:    velocity,
 		Acceleration: acceleration,
-		Radius:       radius,
+		_radius:      radius,
 		Composition:  comp,
 		Heat:         0.0,
 		canBeAltered: canBeAltered,
@@ -235,10 +234,10 @@ func (s *Simulation) GetUnits() []*Unit {
 		// Create unit with the random material composition
 		unit := &Unit{
 			Id:           uuid.New(),
-			Position:     s.FinalSpawnPosition,
-			Velocity:     static,
+			_position:    s.FinalSpawnPosition,
+			_velocity:    static,
 			Acceleration: static,
-			Radius:       currentRadius,
+			_radius:      currentRadius,
 			Composition:  comp,
 			Heat:         0.0,
 			canBeAltered: true,
@@ -295,14 +294,15 @@ func (s *Simulation) GiveRotationalVelocity(units []*Unit) {
 }
 
 func (u *Unit) CalcolaVettoreVelocitaRotazione(p *vector3.Vector[float64]) {
-	d := math.Sqrt(u.Position.X()*u.Position.X() + u.Position.Y()*u.Position.Y())
+	pos := u.Position()
+	d := math.Sqrt(pos.X()*pos.X() + pos.Y()*pos.Y())
 	k := 0.2
 	v := k * d
 
-	v_x := v * u.Position.Y() / d
-	v_y := -v * u.Position.X() / d
+	v_x := v * pos.Y() / d
+	v_y := -v * pos.X() / d
 
-	u.Velocity = vector3.New(v_x, v_y, 0)
+	u.SetVelocity(vector3.New(v_x, v_y, 0))
 }
 
 func positionUnitsCuboidally(units []*Unit, finalSpawnPosition vector3.Vector[float64], spacing float64) error {
@@ -313,7 +313,7 @@ func positionUnitsCuboidally(units []*Unit, finalSpawnPosition vector3.Vector[fl
 	n := len(units)
 	sideLengthX, sideLengthY, sideLengthZ := optimalCuboidDimensions(n)
 
-	unitRadius := units[0].Radius
+	unitRadius := units[0].Radius()
 
 	totalWidth := float64(sideLengthX)*(2*unitRadius+spacing) - spacing
 	totalHeight := float64(sideLengthY)*(2*unitRadius+spacing) - spacing
@@ -331,7 +331,7 @@ func positionUnitsCuboidally(units []*Unit, finalSpawnPosition vector3.Vector[fl
 				unitY := startY + float64(y)*(2*unitRadius+spacing)
 				unitZ := startZ + float64(z)*(2*unitRadius+spacing)
 
-				units[index].Position = vector3.New(unitX, unitY, unitZ)
+				units[index].SetPosition(vector3.New(unitX, unitY, unitZ))
 				index++
 			}
 		}
@@ -364,7 +364,7 @@ func positionUnitsInFibonacciSpiral(units []*Unit, center *vector3.Vector[float6
 		y := center.Y() + radius*math.Sin(angle)
 		z := center.Z()
 
-		units[i].Position = vector3.New(x, y, z)
+		units[i].SetPosition(vector3.New(x, y, z))
 		radiusStep += 0.0005
 		angle += phi * 2 * math.Pi
 	}

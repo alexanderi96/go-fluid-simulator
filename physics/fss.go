@@ -210,11 +210,11 @@ func (s *Simulation) createFSSUnit(def *UnitDefinition) *Unit {
 
 	unit := &Unit{
 		Id:           uuid.New(),
-		Position:     pos,
-		Velocity:     vel,
+		_position:    pos,
+		_velocity:    vel,
 		Acceleration: acc,
-		Radius:       def.Radius,
-		Mass:         def.Mass,
+		_radius:      def.Radius,
+		_mass:        def.Mass,
 		Composition:  comp,
 		Heat:         0.0,
 		canBeAltered: true,

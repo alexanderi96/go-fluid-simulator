@@ -148,7 +148,7 @@ func (ot *Octree) calculateGravityRecursive(g Gravitable, theta float64, force *
 
 	// Calculate width and distance squared directly
 	width := ot.Bounds.Max.X() - ot.Bounds.Min.X()
-	deltaPos := g.GetPosition().Sub(ot.CenterOfMass)
+	deltaPos := g.Position().Sub(ot.CenterOfMass)
 	distanceSquared := deltaPos.X()*deltaPos.X() + deltaPos.Y()*deltaPos.Y() + deltaPos.Z()*deltaPos.Z()
 
 	// Avoid sqrt by comparing squares
@@ -161,17 +161,17 @@ func (ot *Octree) calculateGravityRecursive(g Gravitable, theta float64, force *
 }
 
 func (ot *Octree) calculateLeafNodeGravity(g Gravitable, force *vector3.Vector[float64]) {
-	gMass := g.GetMass()    // Cache mass value
-	gPos := g.GetPosition() // Cache position
+	gMass := g.Mass()    // Cache mass value
+	gPos := g.Position() // Cache position
 
 	for _, obj := range ot.objects {
-		if obj != g.GetUnit() {
-			deltaPos := obj.GetPosition().Sub(gPos)
+		if obj != g.Unit() {
+			deltaPos := obj.Position().Sub(gPos)
 			distanceSquared := deltaPos.X()*deltaPos.X() + deltaPos.Y()*deltaPos.Y() + deltaPos.Z()*deltaPos.Z()
 
 			if distanceSquared > 0 {
 				// Pre-calculate common factors
-				forceMagnitude := constants.G * gMass * obj.GetMass() / distanceSquared
+				forceMagnitude := constants.G * gMass * obj.Mass() / distanceSquared
 				invDistance := 1.0 / distanceSquared
 
 				// Calculate force components directly
@@ -186,12 +186,12 @@ func (ot *Octree) calculateLeafNodeGravity(g Gravitable, force *vector3.Vector[f
 }
 
 func (ot *Octree) approximateGravityWithCenterOfMass(g Gravitable, force *vector3.Vector[float64]) {
-	deltaPos := ot.CenterOfMass.Sub(g.GetPosition())
+	deltaPos := ot.CenterOfMass.Sub(g.Position())
 	distanceSquared := deltaPos.X()*deltaPos.X() + deltaPos.Y()*deltaPos.Y() + deltaPos.Z()*deltaPos.Z()
 
 	if distanceSquared > 0 {
 		// Pre-calculate force magnitude
-		forceMagnitude := constants.G * g.GetMass() * ot.TotalMass / distanceSquared
+		forceMagnitude := constants.G * g.Mass() * ot.TotalMass / distanceSquared
 		invDistance := 1.0 / distanceSquared
 
 		// Calculate force components directly

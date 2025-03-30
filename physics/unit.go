@@ -35,13 +35,13 @@ type Unit struct {
 
 	Mesh *PointLightMesh
 
-	Position     vector3.Vector[float64]
-	Velocity     vector3.Vector[float64]
+	_position    vector3.Vector[float64]
+	_velocity    vector3.Vector[float64]
 	Acceleration vector3.Vector[float64]
 
 	Composition  *material.Composition
-	Radius       float64
-	Mass         float64
+	_radius      float64
+	_mass        float64
 	Color        color.RGBA
 	canBeAltered bool
 	isMerged     bool // Track if this unit has been merged into another
@@ -52,7 +52,7 @@ type Unit struct {
 	// Cache frequently used values
 	volume               float64
 	surfaceArea          float64
-	elasticity           float64
+	_elasticity          float64
 	emissivity           float64
 	thermalConductivity  float64
 	specificHeatCapacity float64
@@ -63,7 +63,7 @@ type PointLightMesh struct {
 	Light *light.Point
 }
 
-func (u *Unit) GetUnit() *Unit {
+func (u *Unit) Unit() *Unit {
 	return u
 }
 
@@ -76,46 +76,46 @@ func (u *Unit) Merge(other collision.Collidable) {
 	// Get the actual volume of the other unit
 	var otherVolume float64
 	if otherUnit, ok := other.(*Unit); ok {
-		otherVolume = otherUnit.GetVolume()
+		otherVolume = otherUnit.volume
 	} else {
 		// Fallback to sphere volume calculation if not a Unit
-		r := other.GetRadius()
+		r := other.Radius()
 		otherVolume = (4.0 / 3.0) * math.Pi * r * r * r
 	}
 
 	// Calculate new mass and total volume
-	newMass := u.Mass + other.GetMass()
-	newVolume := u.GetVolume() + otherVolume
+	newMass := u._mass + other.Mass()
+	newVolume := u.volume + otherVolume
 
 	// Calculate new radius based on total volume
 	newRadius := math.Pow((3.0*newVolume)/(4.0*math.Pi), 1.0/3.0)
 
 	// Calculate new position as mass-weighted average
-	newPosition := u.Position.Scale(u.Mass).Add(other.GetPosition().Scale(other.GetMass())).Scale(1.0 / newMass)
+	newPosition := u._position.Scale(u._mass).Add(other.Position().Scale(other.Mass())).Scale(1.0 / newMass)
 
 	// Calculate resultant velocity based on conservation of momentum
 	// p = mv, total momentum = m1v1 + m2v2 = (m1+m2)v_final
-	newVelocity := u.Velocity.Scale(u.Mass).Add(other.GetVelocity().Scale(other.GetMass())).Scale(1.0 / newMass)
+	newVelocity := u._velocity.Scale(u._mass).Add(other.Velocity().Scale(other.Mass())).Scale(1.0 / newMass)
 
 	// Calculate combined heat based on mass-weighted average
-	totalHeat := u.Heat*u.Mass + 0.0
+	totalHeat := u.Heat*u._mass + 0.0
 	if otherUnit, ok := other.(*Unit); ok {
-		totalHeat += otherUnit.Heat * otherUnit.Mass
+		totalHeat += otherUnit.Heat * otherUnit._mass
 	}
 	combinedHeat := totalHeat / newMass
 
 	// Update properties
-	u.Mass = newMass
-	u.Radius = newRadius
-	u.Position = newPosition
-	u.Velocity = newVelocity
+	u._mass = newMass
+	u._radius = newRadius
+	u._position = newPosition
+	u._velocity = newVelocity
 	u.volume = newVolume  // Update cached volume
 	u.Heat = combinedHeat // Set combined heat
 
 	// Update mesh geometry with new radius
 	if u.Mesh != nil {
 		// Create new sphere geometry with updated radius
-		geom := geometry.NewSphere(float64(u.Radius), Segments, Segments)
+		geom := geometry.NewSphere(float64(u._radius), Segments, Segments)
 		// Get color from composition
 		baseColorRGB := u.Composition.GetColor()
 		baseColor := &math32.Color{
@@ -150,28 +150,33 @@ func (u *Unit) Merge(other collision.Collidable) {
 	}
 }
 
-func (u *Unit) GetPosition() vector3.Vector[float64] {
-	return u.Position
+// Implementazione dell'interfaccia Collidable
+func (u *Unit) Position() vector3.Vector[float64] {
+	return u._position
 }
 
-func (u *Unit) GetVelocity() vector3.Vector[float64] {
-	return u.Velocity
+func (u *Unit) Velocity() vector3.Vector[float64] {
+	return u._velocity
 }
 
-func (u *Unit) GetElasticity() float64 {
-	return u.elasticity
+func (u *Unit) Elasticity() float64 {
+	return u._elasticity
 }
 
-func (u *Unit) GetRadius() float64 {
-	return u.Radius
+func (u *Unit) Radius() float64 {
+	return u._radius
+}
+
+func (u *Unit) Mass() float64 {
+	return u._mass
 }
 
 func (u *Unit) SetPosition(pos vector3.Vector[float64]) {
-	u.Position = pos
+	u._position = pos
 }
 
 func (u *Unit) SetVelocity(vel vector3.Vector[float64]) {
-	u.Velocity = vel
+	u._velocity = vel
 }
 
 func (u *Unit) AddHeat(heat float64) {
@@ -187,9 +192,9 @@ func (u *Unit) TransferHeatTo(other *Unit, dt float64) {
 	vec := vectorPool.Get().([]float64)
 	defer vectorPool.Put(vec)
 
-	vec[0] = u.Position.X() - other.Position.X()
-	vec[1] = u.Position.Y() - other.Position.Y()
-	vec[2] = u.Position.Z() - other.Position.Z()
+	vec[0] = u._position.X() - other._position.X()
+	vec[1] = u._position.Y() - other._position.Y()
+	vec[2] = u._position.Z() - other._position.Z()
 
 	distanceSquared := vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2]
 	if distanceSquared > MaxHeatTransferDistance*MaxHeatTransferDistance {
@@ -206,7 +211,7 @@ func (u *Unit) TransferHeatTo(other *Unit, dt float64) {
 	// Use material properties for heat transfer
 	conductivity := (u.thermalConductivity + other.thermalConductivity) / 2
 	heatTransfer := conductivity * distanceFactor * tempDiff * dt
-	massRatio := math.Sqrt(other.Mass / u.Mass)
+	massRatio := math.Sqrt(other._mass / u._mass)
 	heatTransfer *= massRatio
 	heatTransfer = math.Min(heatTransfer, u.Heat-AmbientTemperature)
 
@@ -224,7 +229,7 @@ func (u *Unit) NewPointLightMesh() {
 	}
 
 	u.Mesh = new(PointLightMesh)
-	geom := geometry.NewSphere(float64(u.Radius), Segments, Segments)
+	geom := geometry.NewSphere(float64(u._radius), Segments, Segments)
 	mat := g3nmat.NewStandard(&baseColor)
 	u.Mesh.Mesh = graphic.NewMesh(geom, mat)
 	u.Mesh.Mesh.SetVisible(true)
@@ -234,19 +239,19 @@ func (u *Unit) NewPointLightMesh() {
 	u.Mesh.Add(light)
 
 	// Initialize cached values
-	u.volume = (4.0 / 3.0) * math.Pi * math.Pow(u.Radius, 3)
-	u.surfaceArea = 4.0 * math.Pi * math.Pow(u.Radius, 2)
+	u.volume = (4.0 / 3.0) * math.Pi * math.Pow(u._radius, 3)
+	u.surfaceArea = 4.0 * math.Pi * math.Pow(u._radius, 2)
 
 	// Get material properties
 	density, specificHeat, thermalConductivity, emissivity, elasticity := u.Composition.GetEffectiveProperties()
 	// Only calculate mass if it hasn't been set (i.e., not during merge)
-	if u.Mass == 0 {
-		u.Mass = u.volume * density
+	if u._mass == 0 {
+		u._mass = u.volume * density
 	}
 	u.specificHeatCapacity = specificHeat
 	u.thermalConductivity = thermalConductivity
 	u.emissivity = emissivity
-	u.elasticity = elasticity
+	u._elasticity = elasticity
 }
 
 func (u *Unit) GetVolume() float64 {
@@ -258,26 +263,26 @@ func (u *Unit) GetSurfaceArea() float64 {
 }
 
 func (u *Unit) GetMass() float64 {
-	return u.Mass
+	return u._mass
 }
 
 func (u *Unit) ApplyForce(f vector3.Vector[float64]) {
-	invMass := 1.0 / u.Mass
+	invMass := 1.0 / u._mass
 	u.Acceleration = u.Acceleration.Add(f.Scale(invMass))
 }
 
 func (u *Unit) UpdatePosition(dt float64) {
-	log.Print("unit mass:", u.Mass, " position: ", u.Position)
+	log.Print("unit mass:", u._mass, " position: ", u._position)
 	// Update position and velocity using Verlet integration
 	halfDtSq := 0.5 * dt * dt
-	newPos := u.Position.Add(u.Velocity.Scale(dt)).Add(u.Acceleration.Scale(halfDtSq))
-	newVel := u.Velocity.Add(u.Acceleration.Scale(dt))
+	newPos := u._position.Add(u._velocity.Scale(dt)).Add(u.Acceleration.Scale(halfDtSq))
+	newVel := u._velocity.Add(u.Acceleration.Scale(dt))
 
-	u.Position = newPos
-	u.Velocity = newVel
+	u._position = newPos
+	u._velocity = newVel
 	u.Acceleration = vector3.Zero[float64]()
 
-	u.Mesh.SetPosition(float32(u.Position.X()), float32(u.Position.Y()), float32(u.Position.Z()))
+	u.Mesh.SetPosition(float32(u._position.X()), float32(u._position.Y()), float32(u._position.Z()))
 
 	if u.Heat > AmbientTemperature {
 		cooldown := (u.Heat - AmbientTemperature) * CoolingRate * dt
@@ -311,9 +316,9 @@ func (u *Unit) UpdatePosition(dt float64) {
 		u.Mesh.Light.SetIntensity(intensity)
 	} else {
 		u.Heat = AmbientTemperature
-		normalizedRadius := math32.Clamp(float32(u.Radius/5e3), 0, 1)
-		normalizedMass := math32.Clamp(float32(u.Mass/1e5), 0, 1)
-		normalizedElasticity := float32(u.elasticity)
+		normalizedRadius := math32.Clamp(float32(u._radius/5e3), 0, 1)
+		normalizedMass := math32.Clamp(float32(u._mass/1e5), 0, 1)
+		normalizedElasticity := float32(u._elasticity)
 
 		baseColor := &math32.Color{
 			R: normalizedRadius*0.8 + normalizedMass*0.2,
@@ -326,7 +331,7 @@ func (u *Unit) UpdatePosition(dt float64) {
 
 		// Calculate light intensity based on mass and radius
 		// Using both mass and radius ensures larger, more massive objects emit more light
-		baseIntensity := math32.Clamp(float32(u.Mass/1e5)*float32(u.Radius/5e3), 0.1, 2.0)
+		baseIntensity := math32.Clamp(float32(u._mass/1e5)*float32(u._radius/5e3), 0.1, 2.0)
 		u.Mesh.Light.SetIntensity(baseIntensity)
 		u.Mesh.Light.SetColor(baseColor)
 	}
@@ -337,52 +342,56 @@ func (unit *Unit) CheckAndResolveWallCollision(wallBounds BoundingBox, wallElast
 	vec := vectorPool.Get().([]float64)
 	defer vectorPool.Put(vec)
 
-	vec[0] = unit.Position.X()
-	vec[1] = unit.Position.Y()
-	vec[2] = unit.Position.Z()
+	pos := unit.Position()
+	vel := unit.Velocity()
+	rad := unit.Radius()
 
-	vx, vy, vz := unit.Velocity.X(), unit.Velocity.Y(), unit.Velocity.Z()
+	vec[0] = pos.X()
+	vec[1] = pos.Y()
+	vec[2] = pos.Z()
+
+	vx, vy, vz := vel.X(), vel.Y(), vel.Z()
 
 	// X-axis collision
-	if vec[0]-unit.Radius < wallBounds.Min.X() {
-		vec[0] = wallBounds.Min.X() + unit.Radius
+	if vec[0]-rad < wallBounds.Min.X() {
+		vec[0] = wallBounds.Min.X() + rad
 		vx = -vx * wallElasticity
 		collided = true
-	} else if vec[0]+unit.Radius > wallBounds.Max.X() {
-		vec[0] = wallBounds.Max.X() - unit.Radius
+	} else if vec[0]+rad > wallBounds.Max.X() {
+		vec[0] = wallBounds.Max.X() - rad
 		vx = -vx * wallElasticity
 		collided = true
 	}
 
 	// Y-axis collision
-	if vec[1]-unit.Radius < wallBounds.Min.Y() {
-		vec[1] = wallBounds.Min.Y() + unit.Radius
+	if vec[1]-rad < wallBounds.Min.Y() {
+		vec[1] = wallBounds.Min.Y() + rad
 		vy = -vy * wallElasticity
 		collided = true
-	} else if vec[1]+unit.Radius > wallBounds.Max.Y() {
-		vec[1] = wallBounds.Max.Y() - unit.Radius
+	} else if vec[1]+rad > wallBounds.Max.Y() {
+		vec[1] = wallBounds.Max.Y() - rad
 		vy = -vy * wallElasticity
 		collided = true
 	}
 
 	// Z-axis collision
-	if vec[2]-unit.Radius < wallBounds.Min.Z() {
-		vec[2] = wallBounds.Min.Z() + unit.Radius
+	if vec[2]-rad < wallBounds.Min.Z() {
+		vec[2] = wallBounds.Min.Z() + rad
 		vz = -vz * wallElasticity
 		collided = true
-	} else if vec[2]+unit.Radius > wallBounds.Max.Z() {
-		vec[2] = wallBounds.Max.Z() - unit.Radius
+	} else if vec[2]+rad > wallBounds.Max.Z() {
+		vec[2] = wallBounds.Max.Z() - rad
 		vz = -vz * wallElasticity
 		collided = true
 	}
 
 	if collided {
-		unit.Position = vector3.New(vec[0], vec[1], vec[2])
-		unit.Velocity = vector3.New(vx, vy, vz)
+		unit.SetPosition(vector3.New(vec[0], vec[1], vec[2]))
+		unit.SetVelocity(vector3.New(vx, vy, vz))
 
 		speed := math.Sqrt(vx*vx + vy*vy + vz*vz)
 		// Reduced heat generation from collisions and scaled by mass
-		heatGenerated := 0.5 * unit.Mass * speed * speed * (1 - wallElasticity) * 0.001
+		heatGenerated := 0.5 * unit.Mass() * speed * speed * (1 - wallElasticity) * 0.001
 		// Scale heat increase based on current temperature to avoid spikes
 		heatIncrease := heatGenerated * (1.0 - (unit.Heat-AmbientTemperature)/100.0)
 		if heatIncrease > 0 {
@@ -396,8 +405,8 @@ func (unit *Unit) CheckAndResolveWallCollision(wallBounds BoundingBox, wallElast
 // orbit calculates and sets the velocity needed for orbit around another unit
 func (u *Unit) orbit(target *Unit) error {
 	// Get current position vectors
-	pos1 := u.Position
-	pos2 := target.Position
+	pos1 := u.Position()
+	pos2 := target.Position()
 
 	// Calculate direction vector from target to unit
 	dir := pos1.Sub(pos2)
@@ -415,7 +424,7 @@ func (u *Unit) orbit(target *Unit) error {
 	// G = gravitational constant
 	// M = mass of the central body
 	// r = orbital radius
-	v := math.Sqrt((constants.G * target.Mass) / (2 * currentDistance))
+	v := math.Sqrt((constants.G * target.Mass()) / (2 * currentDistance))
 
 	// For a circular orbit in the XZ plane, the velocity should be perpendicular to the radius vector
 	// and parallel to the XZ plane. Since the radius vector points from the Sun to Earth,
@@ -435,12 +444,15 @@ func (u *Unit) orbit(target *Unit) error {
 
 func (u *Unit) GiveMassAndCenterOfMassForBounds(bounds BoundingBox) (vector3.Vector[float64], float64) {
 	// Simplified calculation using bounding box intersection
-	minX := math.Max(bounds.Min.X(), u.Position.X()-u.Radius)
-	maxX := math.Min(bounds.Max.X(), u.Position.X()+u.Radius)
-	minY := math.Max(bounds.Min.Y(), u.Position.Y()-u.Radius)
-	maxY := math.Min(bounds.Max.Y(), u.Position.Y()+u.Radius)
-	minZ := math.Max(bounds.Min.Z(), u.Position.Z()-u.Radius)
-	maxZ := math.Min(bounds.Max.Z(), u.Position.Z()+u.Radius)
+	pos := u.Position()
+	rad := u.Radius()
+
+	minX := math.Max(bounds.Min.X(), pos.X()-rad)
+	maxX := math.Min(bounds.Max.X(), pos.X()+rad)
+	minY := math.Max(bounds.Min.Y(), pos.Y()-rad)
+	maxY := math.Min(bounds.Max.Y(), pos.Y()+rad)
+	minZ := math.Max(bounds.Min.Z(), pos.Z()-rad)
+	maxZ := math.Min(bounds.Max.Z(), pos.Z()+rad)
 
 	// Calculate volume of intersection
 	dx := maxX - minX
@@ -459,7 +471,7 @@ func (u *Unit) GiveMassAndCenterOfMassForBounds(bounds BoundingBox) (vector3.Vec
 	}
 
 	massRatio := volume / totalVolume
-	mass := u.Mass * massRatio
+	mass := u.Mass() * massRatio
 
 	centerX := (minX + maxX) / 2
 	centerY := (minY + maxY) / 2
