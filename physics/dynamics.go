@@ -1,6 +1,7 @@
 package physics
 
 import (
+	"math"
 	"sync"
 
 	"github.com/EliCDavis/vector/vector3"
@@ -170,11 +171,12 @@ func (ot *Octree) calculateLeafNodeGravity(g Gravitable, force *vector3.Vector[f
 			distanceSquared := deltaPos.X()*deltaPos.X() + deltaPos.Y()*deltaPos.Y() + deltaPos.Z()*deltaPos.Z()
 
 			if distanceSquared > 0 {
-				// Pre-calculate common factors
+				distance := math.Sqrt(distanceSquared)
+				// Calculate force magnitude using Newton's law of gravitation
 				forceMagnitude := constants.G * gMass * obj.Mass() / distanceSquared
-				invDistance := 1.0 / distanceSquared
+				invDistance := 1.0 / distance // Now using 1/r instead of 1/r²
 
-				// Calculate force components directly
+				// Calculate force components with correct direction
 				fx := deltaPos.X() * forceMagnitude * invDistance
 				fy := deltaPos.Y() * forceMagnitude * invDistance
 				fz := deltaPos.Z() * forceMagnitude * invDistance
@@ -190,11 +192,12 @@ func (ot *Octree) approximateGravityWithCenterOfMass(g Gravitable, force *vector
 	distanceSquared := deltaPos.X()*deltaPos.X() + deltaPos.Y()*deltaPos.Y() + deltaPos.Z()*deltaPos.Z()
 
 	if distanceSquared > 0 {
-		// Pre-calculate force magnitude
+		distance := math.Sqrt(distanceSquared)
+		// Calculate force magnitude using Newton's law of gravitation
 		forceMagnitude := constants.G * g.Mass() * ot.TotalMass / distanceSquared
-		invDistance := 1.0 / distanceSquared
+		invDistance := 1.0 / distance // Now using 1/r instead of 1/r²
 
-		// Calculate force components directly
+		// Calculate force components with correct direction
 		fx := deltaPos.X() * forceMagnitude * invDistance
 		fy := deltaPos.Y() * forceMagnitude * invDistance
 		fz := deltaPos.Z() * forceMagnitude * invDistance

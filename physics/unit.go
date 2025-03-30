@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/EliCDavis/vector/vector3"
+	"github.com/alexanderi96/go-fluid-simulator/config"
 	"github.com/alexanderi96/go-fluid-simulator/physics/collision"
 	"github.com/alexanderi96/go-fluid-simulator/physics/constants"
 	"github.com/alexanderi96/go-fluid-simulator/physics/material"
@@ -45,6 +46,7 @@ type Unit struct {
 	Color        color.RGBA
 	canBeAltered bool
 	isMerged     bool // Track if this unit has been merged into another
+	config       *config.Config
 
 	Heat            float64
 	HeatTransferred float64
@@ -285,7 +287,17 @@ func (u *Unit) UpdatePosition(dt float64) {
 	u.Mesh.SetPosition(float32(u._position.X()), float32(u._position.Y()), float32(u._position.Z()))
 
 	if u.Heat > AmbientTemperature {
-		cooldown := (u.Heat - AmbientTemperature) * CoolingRate * dt
+		// Calcolo del raffreddamento secondo la legge di Stefan-Boltzmann
+		tempK := u.Heat + 273.15 // Conversione in Kelvin
+		ambientK := constants.AmbientTemperature + 273.15
+
+		// Potenza irradiata secondo Stefan-Boltzmann
+		power := u.emissivity * constants.StefanBoltzmannConstant * u.surfaceArea *
+			(math.Pow(tempK, 4) - math.Pow(ambientK, 4))
+
+		// Conversione della potenza in variazione di temperatura
+		// dT = (P * dt) / (m * c)
+		cooldown := (power * dt) / (u._mass * u.specificHeatCapacity)
 		u.Heat = math.Max(AmbientTemperature, u.Heat-cooldown)
 
 		normalizedTemp := math32.Clamp(float32((u.Heat-AmbientTemperature)/50), 0, 1)
@@ -440,6 +452,10 @@ func (u *Unit) orbit(target *Unit) error {
 	u.SetVelocity(velDir.Scale(v))
 
 	return nil
+}
+
+func (u *Unit) GetConfig() *config.Config {
+	return u.config
 }
 
 func (u *Unit) GiveMassAndCenterOfMassForBounds(bounds BoundingBox) (vector3.Vector[float64], float64) {

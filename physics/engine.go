@@ -202,6 +202,7 @@ func (s *Simulation) newUnitWithPropertiesAtPosition(position, acceleration, vel
 		Composition:  comp,
 		Heat:         0.0,
 		canBeAltered: canBeAltered,
+		config:       s.Config,
 	}
 
 	unit.NewPointLightMesh()
@@ -241,6 +242,7 @@ func (s *Simulation) GetUnits() []*Unit {
 			Composition:  comp,
 			Heat:         0.0,
 			canBeAltered: true,
+			config:       s.Config,
 		}
 
 		unit.NewPointLightMesh()

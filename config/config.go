@@ -37,6 +37,7 @@ type Config struct {
 	ShowSpeedColor        bool
 	UnitsEmitGravity      bool
 	ShowClusterColor      bool
+	AllowUnitMerge        bool
 	OctreeMaxLevel        int8
 	MaxUnitNumberPerLevel int8
 	Frametime             float64
@@ -84,6 +85,7 @@ func ReadConfig(filepath string) (*Config, error) {
 		SetRandomColor:        viper.GetBool("set_random_color"),
 		ShowSpeedColor:        viper.GetBool("show_speed_color"),
 		UnitsEmitGravity:      viper.GetBool("units_emit_gravity"),
+		AllowUnitMerge:        viper.GetBool("allow_unit_merge"),
 		OctreeMaxLevel:        int8(viper.GetInt("octree_max_level")),
 		MaxUnitNumberPerLevel: int8(viper.GetInt("max_unit_number_per_level")),
 		Frametime:             viper.GetFloat64("frametime"),

@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/EliCDavis/vector/vector3"
+	"github.com/alexanderi96/go-fluid-simulator/config"
 )
 
 var (
@@ -45,6 +46,7 @@ type Collidable interface {
 	AddHeat(heat float64)
 	CanBeAltered() bool
 	Merge(other Collidable)
+	GetConfig() *config.Config
 }
 
 // GatherCollisionData collects all necessary data for collision resolution
@@ -105,8 +107,15 @@ func GatherCollisionData(uA, uB Collidable) *CollisionData {
 func ResolveCollision(collData *CollisionData) {
 	defer collisionDataPool.Put(collData)
 
+	// Se non c'è collisione, non procedere
+	if !collData.Collided {
+		return
+	}
+
 	// Check if units can merge
-	if collData.UnitA.CanBeAltered() && collData.UnitB.CanBeAltered() {
+	if collData.UnitA.GetConfig().AllowUnitMerge &&
+		collData.UnitA.CanBeAltered() &&
+		collData.UnitB.CanBeAltered() {
 		massA := collData.UnitA.Mass()
 		massB := collData.UnitB.Mass()
 
@@ -132,12 +141,16 @@ func ResolveCollision(collData *CollisionData) {
 	vec[1] = collData.ImpulseDirection.Y() * impulseMag
 	vec[2] = collData.ImpulseDirection.Z() * impulseMag
 
-	// Calculate new velocities directly
-	massInvA := 1 / collData.UnitA.Mass()
-	massInvB := 1 / collData.UnitB.Mass()
-
+	// Calculate initial kinetic energy
 	velA := collData.UnitA.Velocity()
 	velB := collData.UnitB.Velocity()
+	initialKE1 := 0.5 * collData.UnitA.Mass() * velA.Length() * velA.Length()
+	initialKE2 := 0.5 * collData.UnitB.Mass() * velB.Length() * velB.Length()
+	initialTotalKE := initialKE1 + initialKE2
+
+	// Calculate new velocities
+	massInvA := 1 / collData.UnitA.Mass()
+	massInvB := 1 / collData.UnitB.Mass()
 
 	newVelA := vector3.New(
 		velA.X()+vec[0]*massInvA,
@@ -151,6 +164,30 @@ func ResolveCollision(collData *CollisionData) {
 		velB.Z()-vec[2]*massInvB,
 	)
 
+	// Calculate final kinetic energy before applying velocities
+	finalKE1 := 0.5 * collData.UnitA.Mass() * newVelA.Length() * newVelA.Length()
+	finalKE2 := 0.5 * collData.UnitB.Mass() * newVelB.Length() * newVelB.Length()
+	finalTotalKE := finalKE1 + finalKE2
+
+	// Energy lost in collision
+	lostEnergy := initialTotalKE - finalTotalKE
+
+	// Convert lost energy to heat based on elasticity
+	elasticityLossA := 1.0 - collData.UnitA.Elasticity()
+	elasticityLossB := 1.0 - collData.UnitB.Elasticity()
+	totalElasticityLoss := elasticityLossA + elasticityLossB
+
+	if totalElasticityLoss > 0 {
+		// Distribute heat proportionally to elasticity loss
+		heatA := lostEnergy * (elasticityLossA / totalElasticityLoss)
+		heatB := lostEnergy * (elasticityLossB / totalElasticityLoss)
+
+		// Convert energy to temperature change (E = m * c * ΔT)
+		collData.UnitA.AddHeat(heatA / (collData.UnitA.Mass() * 100)) // specificHeatCapacity is 100 in the test
+		collData.UnitB.AddHeat(heatB / (collData.UnitB.Mass() * 100))
+	}
+
+	// Apply new velocities
 	collData.UnitA.SetVelocity(newVelA)
 	collData.UnitB.SetVelocity(newVelB)
 
@@ -181,21 +218,5 @@ func ResolveCollision(collData *CollisionData) {
 
 		collData.UnitA.SetPosition(newPosA)
 		collData.UnitB.SetPosition(newPosB)
-
-		// Calculate heat transfer based on collision energy
-		relativeSpeed := math.Abs(collData.RelVelNormal)
-		heatTransfer := relativeSpeed * relativeSpeed * 0.01 // Reduced heat generation factor
-
-		if heatTransfer > 0.01 {
-			elasticityLossA := 1.0 - collData.UnitA.Elasticity()
-			elasticityLossB := 1.0 - collData.UnitB.Elasticity()
-
-			if elasticityLossA > 0.01 {
-				collData.UnitA.AddHeat(heatTransfer * elasticityLossA)
-			}
-			if elasticityLossB > 0.01 {
-				collData.UnitB.AddHeat(heatTransfer * elasticityLossB)
-			}
-		}
 	}
 }

@@ -5,6 +5,9 @@ import (
 	"testing"
 
 	"github.com/EliCDavis/vector/vector3"
+	"github.com/alexanderi96/go-fluid-simulator/config"
+	"github.com/alexanderi96/go-fluid-simulator/physics/collision"
+	"github.com/alexanderi96/go-fluid-simulator/physics/constants"
 	"github.com/alexanderi96/go-fluid-simulator/physics/material"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -163,6 +166,154 @@ func TestUnitMerge(t *testing.T) {
 		assert.Equal(t, expectedVelocity.Y(), vel.Y(), "La velocità Y dovrebbe essere zero")
 		assert.Equal(t, expectedVelocity.Z(), vel.Z(), "La velocità Z dovrebbe essere zero")
 		assert.False(t, unit2.CanBeAltered(), "La seconda unità non dovrebbe essere alterabile dopo il merge")
+	})
+}
+
+func TestEnergyToHeatConversion(t *testing.T) {
+	t.Run("Verifica conversione energia-calore durante collisione", func(t *testing.T) {
+		// Crea prima unità
+		unit1 := &Unit{
+			Id:        uuid.New(),
+			_position: vector3.New(0.0, 0.0, 0.0),
+			_velocity: vector3.New(5.0, 0.0, 0.0), // 5 m/s verso destra
+			_mass:     10.0,                       // 10 kg
+			_radius:   1.0,                        // 1 m
+			Composition: material.NewComposition(map[*material.Material]float64{&material.Material{
+				Name:                 "Test Material",
+				Density:              1000,
+				SpecificHeatCapacity: 100, // 100 J/(kg·K)
+				ThermalConductivity:  50,  // 50 W/(m·K)
+				Emissivity:           0.5, // 0.5 (50% di emissività)
+				BaseColor:            [3]float64{0.5, 0.5, 0.5},
+				Elasticity:           0.5, // 0.5 (50% di energia conservata)
+			}: 1.0}),
+			Heat: constants.AmbientTemperature,
+			Mesh: new(PointLightMesh),
+			config: &config.Config{
+				AllowUnitMerge: false,
+			},
+		}
+		unit1.NewPointLightMesh()
+
+		// Crea seconda unità
+		unit2 := &Unit{
+			Id:        uuid.New(),
+			_position: vector3.New(1.5, 0.0, 0.0),  // 1.5 m a destra (garantisce collisione con unit1)
+			_velocity: vector3.New(-5.0, 0.0, 0.0), // 5 m/s verso sinistra
+			_mass:     10.0,                        // 10 kg
+			_radius:   1.0,                         // 1 m
+			Composition: material.NewComposition(map[*material.Material]float64{&material.Material{
+				Name:                 "Test Material",
+				Density:              1000,
+				SpecificHeatCapacity: 100, // 100 J/(kg·K)
+				ThermalConductivity:  50,  // 50 W/(m·K)
+				Emissivity:           0.5, // 0.5 (50% di emissività)
+				BaseColor:            [3]float64{0.5, 0.5, 0.5},
+				Elasticity:           0.5, // 0.5 (50% di energia conservata)
+			}: 1.0}),
+			Heat: AmbientTemperature,
+			Mesh: new(PointLightMesh),
+			config: &config.Config{
+				AllowUnitMerge: false,
+			},
+		}
+		unit2.NewPointLightMesh()
+
+		// Calcolo dell'energia cinetica iniziale
+		initialKE1 := 0.5 * unit1.Mass() * math.Pow(unit1.Velocity().Length(), 2)
+		initialKE2 := 0.5 * unit2.Mass() * math.Pow(unit2.Velocity().Length(), 2)
+		initialTotalKE := initialKE1 + initialKE2
+
+		t.Logf("Energia cinetica iniziale: %.2f J (unit1: %.2f J, unit2: %.2f J)",
+			initialTotalKE, initialKE1, initialKE2)
+
+		// Memorizza temperature iniziali
+		initialTemp1 := unit1.Heat
+		initialTemp2 := unit2.Heat
+
+		// Simula la collisione
+		collData := collision.GatherCollisionData(unit1, unit2)
+		assert.True(t, collData.Collided, "Le unità dovrebbero collidere")
+		collision.ResolveCollision(collData)
+
+		// Calcolo dell'energia cinetica finale
+		finalKE1 := 0.5 * unit1.Mass() * math.Pow(unit1.Velocity().Length(), 2)
+		finalKE2 := 0.5 * unit2.Mass() * math.Pow(unit2.Velocity().Length(), 2)
+		finalTotalKE := finalKE1 + finalKE2
+
+		t.Logf("Energia cinetica finale: %.2f J (unit1: %.2f J, unit2: %.2f J)",
+			finalTotalKE, finalKE1, finalKE2)
+
+		// Calcolo dell'energia persa
+		lostKE := initialTotalKE - finalTotalKE
+		t.Logf("Energia cinetica persa: %.2f J", lostKE)
+
+		// Calcolo del calore generato
+		_, specificHeat1, _, _, _ := unit1.Composition.GetEffectiveProperties()
+		_, specificHeat2, _, _, _ := unit2.Composition.GetEffectiveProperties()
+		heatGained1 := unit1.Mass() * specificHeat1 * (unit1.Heat - initialTemp1)
+		heatGained2 := unit2.Mass() * specificHeat2 * (unit2.Heat - initialTemp2)
+		totalHeatGained := heatGained1 + heatGained2
+
+		t.Logf("Calore generato: %.2f J (unit1: %.2f J, unit2: %.2f J)",
+			totalHeatGained, heatGained1, heatGained2)
+
+		// Verifica della conservazione dell'energia
+		energyConservationRatio := totalHeatGained / lostKE
+		t.Logf("Rapporto di conservazione dell'energia (calore/energia persa): %.4f",
+			energyConservationRatio)
+
+		// Il rapporto dovrebbe essere vicino a 1.0 (tolleranza 5%)
+		assert.InDelta(t, 1.0, energyConservationRatio, 0.05,
+			"L'energia cinetica persa dovrebbe essere convertita in calore")
+
+		// Test del raffreddamento
+		dt := 1.0 // 1 secondo
+		initialHeat1 := unit1.Heat
+		initialHeat2 := unit2.Heat
+
+		// Aggiorna le posizioni per simulare il passaggio del tempo
+		unit1.UpdatePosition(dt)
+		unit2.UpdatePosition(dt)
+
+		// Calcolo del raffreddamento teorico secondo Stefan-Boltzmann
+		temp1K := initialHeat1 + 273.15
+		temp2K := initialHeat2 + 273.15
+		ambientK := constants.AmbientTemperature + 273.15
+
+		// Calcolo della potenza irradiata
+		_, specificHeat1, _, emissivity1, _ := unit1.Composition.GetEffectiveProperties()
+		_, specificHeat2, _, emissivity2, _ := unit2.Composition.GetEffectiveProperties()
+		power1 := emissivity1 * constants.StefanBoltzmannConstant * unit1.GetSurfaceArea() *
+			(math.Pow(temp1K, 4) - math.Pow(ambientK, 4))
+		power2 := emissivity2 * constants.StefanBoltzmannConstant * unit2.GetSurfaceArea() *
+			(math.Pow(temp2K, 4) - math.Pow(ambientK, 4))
+
+		// Calore perso in dt secondi
+		expectedHeatLoss1 := power1 * dt / (specificHeat1 * unit1.Mass())
+		expectedHeatLoss2 := power2 * dt / (specificHeat2 * unit2.Mass())
+
+		// Calore effettivamente perso
+		actualHeatLoss1 := initialHeat1 - unit1.Heat
+		actualHeatLoss2 := initialHeat2 - unit2.Heat
+
+		t.Logf("Raffreddamento unit1 - Atteso: %.4f°C, Effettivo: %.4f°C",
+			expectedHeatLoss1, actualHeatLoss1)
+		t.Logf("Raffreddamento unit2 - Atteso: %.4f°C, Effettivo: %.4f°C",
+			expectedHeatLoss2, actualHeatLoss2)
+
+		// Verifica del raffreddamento
+		coolingAccuracy1 := actualHeatLoss1 / expectedHeatLoss1
+		coolingAccuracy2 := actualHeatLoss2 / expectedHeatLoss2
+
+		t.Logf("Precisione del raffreddamento - unit1: %.4f, unit2: %.4f",
+			coolingAccuracy1, coolingAccuracy2)
+
+		// Tolleranza del 50% per il raffreddamento dato il modello semplificato
+		assert.InDelta(t, 1.0, coolingAccuracy1, 0.5,
+			"Il raffreddamento dovrebbe seguire approssimativamente la legge di Stefan-Boltzmann")
+		assert.InDelta(t, 1.0, coolingAccuracy2, 0.5,
+			"Il raffreddamento dovrebbe seguire approssimativamente la legge di Stefan-Boltzmann")
 	})
 }
 

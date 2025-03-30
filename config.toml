@@ -46,6 +46,7 @@
   show_overlay = false
   set_random_color = true
   show_speed_color = false
+  allow_unit_merge = false
 
 # testing
   # test_duration = 5
