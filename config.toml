@@ -21,7 +21,7 @@
   central_mass = 1e10
   
 # unit config
-  unit_number = 500
+  unit_number = 1000
   unit_initial_spacing = 0.2
   units_emit_gravity = true
   unit_gravitational_multiplier = 1
@@ -31,7 +31,7 @@
   radius_min = 0.1
   radius_max = 10
   
-  set_random_mass_multiplier = false
+  set_random_mass_multiplier = true
   mass_multiplier_min = 1
   mass_multiplier_max = 10
   

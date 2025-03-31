@@ -240,12 +240,20 @@ func main() {
 			spaceship.UpdateMovement(s.SpaceShip)
 			UpdateCamera(s)
 		}
-		// gui.Draw(s)
-		s.App.Gls().Clear(gls.DEPTH_BUFFER_BIT | gls.STENCIL_BUFFER_BIT | gls.COLOR_BUFFER_BIT)
+		// Raggruppa le operazioni di rendering
+		gl := s.App.Gls()
 
+		// Esegui tutte le operazioni di pulizia del buffer insieme
+		gl.Clear(gls.DEPTH_BUFFER_BIT | gls.STENCIL_BUFFER_BIT | gls.COLOR_BUFFER_BIT)
+
+		// Abilita il depth testing per ottimizzare il rendering
+		gl.Enable(gls.DEPTH_TEST)
+
+		// Esegui il rendering della scena
 		renderer.Render(s.Scene, s.Cam)
 
-		// s.Config.UpdateWindowSettings()
+		// Disabilita il depth testing dopo il rendering
+		gl.Disable(gls.DEPTH_TEST)
 	})
 
 }

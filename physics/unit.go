@@ -3,7 +3,6 @@ package physics
 import (
 	"fmt"
 	"image/color"
-	"log"
 	"math"
 	"sync"
 
@@ -21,8 +20,9 @@ import (
 )
 
 var (
-	mat        = g3nmat.NewStandard(math32.NewColor("white"))
-	overlapMat = g3nmat.NewStandard(math32.NewColor("red"))
+	// Cache dei materiali per riutilizzo
+	materialCache = make(map[math32.Color]*g3nmat.Standard)
+
 	// Object pool for vector calculations
 	vectorPool = sync.Pool{
 		New: func() interface{} {
@@ -30,6 +30,16 @@ var (
 		},
 	}
 )
+
+// getMaterial ritorna un materiale dalla cache o ne crea uno nuovo
+func getMaterial(color *math32.Color) *g3nmat.Standard {
+	if cached, exists := materialCache[*color]; exists {
+		return cached
+	}
+	mat := g3nmat.NewStandard(color)
+	materialCache[*color] = mat
+	return mat
+}
 
 type Unit struct {
 	Id uuid.UUID
@@ -116,9 +126,16 @@ func (u *Unit) Merge(other collision.Collidable) {
 
 	// Update mesh geometry with new radius
 	if u.Mesh != nil {
-		// Create new sphere geometry with updated radius
-		geom := geometry.NewSphere(float64(u._radius), Segments, Segments)
-		// Get color from composition
+		// Usa la cache delle geometrie per il nuovo raggio
+		var geom *geometry.Geometry
+		if cached, exists := geometryCache[u._radius]; exists {
+			geom = cached
+		} else {
+			geom = geometry.NewSphere(float64(u._radius), Segments, Segments)
+			geometryCache[u._radius] = geom
+		}
+
+		// Ottieni il colore dalla composizione
 		baseColorRGB := u.Composition.GetColor()
 		baseColor := &math32.Color{
 			R: float32(baseColorRGB[0]),
@@ -126,16 +143,21 @@ func (u *Unit) Merge(other collision.Collidable) {
 			B: float32(baseColorRGB[2]),
 		}
 
-		// Create new mesh with updated geometry
-		newMat := g3nmat.NewStandard(baseColor)
-		u.Mesh.Mesh = graphic.NewMesh(geom, newMat)
-		u.Mesh.Mesh.SetVisible(true)
+		// Crea un nuovo mesh con la geometria e il materiale dalla cache
+		mat := getMaterial(baseColor)
+		newMesh := graphic.NewMesh(geom, mat)
+		newMesh.SetVisible(true)
 
-		// Keep the same light but update its position and color
+		// Mantieni la luce esistente
 		if u.Mesh.Light != nil {
 			u.Mesh.Light.SetColor(baseColor)
-			u.Mesh.Add(u.Mesh.Light)
+			// Rimuovi la luce dal vecchio mesh e aggiungila al nuovo
+			u.Mesh.Remove(u.Mesh.Light)
+			newMesh.Add(u.Mesh.Light)
 		}
+
+		// Sostituisci il vecchio mesh con quello nuovo
+		u.Mesh.Mesh = newMesh
 	} else {
 		// If no mesh exists, create a new one
 		u.NewPointLightMesh()
@@ -221,32 +243,16 @@ func (u *Unit) TransferHeatTo(other *Unit, dt float64) {
 	other.Heat += heatTransfer
 }
 
+// Cache delle geometrie per riutilizzo
+var geometryCache = make(map[float64]*geometry.Geometry)
+
 func (u *Unit) NewPointLightMesh() {
-	// Get base color from composition
-	baseColorRGB := u.Composition.GetColor()
-	baseColor := math32.Color{
-		R: float32(baseColorRGB[0]),
-		G: float32(baseColorRGB[1]),
-		B: float32(baseColorRGB[2]),
-	}
-
-	u.Mesh = new(PointLightMesh)
-	geom := geometry.NewSphere(float64(u._radius), Segments, Segments)
-	mat := g3nmat.NewStandard(&baseColor)
-	u.Mesh.Mesh = graphic.NewMesh(geom, mat)
-	u.Mesh.Mesh.SetVisible(true)
-
-	light := light.NewPoint(&baseColor, 1.0)
-	u.Mesh.Light = light
-	u.Mesh.Add(light)
-
-	// Initialize cached values
+	// Inizializza i valori cached
 	u.volume = (4.0 / 3.0) * math.Pi * math.Pow(u._radius, 3)
 	u.surfaceArea = 4.0 * math.Pi * math.Pow(u._radius, 2)
 
-	// Get material properties
+	// Ottieni le proprietà del materiale
 	density, specificHeat, thermalConductivity, emissivity, elasticity := u.Composition.GetEffectiveProperties()
-	// Only calculate mass if it hasn't been set (i.e., not during merge)
 	if u._mass == 0 {
 		u._mass = u.volume * density
 	}
@@ -254,6 +260,34 @@ func (u *Unit) NewPointLightMesh() {
 	u.thermalConductivity = thermalConductivity
 	u.emissivity = emissivity
 	u._elasticity = elasticity
+
+	// Ottieni il colore base dalla composizione
+	baseColorRGB := u.Composition.GetColor()
+	baseColor := math32.Color{
+		R: float32(baseColorRGB[0]),
+		G: float32(baseColorRGB[1]),
+		B: float32(baseColorRGB[2]),
+	}
+
+	// Crea o riutilizza la geometria dalla cache
+	var geom *geometry.Geometry
+	if cached, exists := geometryCache[u._radius]; exists {
+		geom = cached
+	} else {
+		geom = geometry.NewSphere(float64(u._radius), Segments, Segments)
+		geometryCache[u._radius] = geom
+	}
+
+	// Crea il mesh con la geometria e il materiale dalla cache
+	u.Mesh = new(PointLightMesh)
+	mat := getMaterial(&baseColor)
+	u.Mesh.Mesh = graphic.NewMesh(geom, mat)
+	u.Mesh.Mesh.SetVisible(true)
+
+	// Crea e aggiungi la luce
+	light := light.NewPoint(&baseColor, 1.0)
+	u.Mesh.Light = light
+	u.Mesh.Add(light)
 }
 
 func (u *Unit) GetVolume() float64 {
@@ -274,17 +308,25 @@ func (u *Unit) ApplyForce(f vector3.Vector[float64]) {
 }
 
 func (u *Unit) UpdatePosition(dt float64) {
-	log.Print("unit mass:", u._mass, " position: ", u._position)
 	// Update position and velocity using Verlet integration
 	halfDtSq := 0.5 * dt * dt
 	newPos := u._position.Add(u._velocity.Scale(dt)).Add(u.Acceleration.Scale(halfDtSq))
 	newVel := u._velocity.Add(u.Acceleration.Scale(dt))
 
+	// Aggiorna la posizione e velocità
 	u._position = newPos
 	u._velocity = newVel
 	u.Acceleration = vector3.Zero[float64]()
 
-	u.Mesh.SetPosition(float32(u._position.X()), float32(u._position.Y()), float32(u._position.Z()))
+	// Aggiorna la posizione del mesh solo se è cambiata significativamente
+	const posThreshold = 0.0001 // Soglia per considerare un cambiamento di posizione significativo
+	dx := math.Abs(float64(u.Mesh.Position().X) - u._position.X())
+	dy := math.Abs(float64(u.Mesh.Position().Y) - u._position.Y())
+	dz := math.Abs(float64(u.Mesh.Position().Z) - u._position.Z())
+
+	if dx > posThreshold || dy > posThreshold || dz > posThreshold {
+		u.Mesh.SetPosition(float32(u._position.X()), float32(u._position.Y()), float32(u._position.Z()))
+	}
 
 	if u.Heat > AmbientTemperature {
 		// Calcolo del raffreddamento secondo la legge di Stefan-Boltzmann
@@ -296,36 +338,42 @@ func (u *Unit) UpdatePosition(dt float64) {
 			(math.Pow(tempK, 4) - math.Pow(ambientK, 4))
 
 		// Conversione della potenza in variazione di temperatura
-		// dT = (P * dt) / (m * c)
 		cooldown := (power * dt) / (u._mass * u.specificHeatCapacity)
-		u.Heat = math.Max(AmbientTemperature, u.Heat-cooldown)
+		newHeat := math.Max(AmbientTemperature, u.Heat-cooldown)
 
-		normalizedTemp := math32.Clamp(float32((u.Heat-AmbientTemperature)/50), 0, 1)
-		baseColorRGB := u.Composition.GetColor()
-		baseColor := math32.Color{
-			R: float32(baseColorRGB[0]),
-			G: float32(baseColorRGB[1]),
-			B: float32(baseColorRGB[2]),
+		// Aggiorna il colore e l'intensità della luce solo se la temperatura è cambiata significativamente
+		const tempThreshold = 0.1 // Soglia per considerare un cambiamento di temperatura significativo
+		if math.Abs(newHeat-u.Heat) > tempThreshold {
+			u.Heat = newHeat
+
+			normalizedTemp := math32.Clamp(float32((u.Heat-AmbientTemperature)/50), 0, 1)
+			baseColorRGB := u.Composition.GetColor()
+			baseColor := math32.Color{
+				R: float32(baseColorRGB[0]),
+				G: float32(baseColorRGB[1]),
+				B: float32(baseColorRGB[2]),
+			}
+
+			heatColor := math32.Color{
+				R: 1.0,
+				G: math32.Clamp(normalizedTemp*0.6, 0, 0.6),
+				B: math32.Clamp(normalizedTemp*0.3, 0, 0.3),
+			}
+
+			finalColor := math32.Color{
+				R: baseColor.R*(1-normalizedTemp) + heatColor.R*normalizedTemp,
+				G: baseColor.G*(1-normalizedTemp) + heatColor.G*normalizedTemp,
+				B: baseColor.B*(1-normalizedTemp) + heatColor.B*normalizedTemp,
+			}
+
+			// Aggiorna il materiale usando la cache
+			mat := getMaterial(&finalColor)
+			u.Mesh.Mesh.SetMaterial(mat)
+
+			intensity := math32.Clamp(float32((u.Heat-AmbientTemperature)/50), 0.1, 2.0)
+			u.Mesh.Light.SetColor(&finalColor)
+			u.Mesh.Light.SetIntensity(intensity)
 		}
-
-		heatColor := math32.Color{
-			R: 1.0,
-			G: math32.Clamp(normalizedTemp*0.6, 0, 0.6),
-			B: math32.Clamp(normalizedTemp*0.3, 0, 0.3),
-		}
-
-		finalColor := math32.Color{
-			R: baseColor.R*(1-normalizedTemp) + heatColor.R*normalizedTemp,
-			G: baseColor.G*(1-normalizedTemp) + heatColor.G*normalizedTemp,
-			B: baseColor.B*(1-normalizedTemp) + heatColor.B*normalizedTemp,
-		}
-
-		mat := u.Mesh.Mesh.GetMaterial(0).(*g3nmat.Standard)
-		mat.SetColor(&finalColor)
-
-		intensity := math32.Clamp(float32((u.Heat-AmbientTemperature)/50), 0.1, 2.0)
-		u.Mesh.Light.SetColor(&finalColor)
-		u.Mesh.Light.SetIntensity(intensity)
 	} else {
 		u.Heat = AmbientTemperature
 		normalizedRadius := math32.Clamp(float32(u._radius/5e3), 0, 1)
@@ -338,8 +386,9 @@ func (u *Unit) UpdatePosition(dt float64) {
 			B: (1.0-normalizedMass)*0.6 + (1.0-normalizedElasticity)*0.4,
 		}
 
-		mat := u.Mesh.Mesh.GetMaterial(0).(*g3nmat.Standard)
-		mat.SetColor(baseColor)
+		// Aggiorna il materiale usando la cache
+		mat := getMaterial(baseColor)
+		u.Mesh.Mesh.SetMaterial(mat)
 
 		// Calculate light intensity based on mass and radius
 		// Using both mass and radius ensures larger, more massive objects emit more light
