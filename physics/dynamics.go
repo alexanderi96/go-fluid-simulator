@@ -6,7 +6,6 @@ import (
 
 	"github.com/EliCDavis/vector/vector3"
 	"github.com/alexanderi96/go-fluid-simulator/physics/collision"
-	"github.com/alexanderi96/go-fluid-simulator/physics/constants"
 )
 
 func (s *Simulation) UpdateWithOctrees() error {
@@ -17,10 +16,40 @@ func (s *Simulation) UpdateWithOctrees() error {
 	// Clean up merged units
 	s.cleanupMergedUnits()
 
+	// Update octree
 	s.updateOctree()
-	s.applyGravitationalForces()
-	s.handleCollisions()
-	s.handleHeatTransfer()
+
+	// Create WaitGroup for parallel operations
+	var wg sync.WaitGroup
+
+	// Apply gravitational forces in parallel
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		s.applyGravitationalForces()
+	}()
+
+	// Handle collisions in parallel
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		s.handleCollisions()
+	}()
+
+	// Wait for parallel operations to complete
+	wg.Wait()
+
+	// Handle heat transfer in parallel
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		s.handleHeatTransfer()
+	}()
+
+	// Wait for heat transfer to complete
+	wg.Wait()
+
+	// Update positions (must be sequential after forces are applied)
 	s.updatePositions()
 
 	return nil
@@ -70,47 +99,89 @@ func (s *Simulation) applyGravitationalForces() {
 }
 
 func (s *Simulation) handleCollisions() {
+	var wg sync.WaitGroup
+	semaphore := make(chan struct{}, 8) // Limit concurrent goroutines
+
 	for _, unitA := range s.Fluid {
 		if unitA == nil || !unitA.CanBeAltered() {
 			continue
 		}
 
-		unitA.CheckAndResolveWallCollision(s.WorldBoundray, s.Config.WallElasticity)
+		wg.Add(1)
+		semaphore <- struct{}{} // Acquire semaphore
 
-		nearUnits := make([]*Unit, 0, 8) // Pre-allocate with typical capacity
-		s.Octree.Retrieve(&nearUnits, unitA)
+		go func(unit *Unit) {
+			defer wg.Done()
+			defer func() { <-semaphore }() // Release semaphore
 
-		for _, unitB := range nearUnits {
-			if !isValidCollisionPair(unitA, unitB) {
-				continue
+			unit.CheckAndResolveWallCollision(s.WorldBoundray, s.Config.WallElasticity)
+
+			// Get slice from pool
+			nearUnitsPtr := NearUnitsPool.Get().(*[]*Unit)
+			nearUnits := *nearUnitsPtr
+			nearUnits = nearUnits[:0] // Reset slice but keep capacity
+
+			s.Octree.Retrieve(&nearUnits, unit)
+
+			for _, unitB := range nearUnits {
+				if !isValidCollisionPair(unit, unitB) {
+					continue
+				}
+
+				collData := collision.GatherCollisionData(unit, unitB)
+				if collData.Collided {
+					collision.ResolveCollision(collData)
+				}
 			}
 
-			collData := collision.GatherCollisionData(unitA, unitB)
-			if collData.Collided {
-				collision.ResolveCollision(collData)
-			}
-		}
+			// Return slice to pool
+			*nearUnitsPtr = nearUnits
+			NearUnitsPool.Put(nearUnitsPtr)
+		}(unitA)
 	}
+
+	wg.Wait()
 }
 
 func (s *Simulation) handleHeatTransfer() {
 	deltaTime := s.GetDeltaTime()
+	var wg sync.WaitGroup
+	semaphore := make(chan struct{}, 8) // Limit concurrent goroutines
+
 	for _, unitA := range s.Fluid {
 		if unitA == nil || !unitA.CanBeAltered() {
 			continue
 		}
 
-		nearUnits := make([]*Unit, 0, 8) // Pre-allocate with typical capacity
-		s.Octree.Retrieve(&nearUnits, unitA)
+		wg.Add(1)
+		semaphore <- struct{}{} // Acquire semaphore
 
-		for _, unitB := range nearUnits {
-			if !isValidHeatTransferPair(unitA, unitB) {
-				continue
+		go func(unit *Unit) {
+			defer wg.Done()
+			defer func() { <-semaphore }() // Release semaphore
+
+			// Get slice from pool
+			nearUnitsPtr := NearUnitsPool.Get().(*[]*Unit)
+			nearUnits := *nearUnitsPtr
+			nearUnits = nearUnits[:0] // Reset slice but keep capacity
+
+			s.Octree.Retrieve(&nearUnits, unit)
+
+			for _, unitB := range nearUnits {
+				if !isValidHeatTransferPair(unit, unitB) {
+					continue
+				}
+
+				unit.TransferHeatTo(unitB, deltaTime)
 			}
 
-			unitA.TransferHeatTo(unitB, deltaTime)
-		}
+			// Return slice to pool
+			*nearUnitsPtr = nearUnits
+			NearUnitsPool.Put(nearUnitsPtr)
+		}(unitA)
 	}
+
+	wg.Wait()
 }
 
 func (s *Simulation) updatePositions() {
@@ -165,22 +236,32 @@ func (ot *Octree) calculateLeafNodeGravity(g Gravitable, force *vector3.Vector[f
 	gMass := g.Mass()    // Cache mass value
 	gPos := g.Position() // Cache position
 
+	// Get temporary vector from pool
+	vec := VectorPool.Get().([]float64)
+	defer VectorPool.Put(vec)
+
 	for _, obj := range ot.objects {
 		if obj != g.Unit() {
-			deltaPos := obj.Position().Sub(gPos)
-			distanceSquared := deltaPos.X()*deltaPos.X() + deltaPos.Y()*deltaPos.Y() + deltaPos.Z()*deltaPos.Z()
+			// Calculate distance components directly
+			vec[0] = obj.Position().X() - gPos.X()
+			vec[1] = obj.Position().Y() - gPos.Y()
+			vec[2] = obj.Position().Z() - gPos.Z()
+
+			distanceSquared := vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2]
 
 			if distanceSquared > 0 {
-				distance := math.Sqrt(distanceSquared)
-				// Calculate force magnitude using Newton's law of gravitation
-				forceMagnitude := constants.G * gMass * obj.Mass() / distanceSquared
-				invDistance := 1.0 / distance // Now using 1/r instead of 1/r²
+				// Avoid sqrt when possible using distanceSquared
+				invDistCubed := 1.0 / (distanceSquared * math.Sqrt(distanceSquared))
 
-				// Calculate force components with correct direction
-				fx := deltaPos.X() * forceMagnitude * invDistance
-				fy := deltaPos.Y() * forceMagnitude * invDistance
-				fz := deltaPos.Z() * forceMagnitude * invDistance
+				// Calculate force magnitude
+				forceMagnitude := G * gMass * obj.Mass()
 
+				// Calculate force components directly
+				fx := vec[0] * forceMagnitude * invDistCubed
+				fy := vec[1] * forceMagnitude * invDistCubed
+				fz := vec[2] * forceMagnitude * invDistCubed
+
+				// Update force vector
 				*force = force.Add(vector3.New(fx, fy, fz))
 			}
 		}
@@ -188,20 +269,31 @@ func (ot *Octree) calculateLeafNodeGravity(g Gravitable, force *vector3.Vector[f
 }
 
 func (ot *Octree) approximateGravityWithCenterOfMass(g Gravitable, force *vector3.Vector[float64]) {
-	deltaPos := ot.CenterOfMass.Sub(g.Position())
-	distanceSquared := deltaPos.X()*deltaPos.X() + deltaPos.Y()*deltaPos.Y() + deltaPos.Z()*deltaPos.Z()
+	// Get temporary vector from pool
+	vec := VectorPool.Get().([]float64)
+	defer VectorPool.Put(vec)
+
+	// Calculate position difference directly
+	pos := g.Position()
+	vec[0] = ot.CenterOfMass.X() - pos.X()
+	vec[1] = ot.CenterOfMass.Y() - pos.Y()
+	vec[2] = ot.CenterOfMass.Z() - pos.Z()
+
+	distanceSquared := vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2]
 
 	if distanceSquared > 0 {
-		distance := math.Sqrt(distanceSquared)
-		// Calculate force magnitude using Newton's law of gravitation
-		forceMagnitude := constants.G * g.Mass() * ot.TotalMass / distanceSquared
-		invDistance := 1.0 / distance // Now using 1/r instead of 1/r²
+		// Avoid sqrt when possible using distanceSquared
+		invDistCubed := 1.0 / (distanceSquared * math.Sqrt(distanceSquared))
 
-		// Calculate force components with correct direction
-		fx := deltaPos.X() * forceMagnitude * invDistance
-		fy := deltaPos.Y() * forceMagnitude * invDistance
-		fz := deltaPos.Z() * forceMagnitude * invDistance
+		// Calculate force magnitude
+		forceMagnitude := G * g.Mass() * ot.TotalMass
 
+		// Calculate force components directly
+		fx := vec[0] * forceMagnitude * invDistCubed
+		fy := vec[1] * forceMagnitude * invDistCubed
+		fz := vec[2] * forceMagnitude * invDistCubed
+
+		// Update force vector
 		*force = force.Add(vector3.New(fx, fy, fz))
 	}
 }

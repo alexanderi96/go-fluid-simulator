@@ -7,7 +7,6 @@ import (
 	"github.com/EliCDavis/vector/vector3"
 	"github.com/alexanderi96/go-fluid-simulator/config"
 	"github.com/alexanderi96/go-fluid-simulator/physics/collision"
-	"github.com/alexanderi96/go-fluid-simulator/physics/constants"
 	"github.com/alexanderi96/go-fluid-simulator/physics/material"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -187,7 +186,7 @@ func TestEnergyToHeatConversion(t *testing.T) {
 				BaseColor:            [3]float64{0.5, 0.5, 0.5},
 				Elasticity:           0.5, // 0.5 (50% di energia conservata)
 			}: 1.0}),
-			Heat: constants.AmbientTemperature,
+			Heat: AmbientTemperature,
 			Mesh: new(PointLightMesh),
 			config: &config.Config{
 				AllowUnitMerge: false,
@@ -279,14 +278,14 @@ func TestEnergyToHeatConversion(t *testing.T) {
 		// Calcolo del raffreddamento teorico secondo Stefan-Boltzmann
 		temp1K := initialHeat1 + 273.15
 		temp2K := initialHeat2 + 273.15
-		ambientK := constants.AmbientTemperature + 273.15
+		ambientK := AmbientTemperature + 273.15
 
 		// Calcolo della potenza irradiata
 		_, specificHeat1, _, emissivity1, _ := unit1.Composition.GetEffectiveProperties()
 		_, specificHeat2, _, emissivity2, _ := unit2.Composition.GetEffectiveProperties()
-		power1 := emissivity1 * constants.StefanBoltzmannConstant * unit1.GetSurfaceArea() *
+		power1 := emissivity1 * StefanBoltzmannConstant * unit1.GetSurfaceArea() *
 			(math.Pow(temp1K, 4) - math.Pow(ambientK, 4))
-		power2 := emissivity2 * constants.StefanBoltzmannConstant * unit2.GetSurfaceArea() *
+		power2 := emissivity2 * StefanBoltzmannConstant * unit2.GetSurfaceArea() *
 			(math.Pow(temp2K, 4) - math.Pow(ambientK, 4))
 
 		// Calore perso in dt secondi

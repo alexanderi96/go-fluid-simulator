@@ -228,7 +228,7 @@ func (s *Simulation) createFSSUnit(def *UnitDefinition) *Unit {
 func (s *Simulation) executeFSSCommand(unit *Unit, target *Unit, cmd Command) error {
 	switch cmd.Action {
 	case "orbit":
-		return unit.orbit(target)
+		return unit.Orbit(target)
 	default:
 		return fmt.Errorf("unknown command: %s", cmd.Action)
 	}

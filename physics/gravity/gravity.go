@@ -2,7 +2,7 @@ package gravity
 
 import (
 	"github.com/EliCDavis/vector/vector3"
-	"github.com/alexanderi96/go-fluid-simulator/physics/constants"
+	"github.com/alexanderi96/go-fluid-simulator/physics"
 )
 
 // Gravitable defines objects affected by gravity
@@ -36,7 +36,7 @@ func CalculateForce(a, b Gravitable) vector3.Vector[float64] {
 
 	// Pre-calculate mass product and constant
 	massProduct := a.GetMass() * b.GetMass()
-	forceMagnitude := constants.G * massProduct / distanceSquared
+	forceMagnitude := physics.G * massProduct / distanceSquared
 
 	// Avoid normalization by dividing by distance directly
 	invDistance := 1.0 / distanceSquared

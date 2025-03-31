@@ -33,7 +33,7 @@ func SetupHUD(s *physics.Simulation) {
 	modePanel.Add(s.Hud.ShipStatusLabel)
 
 	// Controls panel (top left)
-	controlsPanel := gui.NewPanel(180, 140)
+	controlsPanel := gui.NewPanel(180, 180)
 	controlsPanel.SetBorders(1, 1, 1, 1)
 	controlsPanel.SetBordersColor(math32.NewColor("darkgray"))
 	controlsPanel.SetColor4(&math32.Color4{R: 0.2, G: 0.2, B: 0.2, A: 0.7})
@@ -70,6 +70,17 @@ func SetupHUD(s *physics.Simulation) {
 	s.Hud.TimeScaleLabel.SetPosition(10, 110)
 	s.Hud.TimeScaleLabel.SetColor(math32.NewColor("white"))
 	controlsPanel.Add(s.Hud.TimeScaleLabel)
+
+	// Temperature labels
+	s.Hud.MaxTempLabel = gui.NewLabel("Temp Max: 0°C")
+	s.Hud.MaxTempLabel.SetPosition(10, 130)
+	s.Hud.MaxTempLabel.SetColor(math32.NewColor("red"))
+	controlsPanel.Add(s.Hud.MaxTempLabel)
+
+	s.Hud.MinTempLabel = gui.NewLabel("Temp Min: 0°C")
+	s.Hud.MinTempLabel.SetPosition(10, 150)
+	s.Hud.MinTempLabel.SetColor(math32.NewColor("blue"))
+	controlsPanel.Add(s.Hud.MinTempLabel)
 
 	// Key controls info (bottom left)
 	keysPanel := gui.NewPanel(200, 160)
@@ -152,6 +163,25 @@ func UpdateHUD(s *physics.Simulation, deltaTime time.Duration) {
 	s.Hud.SimDurationLabel.SetText(fmt.Sprintf("Sim duration: %.1f", s.Metrics.SimDuration))
 	s.Hud.RealDurationLabel.SetText(fmt.Sprintf("Real duration: %.1f", -time.Until(s.AppStartTime).Seconds()))
 	s.Hud.TimeScaleLabel.SetText(fmt.Sprintf("Time Scale: %.0fx", s.TimeScale))
+
+	// Trova temperature min e max
+	var maxTemp, minTemp float64
+	if len(s.Fluid) > 0 {
+		maxTemp = s.Fluid[0].Heat
+		minTemp = s.Fluid[0].Heat
+
+		for _, unit := range s.Fluid {
+			if unit.Heat > maxTemp {
+				maxTemp = unit.Heat
+			}
+			if unit.Heat < minTemp {
+				minTemp = unit.Heat
+			}
+		}
+	}
+
+	s.Hud.MaxTempLabel.SetText(fmt.Sprintf("Temp Max: %.1f°C", maxTemp))
+	s.Hud.MinTempLabel.SetText(fmt.Sprintf("Temp Min: %.1f°C", minTemp))
 
 	// Update navigation mode and ship status
 	if s.Fly {

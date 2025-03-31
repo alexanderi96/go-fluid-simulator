@@ -78,6 +78,8 @@ type Simulation struct {
 		DirectionLabel    *gui.Label
 		OrientationLabel  *gui.Label
 		StatusLabel       *gui.Label
+		MaxTempLabel      *gui.Label
+		MinTempLabel      *gui.Label
 		// Add panel fields for responsive UI
 		ModePanel     *gui.Panel `json:"-"`
 		ControlsPanel *gui.Panel `json:"-"`
@@ -200,7 +202,6 @@ func (s *Simulation) newUnitWithPropertiesAtPosition(position, acceleration, vel
 		Acceleration: acceleration,
 		_radius:      radius,
 		Composition:  comp,
-		Heat:         0.0,
 		canBeAltered: canBeAltered,
 		config:       s.Config,
 	}
@@ -240,7 +241,6 @@ func (s *Simulation) GetUnits() []*Unit {
 			Acceleration: static,
 			_radius:      currentRadius,
 			Composition:  comp,
-			Heat:         0.0,
 			canBeAltered: true,
 			config:       s.Config,
 		}

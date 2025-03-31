@@ -25,6 +25,7 @@ const (
 	AmbientTemperature      = 20.0    // Temperatura ambiente (°C)
 	MaxHeatTransferDistance = 10.0    // Distanza massima per il trasferimento di calore (m)
 	CoolingRate             = 0.01    // Tasso di raffreddamento
+	InitialThermalEnergy    = 1000.0  // Energia termica iniziale per unità (J)
 
 	// Costanti di rendering
 	Segments = 10 // Numero di segmenti per la mesh sferica
